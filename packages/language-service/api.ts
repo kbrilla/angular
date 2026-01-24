@@ -14,6 +14,29 @@
 
 import ts from 'typescript';
 
+/**
+ * Represents an item in the type hierarchy.
+ */
+export interface TypeHierarchyItem {
+  /** The name of this item */
+  name: string;
+  /** The kind of this item (class, interface, etc.) */
+  kind: ts.ScriptElementKind;
+  /** More detail for this item, e.g. the module name */
+  detail?: string;
+  /** The file path containing this item */
+  uri: string;
+  /** The full range of the symbol definition */
+  range: ts.TextSpan;
+  /** The range of the symbol name (for highlighting) */
+  selectionRange: ts.TextSpan;
+  /** Data to help resolve supertypes/subtypes */
+  data?: {
+    fileName: string;
+    position: number;
+  };
+}
+
 export interface PluginConfig {
   /**
    * If true, return only Angular results. Otherwise, return Angular + TypeScript
@@ -113,6 +136,10 @@ export interface NgLanguageService extends ts.LanguageService {
 
   getTokenTypeFromClassification(classification: number): number | undefined;
   getTokenModifierFromClassification(classification: number): number;
+
+  prepareTypeHierarchy(fileName: string, position: number): TypeHierarchyItem[] | undefined;
+  getTypeHierarchySupertypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
+  getTypeHierarchySubtypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
 }
 
 export function isNgLanguageService(

@@ -156,6 +156,18 @@ export function create(info: ts.server.PluginCreateInfo): NgLanguageService {
     return ngLS.getTokenModifierFromClassification(classification);
   }
 
+  function prepareTypeHierarchy(fileName: string, position: number) {
+    return ngLS.prepareTypeHierarchy(fileName, position);
+  }
+
+  function getTypeHierarchySupertypes(item: any) {
+    return ngLS.getTypeHierarchySupertypes(item);
+  }
+
+  function getTypeHierarchySubtypes(item: any) {
+    return ngLS.getTypeHierarchySubtypes(item);
+  }
+
   function getCompletionsAtPosition(
     fileName: string,
     position: number,
@@ -380,6 +392,9 @@ export function create(info: ts.server.PluginCreateInfo): NgLanguageService {
     getEncodedSemanticClassifications,
     getTokenTypeFromClassification,
     getTokenModifierFromClassification,
+    prepareTypeHierarchy,
+    getTypeHierarchySupertypes,
+    getTypeHierarchySubtypes,
     getCompletionsAtPosition,
     getCompletionEntryDetails,
     getCompletionEntrySymbol,
