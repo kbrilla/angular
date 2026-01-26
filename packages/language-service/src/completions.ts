@@ -52,6 +52,7 @@ import {
   buildAttributeCompletionTable,
   getAttributeCompletionSymbol,
 } from './attribute_completions';
+import {getCSSPropertyCompletions, getCSSUnitCompletions} from './css';
 import {
   DisplayInfo,
   DisplayInfoKind,
@@ -1146,6 +1147,64 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
         replacementSpan,
         insertSnippet,
       );
+    }
+
+    // Add CSS property completions for style bindings
+    // When the user is typing after `[style.`, provide CSS property name completions
+    if (
+      this.node instanceof TmplAstBoundAttribute &&
+      this.node.type === BindingType.Style &&
+      this.node.keySpan !== undefined
+    ) {
+      // Extract the typed prefix after 'style.'
+      // For example, if the user typed '[style.back', the name will be 'style.back' or similar
+      // We need to get what they've typed after 'style.'
+      const typedName = this.node.name;
+      const cssPropertyPrefix = typedName.includes('.')
+        ? typedName.substring(typedName.indexOf('.') + 1)
+        : '';
+
+      // Check if the user is typing a unit suffix (e.g., style.width.|)
+      const hasUnit = this.node.unit !== null && this.node.unit.length > 0;
+      const hasTwoDots = typedName.split('.').length > 2;
+
+      if (hasUnit || hasTwoDots) {
+        // User is typing a unit suffix - provide unit completions
+        const unitEntries = getCSSUnitCompletions(cssPropertyPrefix.split('.')[0] || '');
+        // Calculate replacement span for just the unit portion
+        const unitStart = this.node.keySpan.start.offset + typedName.lastIndexOf('.') + 1;
+        const unitLength = hasTwoDots
+          ? typedName.length - typedName.lastIndexOf('.') - 1
+          : (this.node.unit?.length ?? 0);
+        const unitReplacementSpan = {
+          start: unitStart,
+          length: unitLength,
+        };
+        for (const entry of unitEntries) {
+          entries.push({
+            ...entry,
+            replacementSpan: unitReplacementSpan,
+          });
+        }
+      } else {
+        // User is typing a CSS property name - provide property completions
+        const cssEntries = getCSSPropertyCompletions(cssPropertyPrefix);
+        // Calculate replacement span for just the property portion
+        const propertyStart = this.node.keySpan.start.offset + 'style.'.length;
+        const propertyLength = cssPropertyPrefix.length;
+        const cssReplacementSpan = {
+          start: propertyStart,
+          length: propertyLength,
+        };
+        for (const entry of cssEntries) {
+          entries.push({
+            ...entry,
+            replacementSpan: cssReplacementSpan,
+            // Prepend '[style.' to the insert text to complete the full binding syntax
+            insertText: entry.insertText,
+          });
+        }
+      }
     }
 
     directiveInfoForCompletionDetailCache = directiveCompletionDetailMap;

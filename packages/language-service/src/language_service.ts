@@ -56,7 +56,8 @@ import {ActiveRefactoring, allRefactorings} from './refactorings/refactoring';
 import {getClassificationsForTemplate, TokenEncodingConsts} from './semantic_tokens';
 import {isExternalResource} from '@angular/compiler-cli/src/ngtsc/metadata';
 import {getInlayHintsForTemplate} from './inlay_hints';
-import type {AngularInlayHint, InlayHintsConfig} from '../api';
+import type {AngularInlayHint, InlayHintsConfig, CssDiagnosticsConfig} from '../api';
+import {getCssDiagnostics, DEFAULT_CSS_DIAGNOSTICS_CONFIG} from './css';
 
 type LanguageServiceConfig = Omit<PluginConfig, 'angularOnly'>;
 
@@ -110,12 +111,25 @@ export class LanguageService {
         if (sourceFile) {
           const ngDiagnostics = compiler.getDiagnosticsForFile(sourceFile, OptimizeFor.SingleFile);
           diagnostics.push(...filterNgDiagnosticsForFile(ngDiagnostics, sourceFile.fileName));
+
+          // Add CSS property validation diagnostics for inline templates
+          const cssConfig = this.getCssDiagnosticsConfig();
+          if (cssConfig.enabled) {
+            const components = compiler.getComponentsWithTemplateFile(fileName);
+            for (const component of components) {
+              if (ts.isClassDeclaration(component)) {
+                diagnostics.push(...getCssDiagnostics(component, compiler, cssConfig));
+              }
+            }
+          }
         }
       } else {
         const components = compiler.getComponentsWithTemplateFile(fileName);
         for (const component of components) {
           if (ts.isClassDeclaration(component)) {
             diagnostics.push(...compiler.getDiagnosticsForComponent(component));
+            // Add CSS property validation diagnostics
+            diagnostics.push(...this.getCssDiagnosticsForComponent(component, compiler));
           }
         }
       }
@@ -129,6 +143,48 @@ export class LanguageService {
       }
       return diagnostics;
     });
+  }
+
+  /**
+   * Gets CSS property validation diagnostics for a component.
+   * @internal
+   */
+  private getCssDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+  ): ts.Diagnostic[] {
+    const cssConfig = this.getCssDiagnosticsConfig();
+    if (!cssConfig.enabled) {
+      return [];
+    }
+    return getCssDiagnostics(component, compiler, cssConfig);
+  }
+
+  /**
+   * Normalizes the CSS diagnostics configuration from the plugin config.
+   * @internal
+   */
+  private getCssDiagnosticsConfig(): {
+    enabled: boolean;
+    severity: 'error' | 'warning' | 'suggestion';
+  } {
+    const cssValidation = this.config.cssPropertyValidation;
+
+    if (cssValidation === undefined || cssValidation === true) {
+      // Default: enabled with warning severity
+      return DEFAULT_CSS_DIAGNOSTICS_CONFIG;
+    }
+
+    if (cssValidation === false) {
+      // Explicitly disabled
+      return {enabled: false, severity: 'warning'};
+    }
+
+    // Custom configuration object
+    return {
+      enabled: cssValidation.enabled !== false,
+      severity: cssValidation.severity ?? 'warning',
+    };
   }
 
   getSuggestionDiagnostics(fileName: string): ts.DiagnosticWithLocation[] {
