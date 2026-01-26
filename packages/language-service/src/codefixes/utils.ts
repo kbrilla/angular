@@ -29,6 +29,7 @@ export interface CodeActionContext {
   formatOptions: tss.FormatCodeSettings;
   preferences: tss.UserPreferences;
   tsLs: tss.LanguageService;
+  diagnostics: tss.Diagnostic[];
 }
 
 /**
@@ -139,4 +140,5 @@ export enum FixIdForCodeFixesAll {
   FIX_MISSING_IMPORT = 'fixMissingImport',
   FIX_UNUSED_STANDALONE_IMPORTS = 'fixUnusedStandaloneImports',
   FIX_MISSING_REQUIRED_INPUTS = 'fixMissingRequiredInputs',
+  FIX_CSS_PROPERTY_TYPO = 'fixCssPropertyTypo',
 }

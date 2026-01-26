@@ -7,6 +7,7 @@
  */
 
 import {initMockFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system/testing';
+import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import ts from 'typescript';
 
 import {FixIdForCodeFixesAll} from '../src/codefixes/utils';
@@ -1417,6 +1418,150 @@ describe('code fixes', () => {
         newText: '[]',
         fileName: 'app.ts',
       });
+    });
+  });
+
+  describe('CSS property typo quick fixes', () => {
+    it('should fix CSS property typo in individual binding', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.wdith]="100"></div>',
+         })
+         export class AppComponent {}
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const appFile = project.openFile('app.ts');
+
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
+      expect(cssDiags.length).toBe(1);
+
+      // Use the diagnostic's start position to request code fixes
+      const diagStart = cssDiags[0].start!;
+      const diagEnd = diagStart + cssDiags[0].length!;
+
+      const codeActions = project.getCodeFixesAtPosition('app.ts', diagStart, diagEnd, [
+        cssDiags[0].code,
+      ]);
+      expectIncludeReplacementText({
+        codeActions,
+        content: appFile.contents,
+        text: `wdith`,
+        newText: `width`,
+        fileName: 'app.ts',
+        description: `Change 'wdith' to 'width'`,
+      });
+    });
+
+    it('should fix CSS property typo in style object binding', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style]="{backgroudnColor: color}"></div>',
+         })
+         export class AppComponent {
+           color = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const appFile = project.openFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+
+      // Use the diagnostic's start position to request code fixes
+      const diagStart = cssDiags[0].start!;
+      const diagEnd = diagStart + cssDiags[0].length!;
+
+      const codeActions = project.getCodeFixesAtPosition('app.ts', diagStart, diagEnd, [
+        cssDiags[0].code,
+      ]);
+      expectIncludeReplacementText({
+        codeActions,
+        content: appFile.contents,
+        text: `backgroudnColor`,
+        newText: `backgroundColor`,
+        fileName: 'app.ts',
+        description: `Change 'backgroudnColor' to 'backgroundColor'`,
+      });
+    });
+
+    it('should fix all CSS property typos in template', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.wdith]="100" [style.hieght]="50"></div>',
+         })
+         export class AppComponent {}
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const appFile = project.openFile('app.ts');
+
+      const fixesAllActions = project.getCombinedCodeFix(
+        'app.ts',
+        FixIdForCodeFixesAll.FIX_CSS_PROPERTY_TYPO,
+      );
+      expectIncludeReplacementTextForFileTextChange({
+        fileTextChanges: fixesAllActions.changes,
+        content: appFile.contents,
+        text: `wdith`,
+        newText: `width`,
+        fileName: 'app.ts',
+      });
+      expectIncludeReplacementTextForFileTextChange({
+        fileTextChanges: fixesAllActions.changes,
+        content: appFile.contents,
+        text: `hieght`,
+        newText: `height`,
+        fileName: 'app.ts',
+      });
+    });
+
+    it('should not provide fix for unknown property without suggestion', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.xyzabc]="100"></div>',
+         })
+         export class AppComponent {}
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const appFile = project.openFile('app.ts');
+
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
+      expect(cssDiags.length).toBe(1);
+
+      // Use the diagnostic's start position to request code fixes
+      const diagStart = cssDiags[0].start!;
+      const diagEnd = diagStart + cssDiags[0].length!;
+
+      const codeActions = project.getCodeFixesAtPosition('app.ts', diagStart, diagEnd, [
+        cssDiags[0].code,
+      ]);
+      // No code fix should be provided for properties without a suggestion
+      const cssFixActions = codeActions.filter((a) => a.description.includes('Change'));
+      expect(cssFixActions.length).toBe(0);
     });
   });
 });
