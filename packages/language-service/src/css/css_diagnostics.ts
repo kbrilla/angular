@@ -31,6 +31,7 @@ import {
   tmplAstVisitAll,
   TmplAstVisitor,
   TmplAstHostElement,
+  TmplAstLetDeclaration,
   ParseSourceSpan,
 } from '@angular/compiler';
 import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
@@ -421,11 +422,17 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
   /**
    * Validates a LiteralMap expression used as a style object.
-   * Checks each key to ensure it's a valid CSS property name.
+   * Checks each key to ensure it's a valid CSS property name and detects duplicate properties.
    */
   private validateStyleLiteralMap(literalMap: LiteralMap, attribute: TmplAstBoundAttribute): void {
     // Get the valueSpan to use as a reference for creating key spans
     const valueSpan = attribute.valueSpan ?? attribute.sourceSpan;
+
+    // Track seen property names (normalized to catch both 'background-color' and 'backgroundColor')
+    const seenProperties = new Map<
+      string,
+      {originalName: string; sourceSpanStart: number; sourceSpanEnd: number}
+    >();
 
     for (const key of literalMap.keys) {
       // Skip spread keys (e.g., { ...spreadStyles })
@@ -440,13 +447,51 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         continue;
       }
 
-      // Convert kebab-case to camelCase for validation
+      // Convert kebab-case to camelCase for validation and duplicate detection
       // Both 'backgroundColor' and 'background-color' are valid in [ngStyle]
       const normalizedName = propertyName.includes('-')
         ? kebabToCamelCase(propertyName)
         : propertyName;
 
-      if (!isValidCSSProperty(normalizedName)) {
+      // Check for duplicate property (after normalization)
+      const previousOccurrence = seenProperties.get(normalizedName);
+      if (previousOccurrence) {
+        // Create a span for the duplicate key
+        const keyStartOffset = key.sourceSpan.start - valueSpan.start.offset;
+        const keyEndOffset = key.sourceSpan.end - valueSpan.start.offset;
+        const keySpan = new ParseSourceSpan(
+          valueSpan.start.moveBy(keyStartOffset),
+          valueSpan.start.moveBy(keyEndOffset),
+        );
+
+        // Check if it's the same name or different naming conventions
+        let message: string;
+        if (propertyName === previousOccurrence.originalName) {
+          message = `Duplicate CSS property '${propertyName}'. Only the last value will be used.`;
+        } else {
+          // Different formats like 'backgroundColor' and 'background-color'
+          message = `Duplicate CSS property: '${propertyName}' and '${previousOccurrence.originalName}' refer to the same property. Only the last value will be used.`;
+        }
+
+        const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+          this.component,
+          keySpan,
+          this.severity,
+          ErrorCode.DUPLICATE_CSS_PROPERTY,
+          message,
+        );
+        this.diagnostics.push(diagnostic);
+      }
+
+      // Record this occurrence (will overwrite if it's a duplicate, which is fine)
+      seenProperties.set(normalizedName, {
+        originalName: propertyName,
+        sourceSpanStart: key.sourceSpan.start,
+        sourceSpanEnd: key.sourceSpan.end,
+      });
+
+      // Validate CSS property name (skip if it's a duplicate - we already flagged that)
+      if (!previousOccurrence && !isValidCSSProperty(normalizedName)) {
         const suggestions = findSimilarCSSProperties(normalizedName);
         let message = `Unknown CSS property '${propertyName}'.`;
         if (suggestions.length > 0) {
@@ -546,7 +591,96 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     tmplAstVisitAll(this, block.children);
   }
   visitUnknownBlock(): void {}
-  visitLetDeclaration(): void {}
+  visitLetDeclaration(decl: TmplAstLetDeclaration): void {
+    // Validate @let declarations that contain style object literals
+    // This allows us to detect invalid CSS properties and duplicates directly in the declaration
+    const value = decl.value;
+
+    // Unwrap ASTWithSource to get the actual expression
+    const expr = value instanceof ASTWithSource ? value.ast : value;
+
+    // Check if it's an object literal
+    if (expr instanceof LiteralMap) {
+      // We validate the literal map for potential style usage
+      // Since @let declarations are general-purpose, we only report CSS-specific issues
+      // when the object is actually used in a [style] or [ngStyle] binding
+      // However, we can still validate for duplicates now
+      this.validateLetDeclStyleLiteralMap(expr, decl);
+    }
+  }
+
+  /**
+   * Validates a LiteralMap in a @let declaration for CSS-related issues.
+   * We validate duplicate properties here since TypeScript's type system collapses duplicates.
+   */
+  private validateLetDeclStyleLiteralMap(
+    literalMap: LiteralMap,
+    decl: TmplAstLetDeclaration,
+  ): void {
+    // Get the valueSpan to use as a reference for creating key spans
+    const valueSpan = decl.valueSpan ?? decl.sourceSpan;
+
+    // Track seen property names (normalized to catch both 'background-color' and 'backgroundColor')
+    const seenProperties = new Map<
+      string,
+      {originalName: string; sourceSpanStart: number; sourceSpanEnd: number}
+    >();
+
+    for (const key of literalMap.keys) {
+      // Skip spread keys
+      if (key.kind === 'spread') {
+        continue;
+      }
+
+      const propertyName = key.key;
+
+      // Skip CSS custom properties (--var-name)
+      if (propertyName.startsWith('--')) {
+        continue;
+      }
+
+      // Convert kebab-case to camelCase for duplicate detection
+      const normalizedName = propertyName.includes('-')
+        ? kebabToCamelCase(propertyName)
+        : propertyName;
+
+      // Check for duplicate property (after normalization)
+      const previousOccurrence = seenProperties.get(normalizedName);
+      if (previousOccurrence) {
+        // Create a span for the duplicate key
+        const keyStartOffset = key.sourceSpan.start - valueSpan.start.offset;
+        const keyEndOffset = key.sourceSpan.end - valueSpan.start.offset;
+        const keySpan = new ParseSourceSpan(
+          valueSpan.start.moveBy(keyStartOffset),
+          valueSpan.start.moveBy(keyEndOffset),
+        );
+
+        // Check if it's the same name or different naming conventions
+        let message: string;
+        if (propertyName === previousOccurrence.originalName) {
+          message = `Duplicate CSS property '${propertyName}' in @let declaration. Only the last value will be used.`;
+        } else {
+          message = `Duplicate CSS property: '${propertyName}' and '${previousOccurrence.originalName}' refer to the same property. Only the last value will be used.`;
+        }
+
+        const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+          this.component,
+          keySpan,
+          this.severity,
+          ErrorCode.DUPLICATE_CSS_PROPERTY,
+          message,
+        );
+        this.diagnostics.push(diagnostic);
+      }
+
+      // Record this occurrence
+      seenProperties.set(normalizedName, {
+        originalName: propertyName,
+        sourceSpanStart: key.sourceSpan.start,
+        sourceSpanEnd: key.sourceSpan.end,
+      });
+    }
+  }
   visitComponent(): void {}
   visitDirective(): void {}
 }

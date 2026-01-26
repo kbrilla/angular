@@ -708,6 +708,201 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('duplicate CSS property validation', () => {
+    it('should report diagnostic for duplicate CSS properties in [style] object', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{backgroundColor: \\'blue\\', backgroundColor: \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain("Duplicate CSS property 'backgroundColor'");
+      expect(cssDiags[0].messageText).toContain('Only the last value will be used');
+    });
+
+    it('should report diagnostic for duplicate kebab-case CSS properties in [ngStyle]', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [ngStyle]="{\\'background-color\\': \\'blue\\', \\'background-color\\': \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain("Duplicate CSS property 'background-color'");
+    });
+
+    it('should report diagnostic for duplicate CSS properties with mixed case formats', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [ngStyle]="{backgroundColor: \\'blue\\', \\'background-color\\': \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain("'background-color' and 'backgroundColor'");
+      expect(cssDiags[0].messageText).toContain('refer to the same property');
+    });
+
+    it('should report multiple duplicate properties separately', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{color: \\'blue\\', color: \\'red\\', width: \\'10px\\', width: \\'20px\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      expect(cssDiags.length).toBe(2);
+    });
+
+    it('should report both duplicate and invalid CSS properties', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{backgroundColor: \\'blue\\', backgroundColor: \\'red\\', backgroudnColor: \\'green\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const duplicateDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      const unknownDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+
+      // One for the duplicate 'backgroundColor'
+      expect(duplicateDiags.length).toBe(1);
+      // One for the typo 'backgroudnColor'
+      expect(unknownDiags.length).toBe(1);
+    });
+
+    it('should not report duplicate when CSS custom properties have same name', () => {
+      // CSS custom properties ARE allowed to be duplicated (for fallback values etc.)
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{\\'--my-var\\': \\'blue\\', \\'--my-var\\': \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should report duplicate CSS properties in @let declarations', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: \`
+              @let styleConst = { 'backgroundColor': 'blue', 'backgroundColor': 'red' };
+              <div [style]="styleConst"></div>
+            \`,
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain('Duplicate CSS property');
+      expect(cssDiags[0].messageText).toContain('backgroundColor');
+      expect(cssDiags[0].messageText).toContain('@let declaration');
+    });
+
+    it('should report both duplicate and invalid properties in @let declarations', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: \`
+              @let styleConst = { 'backgroundColor': 'blue', 'backgroundColor': 'red', 'backgroudnCoor': 'red' };
+              <div [style]="styleConst"></div>
+            \`,
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const duplicateDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.DUPLICATE_CSS_PROPERTY),
+      );
+      const unknownDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+
+      // One for the duplicate 'backgroundColor' in @let declaration
+      expect(duplicateDiags.length).toBe(1);
+      // One for the typo 'backgroudnCoor' when used in [style] binding
+      expect(unknownDiags.length).toBe(1);
+    });
+  });
+
   // TODO: Configuration tests require updating the testing infrastructure to support
   // PluginConfig options (cssPropertyValidation). Currently, the test environment
   // always uses default config. Configuration tests should be added in a follow-up PR.

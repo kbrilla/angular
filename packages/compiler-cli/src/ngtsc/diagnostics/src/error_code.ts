@@ -704,6 +704,18 @@ export enum ErrorCode {
   INVALID_CSS_UNIT_IN_HOST = 8205,
 
   /**
+   * A style object contains duplicate CSS property declarations.
+   *
+   * For example:
+   * ```html
+   * <div [style]="{ backgroundColor: 'red', backgroundColor: 'blue' }"></div>
+   * ```
+   *
+   * The property `backgroundColor` is defined multiple times. Only the last value will be used.
+   */
+  DUPLICATE_CSS_PROPERTY = 8206,
+
+  /**
    * The template type-checking engine would need to generate an inline type check block for a
    * component, but the current type-checking environment doesn't support it.
    */
