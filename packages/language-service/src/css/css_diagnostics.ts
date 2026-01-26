@@ -29,6 +29,7 @@ import {
   TmplAstTemplate,
   tmplAstVisitAll,
   TmplAstVisitor,
+  TmplAstHostElement,
 } from '@angular/compiler';
 import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
 import ts from 'typescript';
@@ -51,6 +52,10 @@ export const enum CssDiagnosticCode {
   INVALID_CSS_UNIT = 99002,
   /** Unknown CSS property name in style object literal. */
   UNKNOWN_CSS_PROPERTY_IN_OBJECT = 99003,
+  /** Unknown CSS property name in host binding. */
+  UNKNOWN_CSS_PROPERTY_IN_HOST = 99004,
+  /** Invalid CSS unit suffix in host binding. */
+  INVALID_CSS_UNIT_IN_HOST = 99005,
 }
 
 /**
@@ -72,10 +77,14 @@ export const DEFAULT_CSS_DIAGNOSTICS_CONFIG: CssDiagnosticsConfig = {
 };
 
 /**
- * Gets CSS-related diagnostics for a template.
+ * Gets CSS-related diagnostics for a component's template and host bindings.
  *
  * This validates CSS property names in style bindings like `[style.propertyName]`
  * and reports diagnostics for unknown properties.
+ *
+ * Validates:
+ * - Template style bindings: `[style.propertyName]`, `[style]="{...}"`
+ * - Host bindings: `@HostBinding('style.propertyName')` and `host: { '[style.propertyName]': ... }`
  *
  * @param component The component class declaration.
  * @param compiler The Angular compiler instance.
@@ -92,19 +101,97 @@ export function getCssDiagnostics(
   }
 
   const templateTypeChecker = compiler.getTemplateTypeChecker();
-  const template = templateTypeChecker.getTemplate(component);
-  if (template === null) {
-    return [];
-  }
-
   const diagnostics: ts.Diagnostic[] = [];
   const severity = getDiagnosticCategory(config.severity);
 
-  // Visit all style bindings in the template
-  const visitor = new CssBindingVisitor(component, diagnostics, severity);
-  tmplAstVisitAll(visitor, template);
+  // Validate template style bindings
+  const template = templateTypeChecker.getTemplate(component);
+  if (template !== null) {
+    const visitor = new CssBindingVisitor(component, diagnostics, severity);
+    tmplAstVisitAll(visitor, template);
+  }
+
+  // Validate host element bindings (@HostBinding and host: {...})
+  const hostElement = templateTypeChecker.getHostElement(component);
+  if (hostElement !== null) {
+    validateHostBindings(hostElement, component, diagnostics, severity);
+  }
 
   return diagnostics;
+}
+
+/**
+ * Validates CSS properties in host element bindings.
+ * This includes @HostBinding('style.propertyName') and host: { '[style.propertyName]': ... }
+ */
+function validateHostBindings(
+  hostElement: TmplAstHostElement,
+  component: ts.ClassDeclaration,
+  diagnostics: ts.Diagnostic[],
+  severity: ts.DiagnosticCategory,
+): void {
+  for (const binding of hostElement.bindings) {
+    // Check if this is a style binding
+    if (binding.type === BindingType.Style) {
+      validateHostStyleBinding(binding, component, diagnostics, severity);
+    }
+  }
+}
+
+/**
+ * Validates a single host style binding for valid CSS property and unit.
+ */
+function validateHostStyleBinding(
+  binding: TmplAstBoundAttribute,
+  component: ts.ClassDeclaration,
+  diagnostics: ts.Diagnostic[],
+  severity: ts.DiagnosticCategory,
+): void {
+  const propertyName = binding.name;
+  const unit = binding.unit;
+
+  // Skip CSS custom properties (--var-name)
+  if (propertyName.startsWith('--')) {
+    return;
+  }
+
+  // Convert kebab-case to camelCase for validation
+  const normalizedName = propertyName.includes('-') ? kebabToCamelCase(propertyName) : propertyName;
+
+  // Validate CSS property name
+  if (!isValidCSSProperty(normalizedName)) {
+    const suggestions = findSimilarCSSProperties(normalizedName);
+    let message = `Unknown CSS property '${propertyName}' in host binding.`;
+    if (suggestions.length > 0) {
+      message += ` Did you mean '${suggestions[0]}'?`;
+      if (suggestions.length > 1) {
+        message += ` Other suggestions: ${suggestions.slice(1).join(', ')}.`;
+      }
+    }
+
+    diagnostics.push({
+      category: severity,
+      code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      messageText: message,
+      file: component.getSourceFile(),
+      start: binding.keySpan.start.offset,
+      length: binding.keySpan.end.offset - binding.keySpan.start.offset,
+      source: 'angular',
+    });
+  }
+
+  // Validate CSS unit suffix (if present)
+  if (unit !== null && !isValidCSSUnit(unit)) {
+    diagnostics.push({
+      category: severity,
+      code: CssDiagnosticCode.INVALID_CSS_UNIT_IN_HOST,
+      messageText: `Unknown CSS unit '${unit}' in host binding. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
+      file: component.getSourceFile(),
+      start: binding.keySpan.end.offset - unit.length,
+      length: unit.length,
+      source: 'angular',
+    });
+  }
 }
 
 /**

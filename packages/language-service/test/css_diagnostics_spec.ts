@@ -393,6 +393,181 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('host binding CSS validation', () => {
+    it('should not report diagnostic for valid CSS property in host binding', () => {
+      const files = {
+        'app.ts': `
+          import {Component, HostBinding} from '@angular/core';
+
+          @Component({
+            template: '',
+          })
+          export class AppComponent {
+            @HostBinding('style.width') hostWidth = '100px';
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should not report diagnostic for valid CSS property in host metadata', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '',
+            host: {
+              '[style.backgroundColor]': 'color',
+            },
+          })
+          export class AppComponent {
+            color = 'red';
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should report diagnostic for unknown CSS property in @HostBinding', () => {
+      const files = {
+        'app.ts': `
+          import {Component, HostBinding} from '@angular/core';
+
+          @Component({
+            template: '',
+          })
+          export class AppComponent {
+            @HostBinding('style.backgroudColor') hostColor = 'red';
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain(
+        "Unknown CSS property 'backgroudColor' in host binding",
+      );
+      expect(cssDiags[0].messageText).toContain("Did you mean 'backgroundColor'?");
+    });
+
+    it('should report diagnostic for unknown CSS property in host metadata', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '',
+            host: {
+              '[style.backgroudColor]': 'color',
+            },
+          })
+          export class AppComponent {
+            color = 'red';
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain(
+        "Unknown CSS property 'backgroudColor' in host binding",
+      );
+    });
+
+    it('should report diagnostic for invalid CSS unit in @HostBinding', () => {
+      const files = {
+        'app.ts': `
+          import {Component, HostBinding} from '@angular/core';
+
+          @Component({
+            template: '',
+          })
+          export class AppComponent {
+            @HostBinding('style.width.xyz') hostWidth = 100;
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.INVALID_CSS_UNIT_IN_HOST);
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain("Unknown CSS unit 'xyz' in host binding");
+    });
+
+    it('should not report diagnostic for CSS custom properties in host binding', () => {
+      const files = {
+        'app.ts': `
+          import {Component, HostBinding} from '@angular/core';
+
+          @Component({
+            template: '',
+          })
+          export class AppComponent {
+            @HostBinding('style.--my-custom-var') customVar = 'red';
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should validate both template and host bindings in the same component', () => {
+      const files = {
+        'app.ts': `
+          import {Component, HostBinding} from '@angular/core';
+
+          @Component({
+            template: '<div [style.backgroudColor]="color"></div>',
+          })
+          export class AppComponent {
+            color = 'red';
+            @HostBinding('style.dipslay') hostDisplay = 'block';
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const templateDiags = diags.filter((d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY);
+      const hostDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      );
+
+      expect(templateDiags.length).toBe(1);
+      expect(templateDiags[0].messageText).toContain('backgroudColor');
+
+      expect(hostDiags.length).toBe(1);
+      expect(hostDiags[0].messageText).toContain('dipslay');
+    });
+  });
+
   // TODO: Configuration tests require updating the testing infrastructure to support
   // PluginConfig options (cssPropertyValidation). Currently, the test environment
   // always uses default config. Configuration tests should be added in a follow-up PR.
