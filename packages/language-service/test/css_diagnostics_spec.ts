@@ -393,6 +393,142 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('style variable reference validation', () => {
+    it('should report diagnostic when @let variable contains unknown CSS property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: \`
+              @let styleConst = { 'backgroundColor': 'blue', 'backgroudnColor': 'red' };
+              <div [style]="styleConst"></div>
+            \`,
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      // One diagnostic for the literal object, one for the variable reference
+      expect(cssDiags.length).toBeGreaterThanOrEqual(1);
+      expect(cssDiags.some((d) => (d.messageText as string).includes('backgroudnColor'))).toBe(
+        true,
+      );
+    });
+
+    it('should report diagnostic when component property contains unknown CSS property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="myStyles"></div>',
+          })
+          export class AppComponent {
+            myStyles = {
+              backgroundColor: 'blue',
+              backgroudnColor: 'red',
+            };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain('backgroudnColor');
+    });
+
+    it('should not report diagnostic when component property contains valid CSS properties', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="myStyles"></div>',
+          })
+          export class AppComponent {
+            myStyles = {
+              backgroundColor: 'blue',
+              color: 'red',
+              width: '100px',
+            };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should report diagnostic when spread object contains unknown CSS property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{...myStyles}"></div>',
+          })
+          export class AppComponent {
+            myStyles = {
+              backgroudnColor: 'red',
+            };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain('backgroudnColor');
+    });
+
+    it('should report multiple unknown properties in variable reference', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="myStyles"></div>',
+          })
+          export class AppComponent {
+            myStyles = {
+              backgroudnColor: 'red',
+              colr: 'blue',
+              widht: '100px',
+            };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+      // Message should contain all invalid properties
+      expect(cssDiags[0].messageText).toContain('backgroudnColor');
+      expect(cssDiags[0].messageText).toContain('colr');
+      expect(cssDiags[0].messageText).toContain('widht');
+    });
+  });
+
   describe('host binding CSS validation', () => {
     it('should not report diagnostic for valid CSS property in host binding', () => {
       const files = {

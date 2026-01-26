@@ -12,6 +12,7 @@ import {
   BindingType,
   LiteralMap,
   PropertyRead,
+  SafePropertyRead,
   Call,
   TmplAstBoundAttribute,
   TmplAstDeferredBlock,
@@ -298,7 +299,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
   /**
    * Validates style object bindings like [style]="{backgroundColor: 'red'}"
-   * or [ngStyle]="{'background-color': 'red'}"
+   * or [ngStyle]="{'background-color': 'red'}" or [style]="styleConst"
    */
   private validateStyleObjectBinding(attribute: TmplAstBoundAttribute): void {
     const value = attribute.value;
@@ -306,10 +307,115 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     // Unwrap ASTWithSource to get the actual expression
     const expr = value instanceof ASTWithSource ? value.ast : value;
 
-    // Only validate object literals (LiteralMap)
-    // For method calls or property reads, we'd need type checking
+    // Handle object literals (LiteralMap) - may contain spreads
     if (expr instanceof LiteralMap) {
+      // First validate regular keys in the literal map
       this.validateStyleLiteralMap(expr, attribute);
+      // Then validate any spread expressions
+      this.validateStyleSpreads(expr, attribute);
+      return;
+    }
+
+    // Handle variable references: [style]="styleConst" or [style]="this.styleObj"
+    if (expr instanceof PropertyRead || expr instanceof SafePropertyRead) {
+      this.validateStyleVariableReferenceExpr(expr, attribute, attribute.valueSpan ?? null);
+    }
+  }
+
+  /**
+   * Validates spread expressions within a LiteralMap.
+   * Examples: [style]="{...myStyles}", [style]="{color: 'red', ...myStyles}"
+   */
+  private validateStyleSpreads(literalMap: LiteralMap, attribute: TmplAstBoundAttribute): void {
+    for (let i = 0; i < literalMap.keys.length; i++) {
+      const key = literalMap.keys[i];
+      if (key.kind === 'spread') {
+        // For LiteralMap spreads, the value is the expression directly (not wrapped in SpreadElement)
+        const spreadExpr = literalMap.values[i];
+        // Validate the spread expression (e.g., myStyles in {...myStyles})
+        this.validateStyleVariableReferenceExpr(spreadExpr, attribute, attribute.valueSpan ?? null);
+      }
+    }
+  }
+
+  /**
+   * Validates a single expression that should resolve to a style object.
+   * Uses the type checker to get the object's type and validate its CSS properties.
+   */
+  private validateStyleVariableReferenceExpr(
+    expr: AST,
+    attribute: TmplAstBoundAttribute,
+    varSpan: ParseSourceSpan | null,
+  ): void {
+    // Get the symbol for this expression
+    const symbol = this.templateTypeChecker.getSymbolOfNode(expr, this.component);
+    if (!symbol || !('tsType' in symbol)) {
+      return;
+    }
+
+    const tsType = symbol.tsType;
+    if (!tsType) {
+      return;
+    }
+
+    // Get the properties of the type - tsType is ts.Type which has getProperties() directly
+    const properties = tsType.getProperties();
+
+    // Track invalid properties for a single combined diagnostic
+    const invalidProperties: {name: string; suggestion?: string}[] = [];
+
+    for (const prop of properties) {
+      const propertyName = prop.getName();
+
+      // Skip CSS custom properties (--var-name)
+      if (propertyName.startsWith('--')) {
+        continue;
+      }
+
+      // Convert kebab-case to camelCase for validation
+      const normalizedName = propertyName.includes('-')
+        ? kebabToCamelCase(propertyName)
+        : propertyName;
+
+      if (!isValidCSSProperty(normalizedName)) {
+        const suggestions = findSimilarCSSProperties(normalizedName);
+        invalidProperties.push({
+          name: propertyName,
+          suggestion: suggestions.length > 0 ? suggestions[0] : undefined,
+        });
+      }
+    }
+
+    // If there are invalid properties, create a diagnostic on the variable reference
+    if (invalidProperties.length > 0) {
+      const span = varSpan ?? attribute.sourceSpan;
+
+      let message: string;
+      if (invalidProperties.length === 1) {
+        const {name, suggestion} = invalidProperties[0];
+        message = `Variable contains unknown CSS property '${name}'.`;
+        if (suggestion) {
+          message += ` Did you mean '${suggestion}'?`;
+        }
+      } else {
+        const names = invalidProperties.map((p) => `'${p.name}'`).join(', ');
+        message = `Variable contains unknown CSS properties: ${names}.`;
+        const suggestions = invalidProperties
+          .filter((p) => p.suggestion)
+          .map((p) => `'${p.name}' → '${p.suggestion}'`);
+        if (suggestions.length > 0) {
+          message += ` Suggestions: ${suggestions.join(', ')}.`;
+        }
+      }
+
+      const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+        this.component,
+        span,
+        this.severity,
+        ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        message,
+      );
+      this.diagnostics.push(diagnostic);
     }
   }
 
