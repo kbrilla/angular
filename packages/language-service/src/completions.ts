@@ -1157,25 +1157,25 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
       this.node.keySpan !== undefined
     ) {
       // Extract the typed prefix after 'style.'
-      // For example, if the user typed '[style.back', the name will be 'style.back' or similar
-      // We need to get what they've typed after 'style.'
+      // For example, if the user typed '[style.back', the name will be 'back'
+      // The node.name is already parsed as just the property name (after 'style.')
       const typedName = this.node.name;
-      const cssPropertyPrefix = typedName.includes('.')
-        ? typedName.substring(typedName.indexOf('.') + 1)
-        : '';
 
       // Check if the user is typing a unit suffix (e.g., style.width.|)
-      const hasUnit = this.node.unit !== null && this.node.unit.length > 0;
-      const hasTwoDots = typedName.split('.').length > 2;
+      // Angular parser sets unit to:
+      // - null: no unit (e.g., [style.width])
+      // - "": empty string when there's a trailing dot (e.g., [style.width.])
+      // - "px": the actual unit (e.g., [style.width.px])
+      const isTypingUnit = this.node.unit !== null; // Includes empty string (trailing dot)
 
-      if (hasUnit || hasTwoDots) {
+      if (isTypingUnit) {
         // User is typing a unit suffix - provide unit completions
-        const unitEntries = getCSSUnitCompletions(cssPropertyPrefix.split('.')[0] || '');
+        const unitEntries = getCSSUnitCompletions(typedName);
         // Calculate replacement span for just the unit portion
-        const unitStart = this.node.keySpan.start.offset + typedName.lastIndexOf('.') + 1;
-        const unitLength = hasTwoDots
-          ? typedName.length - typedName.lastIndexOf('.') - 1
-          : (this.node.unit?.length ?? 0);
+        // keySpan covers "style.propertyName" or "style.propertyName.unit"
+        // We want to replace just the unit part after the last dot
+        const unitStart = this.node.keySpan.start.offset + `style.${typedName}.`.length;
+        const unitLength = this.node.unit?.length ?? 0;
         const unitReplacementSpan = {
           start: unitStart,
           length: unitLength,
@@ -1188,10 +1188,10 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
         }
       } else {
         // User is typing a CSS property name - provide property completions
-        const cssEntries = getCSSPropertyCompletions(cssPropertyPrefix);
+        const cssEntries = getCSSPropertyCompletions(typedName);
         // Calculate replacement span for just the property portion
         const propertyStart = this.node.keySpan.start.offset + 'style.'.length;
-        const propertyLength = cssPropertyPrefix.length;
+        const propertyLength = typedName.length;
         const cssReplacementSpan = {
           start: propertyStart,
           length: propertyLength,
