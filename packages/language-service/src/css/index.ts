@@ -56,6 +56,5 @@ export {
   // CSS Diagnostics
   getCssDiagnostics,
   DEFAULT_CSS_DIAGNOSTICS_CONFIG,
-  CssDiagnosticCode,
   type CssDiagnosticsConfig,
 } from './css_diagnostics';

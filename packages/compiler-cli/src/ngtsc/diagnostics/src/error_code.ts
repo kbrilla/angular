@@ -644,6 +644,66 @@ export enum ErrorCode {
   FORBIDDEN_REQUIRED_INITIALIZER_INVOCATION = 8118,
 
   /**
+   * A style binding uses an unknown CSS property name.
+   *
+   * For example:
+   * ```html
+   * <div [style.backgroudColor]="'red'"></div>
+   * ```
+   *
+   * The property `backgroudColor` is not a valid CSS property. It should be `backgroundColor`.
+   */
+  UNKNOWN_CSS_PROPERTY = 8201,
+
+  /**
+   * A style binding uses an unknown CSS unit suffix.
+   *
+   * For example:
+   * ```html
+   * <div [style.width.pixels]="100"></div>
+   * ```
+   *
+   * The unit `pixels` is not a valid CSS unit. It should be `px`.
+   */
+  INVALID_CSS_UNIT = 8202,
+
+  /**
+   * A style object binding contains an unknown CSS property name.
+   *
+   * For example:
+   * ```html
+   * <div [style]="{ backgroudColor: 'red' }"></div>
+   * ```
+   *
+   * The property `backgroudColor` is not a valid CSS property. It should be `backgroundColor`.
+   */
+  UNKNOWN_CSS_PROPERTY_IN_OBJECT = 8203,
+
+  /**
+   * A host binding uses an unknown CSS property name.
+   *
+   * For example:
+   * ```ts
+   * @HostBinding('style.backgroudColor') color = 'red';
+   * ```
+   *
+   * The property `backgroudColor` is not a valid CSS property. It should be `backgroundColor`.
+   */
+  UNKNOWN_CSS_PROPERTY_IN_HOST = 8204,
+
+  /**
+   * A host binding uses an unknown CSS unit suffix.
+   *
+   * For example:
+   * ```ts
+   * @HostBinding('style.width.pixels') width = 100;
+   * ```
+   *
+   * The unit `pixels` is not a valid CSS unit. It should be `px`.
+   */
+  INVALID_CSS_UNIT_IN_HOST = 8205,
+
+  /**
    * The template type-checking engine would need to generate an inline type check block for a
    * component, but the current type-checking environment doesn't support it.
    */

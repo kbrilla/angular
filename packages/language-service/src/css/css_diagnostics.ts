@@ -30,8 +30,11 @@ import {
   tmplAstVisitAll,
   TmplAstVisitor,
   TmplAstHostElement,
+  ParseSourceSpan,
 } from '@angular/compiler';
+import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import {TemplateTypeChecker} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
 import {
@@ -40,23 +43,6 @@ import {
   isValidCSSUnit,
   kebabToCamelCase,
 } from './css_properties';
-
-/**
- * CSS diagnostic codes for the Angular Language Service.
- * These are in a separate range from Angular's core diagnostic codes.
- */
-export const enum CssDiagnosticCode {
-  /** Unknown CSS property name in style binding. */
-  UNKNOWN_CSS_PROPERTY = 99001,
-  /** Invalid CSS unit suffix in style binding. */
-  INVALID_CSS_UNIT = 99002,
-  /** Unknown CSS property name in style object literal. */
-  UNKNOWN_CSS_PROPERTY_IN_OBJECT = 99003,
-  /** Unknown CSS property name in host binding. */
-  UNKNOWN_CSS_PROPERTY_IN_HOST = 99004,
-  /** Invalid CSS unit suffix in host binding. */
-  INVALID_CSS_UNIT_IN_HOST = 99005,
-}
 
 /**
  * Configuration for CSS diagnostics.
@@ -107,7 +93,7 @@ export function getCssDiagnostics(
   // Validate template style bindings
   const template = templateTypeChecker.getTemplate(component);
   if (template !== null) {
-    const visitor = new CssBindingVisitor(component, diagnostics, severity);
+    const visitor = new CssBindingVisitor(component, templateTypeChecker, diagnostics, severity);
     tmplAstVisitAll(visitor, template);
   }
 
@@ -171,7 +157,7 @@ function validateHostStyleBinding(
 
     diagnostics.push({
       category: severity,
-      code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+      code: ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       messageText: message,
       file: component.getSourceFile(),
       start: binding.keySpan.start.offset,
@@ -184,7 +170,7 @@ function validateHostStyleBinding(
   if (unit !== null && !isValidCSSUnit(unit)) {
     diagnostics.push({
       category: severity,
-      code: CssDiagnosticCode.INVALID_CSS_UNIT_IN_HOST,
+      code: ngErrorCode(ErrorCode.INVALID_CSS_UNIT_IN_HOST),
       messageText: `Unknown CSS unit '${unit}' in host binding. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
       file: component.getSourceFile(),
       start: binding.keySpan.end.offset - unit.length,
@@ -216,6 +202,7 @@ function getDiagnosticCategory(
 class CssBindingVisitor implements TmplAstVisitor<void> {
   constructor(
     private readonly component: ts.ClassDeclaration,
+    private readonly templateTypeChecker: TemplateTypeChecker,
     private readonly diagnostics: ts.Diagnostic[],
     private readonly severity: ts.DiagnosticCategory,
   ) {}
@@ -269,28 +256,27 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         }
       }
 
-      this.diagnostics.push({
-        category: this.severity,
-        code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY,
-        messageText: message,
-        file: this.component.getSourceFile(),
-        start: attribute.keySpan.start.offset,
-        length: attribute.keySpan.end.offset - attribute.keySpan.start.offset,
-        source: 'angular',
-      });
+      const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+        this.component,
+        attribute.keySpan,
+        this.severity,
+        ErrorCode.UNKNOWN_CSS_PROPERTY,
+        message,
+      );
+      this.diagnostics.push(diagnostic);
     }
 
     // Validate CSS unit suffix (if present)
     if (unit !== null && !isValidCSSUnit(unit)) {
-      this.diagnostics.push({
-        category: this.severity,
-        code: CssDiagnosticCode.INVALID_CSS_UNIT,
-        messageText: `Unknown CSS unit '${unit}'. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
-        file: this.component.getSourceFile(),
-        start: attribute.keySpan.end.offset - unit.length,
-        length: unit.length,
-        source: 'angular',
-      });
+      // Use the full keySpan - it includes both property name and unit
+      const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+        this.component,
+        attribute.keySpan,
+        this.severity,
+        ErrorCode.INVALID_CSS_UNIT,
+        `Unknown CSS unit '${unit}'. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
+      );
+      this.diagnostics.push(diagnostic);
     }
   }
 
@@ -345,20 +331,17 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           }
         }
 
-        // Calculate position based on key span
-        // The key sourceSpan gives us the absolute position
-        const keyStart = key.sourceSpan.start;
-        const keyLength = key.sourceSpan.end - key.sourceSpan.start;
-
-        this.diagnostics.push({
-          category: this.severity,
-          code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
-          messageText: message,
-          file: this.component.getSourceFile(),
-          start: keyStart,
-          length: keyLength,
-          source: 'angular',
-        });
+        // Use valueSpan or sourceSpan for proper template mapping
+        // This highlights the object literal rather than the specific key
+        const span = attribute.valueSpan ?? attribute.sourceSpan;
+        const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+          this.component,
+          span,
+          this.severity,
+          ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+          message,
+        );
+        this.diagnostics.push(diagnostic);
       }
     }
   }

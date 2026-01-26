@@ -7,10 +7,10 @@
  */
 
 import {initMockFileSystem} from '@angular/compiler-cli/src/ngtsc/file_system/testing';
+import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import ts from 'typescript';
 
 import {createModuleAndProjectWithDeclarations, LanguageServiceTestEnv} from '../testing';
-import {CssDiagnosticCode} from '../src/css';
 
 describe('CSS property validation diagnostics', () => {
   let env: LanguageServiceTestEnv;
@@ -38,8 +38,8 @@ describe('CSS property validation diagnostics', () => {
       // Filter to only CSS diagnostics
       const cssDiags = diags.filter(
         (d) =>
-          d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY ||
-          d.code === CssDiagnosticCode.INVALID_CSS_UNIT,
+          d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY) ||
+          d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -60,8 +60,8 @@ describe('CSS property validation diagnostics', () => {
 
       const cssDiags = diags.filter(
         (d) =>
-          d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY ||
-          d.code === CssDiagnosticCode.INVALID_CSS_UNIT,
+          d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY) ||
+          d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -84,8 +84,8 @@ describe('CSS property validation diagnostics', () => {
 
       const cssDiags = diags.filter(
         (d) =>
-          d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY ||
-          d.code === CssDiagnosticCode.INVALID_CSS_UNIT,
+          d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY) ||
+          d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -108,8 +108,8 @@ describe('CSS property validation diagnostics', () => {
 
       const cssDiags = diags.filter(
         (d) =>
-          d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY ||
-          d.code === CssDiagnosticCode.INVALID_CSS_UNIT,
+          d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY) ||
+          d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -130,7 +130,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS property 'wdith'");
       expect(cssDiags[0].messageText).toContain("Did you mean 'width'");
@@ -152,7 +152,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS property 'colro'");
       expect(cssDiags[0].messageText).toContain("Did you mean 'color'");
@@ -174,7 +174,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
       expect(cssDiags.length).toBe(2);
     });
 
@@ -193,7 +193,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.html');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS property 'wdith'");
     });
@@ -214,7 +214,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.INVALID_CSS_UNIT);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT));
       expect(cssDiags.length).toBe(0);
     });
 
@@ -240,7 +240,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.INVALID_CSS_UNIT);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT));
       expect(cssDiags.length).toBe(0);
     });
 
@@ -258,7 +258,7 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.INVALID_CSS_UNIT);
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT));
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS unit 'pxs'");
     });
@@ -280,7 +280,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -300,7 +300,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
       );
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS property 'backgrond'");
@@ -322,7 +322,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
       );
       expect(cssDiags.length).toBe(2);
     });
@@ -344,7 +344,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -366,7 +366,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
       );
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS property 'backgrond-color'");
@@ -387,7 +387,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -411,7 +411,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -436,7 +436,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -458,7 +458,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       );
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain(
@@ -487,7 +487,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       );
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain(
@@ -511,7 +511,9 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.INVALID_CSS_UNIT_IN_HOST);
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.INVALID_CSS_UNIT_IN_HOST),
+      );
       expect(cssDiags.length).toBe(1);
       expect(cssDiags[0].messageText).toContain("Unknown CSS unit 'xyz' in host binding");
     });
@@ -533,7 +535,7 @@ describe('CSS property validation diagnostics', () => {
       const diags = project.getDiagnosticsForFile('app.ts');
 
       const cssDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       );
       expect(cssDiags.length).toBe(0);
     });
@@ -555,9 +557,11 @@ describe('CSS property validation diagnostics', () => {
       const project = createModuleAndProjectWithDeclarations(env, 'test', files);
       const diags = project.getDiagnosticsForFile('app.ts');
 
-      const templateDiags = diags.filter((d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY);
+      const templateDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY),
+      );
       const hostDiags = diags.filter(
-        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_HOST,
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_HOST),
       );
 
       expect(templateDiags.length).toBe(1);
