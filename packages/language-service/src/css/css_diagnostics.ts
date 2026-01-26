@@ -318,6 +318,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
    * Checks each key to ensure it's a valid CSS property name.
    */
   private validateStyleLiteralMap(literalMap: LiteralMap, attribute: TmplAstBoundAttribute): void {
+    // Get the valueSpan to use as a reference for creating key spans
+    const valueSpan = attribute.valueSpan ?? attribute.sourceSpan;
+
     for (const key of literalMap.keys) {
       // Skip spread keys (e.g., { ...spreadStyles })
       if (key.kind === 'spread') {
@@ -347,12 +350,19 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           }
         }
 
-        // Use valueSpan or sourceSpan for proper template mapping
-        // This highlights the object literal rather than the specific key
-        const span = attribute.valueSpan ?? attribute.sourceSpan;
+        // Create a span that covers just the property key using the key's sourceSpan.
+        // The key.sourceSpan has absolute offsets within the template.
+        // We calculate the relative offset from valueSpan.start to create the span.
+        const keyStartOffset = key.sourceSpan.start - valueSpan.start.offset;
+        const keyEndOffset = key.sourceSpan.end - valueSpan.start.offset;
+        const keySpan = new ParseSourceSpan(
+          valueSpan.start.moveBy(keyStartOffset),
+          valueSpan.start.moveBy(keyEndOffset),
+        );
+
         const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
           this.component,
-          span,
+          keySpan,
           this.severity,
           ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
           message,
