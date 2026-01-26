@@ -51,6 +51,48 @@ export interface PluginConfig {
    * A list of diagnostic codes that should be supressed in the language service.
    */
   suppressAngularDiagnosticCodes?: number[];
+
+  /**
+   * Configuration for CSS property validation in style bindings.
+   * When enabled, provides diagnostics for invalid CSS property names like `[style.colro]`.
+   */
+  cssPropertyValidation?: boolean | CssDiagnosticsConfig;
+}
+
+/**
+ * Configuration for CSS property validation diagnostics.
+ */
+export interface CssDiagnosticsConfig {
+  /** Enable or disable CSS property validation. Default: true */
+  enabled?: boolean;
+
+  /**
+   * Severity level for invalid CSS property diagnostics.
+   * - 'error': Show as error (red squiggly)
+   * - 'warning': Show as warning (yellow squiggly)
+   * - 'suggestion': Show as suggestion (gray dots)
+   * Default: 'warning'
+   */
+  severity?: 'error' | 'warning' | 'suggestion';
+
+  /**
+   * Enable fuzzy matching to suggest corrections for misspelled properties.
+   * Default: true
+   */
+  suggestCorrections?: boolean;
+
+  /**
+   * Maximum edit distance for fuzzy matching suggestions.
+   * Higher values find more suggestions but with less similarity.
+   * Default: 2
+   */
+  maxEditDistance?: number;
+
+  /**
+   * Maximum number of correction suggestions to show per invalid property.
+   * Default: 3
+   */
+  maxSuggestions?: number;
 }
 
 export type GetTcbResponse = {
