@@ -1,4 +1,75 @@
-## Override Rename Ts Plugin
+# Angular Language Service
+
+The Angular Language Service provides rich IDE features for Angular templates, including:
+
+- Code completions
+- Error diagnostics
+- Quick info (hover)
+- Go to definition
+- Refactoring
+- Inlay hints
+- CSS property validation
+
+## Features
+
+### CSS Property Validation
+
+The language service validates CSS property names in style bindings like `[style.propertyName]` and reports diagnostics for unknown properties with suggestions.
+
+Example:
+
+```html
+<!-- Warning: Unknown CSS property 'colro'. Did you mean 'color'? -->
+<div [style.colro]="textColor"></div>
+```
+
+#### Configuration
+
+CSS property validation is enabled by default. You can configure it in your Angular project settings:
+
+```json
+{
+  "angularCompilerOptions": {
+    "cssPropertyValidation": true // Enable (default)
+  }
+}
+```
+
+Or with detailed options:
+
+```json
+{
+  "angularCompilerOptions": {
+    "cssPropertyValidation": {
+      "enabled": true,
+      "severity": "warning" // "error", "warning", or "suggestion"
+    }
+  }
+}
+```
+
+To disable CSS validation:
+
+```json
+{
+  "angularCompilerOptions": {
+    "cssPropertyValidation": false
+  }
+}
+```
+
+### Inlay Hints
+
+The language service provides type hints for template variables:
+
+- `@for` loop variables: `@for (user: User of users)`
+- `@if` alias types: `@if (data; as result: Data)`
+- Event parameters: `(click)="onClick($event: MouseEvent)"`
+- And more...
+
+---
+
+## Override Rename TS Plugin
 
 When the user wants to rename a symbol in the ts file VSCode will ask the rename providers for the answer in turn. If the first extension returns the result, the VSCode will break the loop and apply the result. If the first extension cannot rename the symbol, VSCode will ask the second extension in the list (built-in TS/JS extension, Angular LS extension, etc.). In other words, VSCode takes the result from only one rename provider and the order depends on registration timing, scoring.
 

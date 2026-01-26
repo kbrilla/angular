@@ -11,6 +11,9 @@ import {missingImportMeta} from './fix_missing_import';
 import {missingMemberMeta} from './fix_missing_member';
 import {fixUnusedStandaloneImportsMeta} from './fix_unused_standalone_imports';
 import {fixMissingRequiredInput} from './fix_missing_required_inputs';
+import {fixCssPropertyMeta} from './fix_css_property';
+import {fixCssShorthandConflictMeta} from './fix_css_shorthand_conflict';
+import {fixCssUnitValueMeta} from './fix_css_unit_value';
 import {CodeActionMeta} from './utils';
 
 export const ALL_CODE_FIXES_METAS: CodeActionMeta[] = [
@@ -19,4 +22,7 @@ export const ALL_CODE_FIXES_METAS: CodeActionMeta[] = [
   missingImportMeta,
   fixUnusedStandaloneImportsMeta,
   fixMissingRequiredInput,
+  fixCssPropertyMeta,
+  fixCssShorthandConflictMeta,
+  fixCssUnitValueMeta,
 ];
