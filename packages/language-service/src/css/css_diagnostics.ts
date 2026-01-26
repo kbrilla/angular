@@ -245,6 +245,10 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       ? kebabToCamelCase(propertyName)
       : propertyName;
 
+    // The keySpan covers "style.propertyName" or "style.propertyName.unit"
+    // We want to highlight just the CSS property name (after "style.")
+    const stylePrefix = 'style.';
+
     // Validate CSS property name
     if (!isValidCSSProperty(normalizedName)) {
       const suggestions = findSimilarCSSProperties(normalizedName);
@@ -256,9 +260,15 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         }
       }
 
+      // Create a span that covers just the property name (skip "style." prefix)
+      const propertySpan = new ParseSourceSpan(
+        attribute.keySpan.start.moveBy(stylePrefix.length),
+        attribute.keySpan.start.moveBy(stylePrefix.length + propertyName.length),
+      );
+
       const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
         this.component,
-        attribute.keySpan,
+        propertySpan,
         this.severity,
         ErrorCode.UNKNOWN_CSS_PROPERTY,
         message,
@@ -268,10 +278,16 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
     // Validate CSS unit suffix (if present)
     if (unit !== null && !isValidCSSUnit(unit)) {
-      // Use the full keySpan - it includes both property name and unit
+      // Create a span that covers just the unit (at the end of keySpan)
+      // The keySpan covers "style.propertyName.unit", unit is at the end
+      const unitSpan = new ParseSourceSpan(
+        attribute.keySpan.end.moveBy(-unit.length),
+        attribute.keySpan.end,
+      );
+
       const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
         this.component,
-        attribute.keySpan,
+        unitSpan,
         this.severity,
         ErrorCode.INVALID_CSS_UNIT,
         `Unknown CSS unit '${unit}'. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
