@@ -391,6 +391,64 @@ describe('CSS property validation diagnostics', () => {
       );
       expect(cssDiags.length).toBe(0);
     });
+
+    it('should not report diagnostic for vendor prefixed properties in kebab-case', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{\\'--webkit-transform\\': \\'rotate(45deg)\\', \\'-moz-appearance\\': \\'none\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should not report diagnostic for vendor prefixed properties in camelCase', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{WebkitTransform: \\'rotate(45deg)\\', MozAppearance: \\'none\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should not report diagnostic for vendor prefixed individual bindings', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.WebkitTransform]="\\'rotate(45deg)\\'"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter((d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY));
+      expect(cssDiags.length).toBe(0);
+    });
   });
 
   describe('style variable reference validation', () => {

@@ -787,6 +787,25 @@ export function isValidCSSProperty(propertyName: string): boolean {
   if (propertyName.startsWith('--')) {
     return true;
   }
+
+  // Vendor prefixes are allowed - they start with -webkit-, -moz-, -ms-, -o-
+  // In camelCase: Webkit*, Moz*, ms*, O*
+  // In kebab-case: -webkit-*, -moz-*, -ms-*, -o-*
+  if (
+    propertyName.startsWith('-webkit-') ||
+    propertyName.startsWith('-moz-') ||
+    propertyName.startsWith('-ms-') ||
+    propertyName.startsWith('-o-') ||
+    propertyName.startsWith('Webkit') ||
+    propertyName.startsWith('Moz') ||
+    propertyName.startsWith('ms') ||
+    (propertyName.startsWith('O') &&
+      propertyName.length > 1 &&
+      propertyName[1] === propertyName[1].toUpperCase())
+  ) {
+    return true;
+  }
+
   return getCSSPropertyNameSet().has(propertyName);
 }
 
