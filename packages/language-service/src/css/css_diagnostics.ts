@@ -10,6 +10,7 @@ import {
   AST,
   ASTWithSource,
   BindingType,
+  Conditional,
   LiteralMap,
   PropertyRead,
   SafePropertyRead,
@@ -308,12 +309,29 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     // Unwrap ASTWithSource to get the actual expression
     const expr = value instanceof ASTWithSource ? value.ast : value;
 
+    // Recursively validate the expression
+    this.validateStyleExpression(expr, attribute);
+  }
+
+  /**
+   * Recursively validates a style expression.
+   * Handles object literals, variable references, ternary expressions, and spreads.
+   */
+  private validateStyleExpression(expr: AST, attribute: TmplAstBoundAttribute): void {
     // Handle object literals (LiteralMap) - may contain spreads
     if (expr instanceof LiteralMap) {
       // First validate regular keys in the literal map
       this.validateStyleLiteralMap(expr, attribute);
       // Then validate any spread expressions
       this.validateStyleSpreads(expr, attribute);
+      return;
+    }
+
+    // Handle ternary expressions: [style]="condition ? styleA : styleB"
+    // Validate BOTH branches as both could be used at runtime
+    if (expr instanceof Conditional) {
+      this.validateStyleExpression(expr.trueExp, attribute);
+      this.validateStyleExpression(expr.falseExp, attribute);
       return;
     }
 
@@ -660,6 +678,31 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       expr = expr.ast;
     }
 
+    if (!expr) {
+      return;
+    }
+
+    // Recursively extract properties from the expression
+    this.extractPropertiesFromExpression(expr, bindingType, styleBindings, input.sourceSpan);
+  }
+
+  /**
+   * Recursively extracts CSS property names from an expression.
+   * Handles LiteralMap, Conditional (ternary), and PropertyRead.
+   */
+  private extractPropertiesFromExpression(
+    expr: AST,
+    bindingType: 'style' | 'ngStyle',
+    styleBindings: Map<
+      string,
+      Array<{
+        type: 'specific' | 'style' | 'ngStyle';
+        originalName: string;
+        sourceSpan: ParseSourceSpan;
+      }>
+    >,
+    sourceSpan: ParseSourceSpan,
+  ): void {
     // Handle LiteralMap directly
     if (expr instanceof LiteralMap) {
       for (const key of expr.keys) {
@@ -683,12 +726,50 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         styleBindings.get(normalizedName)!.push({
           type: bindingType,
           originalName: propertyName,
-          sourceSpan: input.sourceSpan,
+          sourceSpan: sourceSpan,
         });
       }
+      return;
     }
-    // Note: For PropertyRead (variable references), we could try to resolve the type
-    // but it would require additional type checking. For now we only handle literals.
+
+    // Handle ternary expressions: condition ? trueExpr : falseExpr
+    // We need to check BOTH branches as either could be used at runtime
+    if (expr instanceof Conditional) {
+      this.extractPropertiesFromExpression(expr.trueExp, bindingType, styleBindings, sourceSpan);
+      this.extractPropertiesFromExpression(expr.falseExp, bindingType, styleBindings, sourceSpan);
+      return;
+    }
+
+    // Handle variable references: try to resolve the type
+    if (expr instanceof PropertyRead || expr instanceof SafePropertyRead) {
+      const symbol = this.templateTypeChecker.getSymbolOfNode(expr, this.component);
+      if (symbol && 'tsType' in symbol && symbol.tsType) {
+        const properties = symbol.tsType.getProperties();
+        for (const prop of properties) {
+          const propertyName = prop.getName();
+
+          // Skip CSS custom properties
+          if (propertyName.startsWith('--')) {
+            continue;
+          }
+
+          const normalizedName = propertyName.includes('-')
+            ? kebabToCamelCase(propertyName)
+            : propertyName;
+
+          if (!styleBindings.has(normalizedName)) {
+            styleBindings.set(normalizedName, []);
+          }
+          styleBindings.get(normalizedName)!.push({
+            type: bindingType,
+            originalName: propertyName,
+            sourceSpan: sourceSpan,
+          });
+        }
+      }
+    }
+    // Note: Other expression types (function calls, etc.) are ignored as we can't
+    // statically determine their return properties.
   }
 
   // Required visitor methods - must visit children to find nested style bindings

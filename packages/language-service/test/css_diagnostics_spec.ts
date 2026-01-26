@@ -587,6 +587,162 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('ternary expression validation', () => {
+    it('should validate CSS properties in true branch of ternary', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="isLarge ? largeStyles : smallStyles"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+            largeStyles = { backgroudnColor: 'red' };
+            smallStyles = { color: 'blue' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain('backgroudnColor');
+    });
+
+    it('should validate CSS properties in false branch of ternary', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="isLarge ? largeStyles : smallStyles"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+            largeStyles = { color: 'red' };
+            smallStyles = { widht: '100px' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain('widht');
+    });
+
+    it('should validate CSS properties in BOTH branches of ternary', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="isLarge ? largeStyles : smallStyles"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+            largeStyles = { backgroudnColor: 'red' };
+            smallStyles = { widht: '100px' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      // Should have 2 diagnostics - one for each branch
+      expect(cssDiags.length).toBe(2);
+      const messages = cssDiags.map((d) => d.messageText);
+      expect(messages.some((m) => typeof m === 'string' && m.includes('backgroudnColor'))).toBe(
+        true,
+      );
+      expect(messages.some((m) => typeof m === 'string' && m.includes('widht'))).toBe(true);
+    });
+
+    it('should validate nested ternary expressions', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="a ? styleA : b ? styleB : styleC"></div>',
+          })
+          export class AppComponent {
+            a = false;
+            b = true;
+            styleA = { color: 'red' };
+            styleB = { backgroudnColor: 'blue' };
+            styleC = { widht: '100px' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      // Should catch errors in both inner ternary branches
+      expect(cssDiags.length).toBe(2);
+    });
+
+    it('should validate inline object literals in ternary', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="isLarge ? { fontSize: \\'18px\\' } : { fontsiz: \\'12px\\' }"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain('fontsiz');
+    });
+
+    it('should not report diagnostic for valid CSS properties in ternary', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="isLarge ? largeStyles : smallStyles"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+            largeStyles = { fontSize: '18px', backgroundColor: 'red' };
+            smallStyles = { fontSize: '12px', color: 'blue' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT),
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+  });
+
   describe('host binding CSS validation', () => {
     it('should not report diagnostic for valid CSS property in host binding', () => {
       const files = {
@@ -1119,6 +1275,59 @@ describe('CSS property validation diagnostics', () => {
       );
       // CSS custom properties are skipped
       expect(conflictDiags.length).toBe(0);
+    });
+
+    it('should detect conflict when ternary expression sets same property as specific binding', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.color]="\\'red\\'" [style]="isLarge ? largeStyles : smallStyles"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+            largeStyles = { color: 'blue' };
+            smallStyles = { fontSize: '12px' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      // largeStyles.color conflicts with [style.color]
+      expect(conflictDiags.length).toBe(1);
+      expect(conflictDiags[0].messageText).toContain('color');
+    });
+
+    it('should detect conflicts from both branches of ternary', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.width]="\\'100px\\'" [style]="isLarge ? largeStyles : smallStyles"></div>',
+          })
+          export class AppComponent {
+            isLarge = true;
+            largeStyles = { width: '200px' };
+            smallStyles = { width: '50px' };
+          }
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      // Both branches set 'width' which conflicts with [style.width]
+      // We should detect this but may report as 1 or 2 depending on implementation
+      expect(conflictDiags.length).toBeGreaterThanOrEqual(1);
+      expect(conflictDiags[0].messageText).toContain('width');
     });
   });
 
