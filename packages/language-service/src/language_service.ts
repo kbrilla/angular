@@ -115,12 +115,23 @@ export class LanguageService {
           // Add CSS property validation diagnostics for inline templates
           const cssConfig = this.getCssDiagnosticsConfig();
           if (cssConfig.enabled) {
-            const components = compiler.getComponentsWithTemplateFile(fileName);
-            for (const component of components) {
-              if (ts.isClassDeclaration(component)) {
-                diagnostics.push(...getCssDiagnostics(component, compiler, cssConfig));
+            const ttc = compiler.getTemplateTypeChecker();
+            // Walk the source file to find component classes with templates
+            const visitForCss = (node: ts.Node): void => {
+              if (ts.isClassDeclaration(node) && node.name) {
+                try {
+                  // Check if this class has a template (indicating it's a component)
+                  const template = ttc.getTemplate(node);
+                  if (template) {
+                    diagnostics.push(...getCssDiagnostics(node, compiler, cssConfig));
+                  }
+                } catch {
+                  // Not a component or error getting template, skip
+                }
               }
-            }
+              ts.forEachChild(node, visitForCss);
+            };
+            visitForCss(sourceFile);
           }
         }
       } else {

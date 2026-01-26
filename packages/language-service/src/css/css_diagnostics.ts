@@ -7,16 +7,38 @@
  */
 
 import {
+  AST,
+  ASTWithSource,
   BindingType,
+  LiteralMap,
+  PropertyRead,
+  Call,
   TmplAstBoundAttribute,
+  TmplAstDeferredBlock,
+  TmplAstDeferredBlockError,
+  TmplAstDeferredBlockLoading,
+  TmplAstDeferredBlockPlaceholder,
+  TmplAstElement,
+  TmplAstForLoopBlock,
+  TmplAstForLoopBlockEmpty,
+  TmplAstIfBlock,
+  TmplAstIfBlockBranch,
   TmplAstNode,
+  TmplAstSwitchBlock,
+  TmplAstSwitchBlockCaseGroup,
+  TmplAstTemplate,
   tmplAstVisitAll,
   TmplAstVisitor,
 } from '@angular/compiler';
 import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
 import ts from 'typescript';
 
-import {isValidCSSProperty, findSimilarCSSProperties, isValidCSSUnit} from './css_properties';
+import {
+  isValidCSSProperty,
+  findSimilarCSSProperties,
+  isValidCSSUnit,
+  kebabToCamelCase,
+} from './css_properties';
 
 /**
  * CSS diagnostic codes for the Angular Language Service.
@@ -27,6 +49,8 @@ export const enum CssDiagnosticCode {
   UNKNOWN_CSS_PROPERTY = 99001,
   /** Invalid CSS unit suffix in style binding. */
   INVALID_CSS_UNIT = 99002,
+  /** Unknown CSS property name in style object literal. */
+  UNKNOWN_CSS_PROPERTY_IN_OBJECT = 99003,
 }
 
 /**
@@ -110,11 +134,22 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   ) {}
 
   visitBoundAttribute(attribute: TmplAstBoundAttribute): void {
-    // Only validate style bindings
-    if (attribute.type !== BindingType.Style) {
+    // Handle individual style property bindings: [style.width], [style.backgroundColor.px]
+    if (attribute.type === BindingType.Style) {
+      this.validateIndividualStyleBinding(attribute);
       return;
     }
 
+    // Handle style object bindings: [style]="{...}" or [ngStyle]="{...}"
+    if (attribute.name === 'style' || attribute.name === 'ngStyle') {
+      this.validateStyleObjectBinding(attribute);
+    }
+  }
+
+  /**
+   * Validates individual style bindings like [style.width] or [style.backgroundColor.px]
+   */
+  private validateIndividualStyleBinding(attribute: TmplAstBoundAttribute): void {
     // Parse the style binding name
     // Format: "propertyName" or "propertyName.unit"
     const fullName = attribute.name;
@@ -125,9 +160,20 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     const propertyName = parts[0];
     const unit = attribute.unit;
 
+    // Skip CSS custom properties (--var-name)
+    if (propertyName.startsWith('--')) {
+      return;
+    }
+
+    // Convert kebab-case to camelCase for validation
+    // Both 'backgroundColor' and 'background-color' are valid in style bindings
+    const normalizedName = propertyName.includes('-')
+      ? kebabToCamelCase(propertyName)
+      : propertyName;
+
     // Validate CSS property name
-    if (!isValidCSSProperty(propertyName)) {
-      const suggestions = findSimilarCSSProperties(propertyName);
+    if (!isValidCSSProperty(normalizedName)) {
+      const suggestions = findSimilarCSSProperties(normalizedName);
       let message = `Unknown CSS property '${propertyName}'.`;
       if (suggestions.length > 0) {
         message += ` Did you mean '${suggestions[0]}'?`;
@@ -161,9 +207,86 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     }
   }
 
-  // Required visitor methods that do nothing for our purposes
-  visitElement(): void {}
-  visitTemplate(): void {}
+  /**
+   * Validates style object bindings like [style]="{backgroundColor: 'red'}"
+   * or [ngStyle]="{'background-color': 'red'}"
+   */
+  private validateStyleObjectBinding(attribute: TmplAstBoundAttribute): void {
+    const value = attribute.value;
+
+    // Unwrap ASTWithSource to get the actual expression
+    const expr = value instanceof ASTWithSource ? value.ast : value;
+
+    // Only validate object literals (LiteralMap)
+    // For method calls or property reads, we'd need type checking
+    if (expr instanceof LiteralMap) {
+      this.validateStyleLiteralMap(expr, attribute);
+    }
+  }
+
+  /**
+   * Validates a LiteralMap expression used as a style object.
+   * Checks each key to ensure it's a valid CSS property name.
+   */
+  private validateStyleLiteralMap(literalMap: LiteralMap, attribute: TmplAstBoundAttribute): void {
+    for (const key of literalMap.keys) {
+      // Skip spread keys (e.g., { ...spreadStyles })
+      if (key.kind === 'spread') {
+        continue;
+      }
+
+      const propertyName = key.key;
+
+      // Skip CSS custom properties (--var-name)
+      if (propertyName.startsWith('--')) {
+        continue;
+      }
+
+      // Convert kebab-case to camelCase for validation
+      // Both 'backgroundColor' and 'background-color' are valid in [ngStyle]
+      const normalizedName = propertyName.includes('-')
+        ? kebabToCamelCase(propertyName)
+        : propertyName;
+
+      if (!isValidCSSProperty(normalizedName)) {
+        const suggestions = findSimilarCSSProperties(normalizedName);
+        let message = `Unknown CSS property '${propertyName}'.`;
+        if (suggestions.length > 0) {
+          message += ` Did you mean '${suggestions[0]}'?`;
+          if (suggestions.length > 1) {
+            message += ` Other suggestions: ${suggestions.slice(1).join(', ')}.`;
+          }
+        }
+
+        // Calculate position based on key span
+        // The key sourceSpan gives us the absolute position
+        const keyStart = key.sourceSpan.start;
+        const keyLength = key.sourceSpan.end - key.sourceSpan.start;
+
+        this.diagnostics.push({
+          category: this.severity,
+          code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+          messageText: message,
+          file: this.component.getSourceFile(),
+          start: keyStart,
+          length: keyLength,
+          source: 'angular',
+        });
+      }
+    }
+  }
+
+  // Required visitor methods - must visit children to find nested style bindings
+  visitElement(element: TmplAstElement): void {
+    tmplAstVisitAll(this, element.attributes);
+    tmplAstVisitAll(this, element.inputs);
+    tmplAstVisitAll(this, element.children);
+  }
+  visitTemplate(template: TmplAstTemplate): void {
+    tmplAstVisitAll(this, template.templateAttrs);
+    tmplAstVisitAll(this, template.inputs);
+    tmplAstVisitAll(this, template.children);
+  }
   visitContent(): void {}
   visitVariable(): void {}
   visitReference(): void {}
@@ -172,18 +295,54 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   visitText(): void {}
   visitIcu(): void {}
   visitBoundEvent(): void {}
-  visitDeferredBlock(): void {}
-  visitDeferredBlockPlaceholder(): void {}
-  visitDeferredBlockError(): void {}
-  visitDeferredBlockLoading(): void {}
+  visitDeferredBlock(deferred: TmplAstDeferredBlock): void {
+    tmplAstVisitAll(this, deferred.children);
+    if (deferred.placeholder) {
+      tmplAstVisitAll(this, deferred.placeholder.children);
+    }
+    if (deferred.loading) {
+      tmplAstVisitAll(this, deferred.loading.children);
+    }
+    if (deferred.error) {
+      tmplAstVisitAll(this, deferred.error.children);
+    }
+  }
+  visitDeferredBlockPlaceholder(block: TmplAstDeferredBlockPlaceholder): void {
+    tmplAstVisitAll(this, block.children);
+  }
+  visitDeferredBlockError(block: TmplAstDeferredBlockError): void {
+    tmplAstVisitAll(this, block.children);
+  }
+  visitDeferredBlockLoading(block: TmplAstDeferredBlockLoading): void {
+    tmplAstVisitAll(this, block.children);
+  }
   visitDeferredTrigger(): void {}
-  visitSwitchBlock(): void {}
+  visitSwitchBlock(block: TmplAstSwitchBlock): void {
+    for (const group of block.groups) {
+      tmplAstVisitAll(this, group.children);
+    }
+  }
   visitSwitchBlockCase(): void {}
-  visitSwitchBlockCaseGroup(): void {}
-  visitForLoopBlock(): void {}
-  visitForLoopBlockEmpty(): void {}
-  visitIfBlock(): void {}
-  visitIfBlockBranch(): void {}
+  visitSwitchBlockCaseGroup(group: TmplAstSwitchBlockCaseGroup): void {
+    tmplAstVisitAll(this, group.children);
+  }
+  visitForLoopBlock(block: TmplAstForLoopBlock): void {
+    tmplAstVisitAll(this, block.children);
+    if (block.empty) {
+      tmplAstVisitAll(this, block.empty.children);
+    }
+  }
+  visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {
+    tmplAstVisitAll(this, block.children);
+  }
+  visitIfBlock(block: TmplAstIfBlock): void {
+    for (const branch of block.branches) {
+      tmplAstVisitAll(this, branch.children);
+    }
+  }
+  visitIfBlockBranch(block: TmplAstIfBlockBranch): void {
+    tmplAstVisitAll(this, block.children);
+  }
   visitUnknownBlock(): void {}
   visitLetDeclaration(): void {}
   visitComponent(): void {}

@@ -264,6 +264,135 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('style object binding validation', () => {
+    it('should not report diagnostic for valid properties in [style] object', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{backgroundColor: \\'red\\', width: \\'100px\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should report diagnostic for unknown property in [style] object', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{backgrond: \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain("Unknown CSS property 'backgrond'");
+      expect(cssDiags[0].messageText).toContain("Did you mean 'background'");
+    });
+
+    it('should report diagnostics for multiple unknown properties in [style] object', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{backgrond: \\'red\\', colr: \\'blue\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+      );
+      expect(cssDiags.length).toBe(2);
+    });
+
+    it('should not report diagnostic for valid kebab-case properties in [ngStyle]', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [ngStyle]="{\\'background-color\\': \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should report diagnostic for unknown kebab-case property in [ngStyle]', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [ngStyle]="{\\'backgrond-color\\': \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+      );
+      expect(cssDiags.length).toBe(1);
+      expect(cssDiags[0].messageText).toContain("Unknown CSS property 'backgrond-color'");
+    });
+
+    it('should not report diagnostic for CSS custom properties', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style]="{\\'--my-custom-var\\': \\'red\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+  });
+
   // TODO: Configuration tests require updating the testing infrastructure to support
   // PluginConfig options (cssPropertyValidation). Currently, the test environment
   // always uses default config. Configuration tests should be added in a follow-up PR.
