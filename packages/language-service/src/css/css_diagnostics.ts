@@ -523,10 +523,184 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     }
   }
 
+  /**
+   * Detects conflicting style bindings on an element.
+   * For example, [style.backgroundColor]="'red'" and [style]="{ backgroundColor: 'blue' }"
+   * both set the same property, which can be confusing.
+   *
+   * Style binding precedence (from highest to lowest):
+   * 1. [style.prop] specific bindings
+   * 2. [style]="{...}" general style binding
+   * 3. [ngStyle]="{...}" directive binding
+   *
+   * We emit warnings when the same property is set via multiple binding types.
+   */
+  private detectConflictingStyleBindings(element: TmplAstElement): void {
+    // Map from normalized property name to list of bindings that set it
+    const styleBindings = new Map<
+      string,
+      Array<{
+        type: 'specific' | 'style' | 'ngStyle';
+        originalName: string;
+        sourceSpan: ParseSourceSpan;
+      }>
+    >();
+
+    for (const input of element.inputs) {
+      if (input.type === BindingType.Style) {
+        // [style.propertyName]="value" - specific style binding
+        const propertyName = input.name;
+        const normalizedName = propertyName.includes('-')
+          ? kebabToCamelCase(propertyName)
+          : propertyName;
+
+        if (!styleBindings.has(normalizedName)) {
+          styleBindings.set(normalizedName, []);
+        }
+        styleBindings.get(normalizedName)!.push({
+          type: 'specific',
+          originalName: propertyName,
+          sourceSpan: input.sourceSpan,
+        });
+      } else if (input.type === BindingType.Property && input.name === 'style') {
+        // [style]="{...}" - general style binding with object literal
+        this.extractPropertiesFromBinding(input, 'style', styleBindings);
+      } else if (input.type === BindingType.Property && input.name === 'ngStyle') {
+        // [ngStyle]="{...}" - ngStyle directive
+        this.extractPropertiesFromBinding(input, 'ngStyle', styleBindings);
+      }
+    }
+
+    // Check for conflicts
+    for (const [normalizedName, bindings] of styleBindings) {
+      if (bindings.length <= 1) {
+        continue;
+      }
+
+      // Check if there are bindings of different types
+      const types = new Set(bindings.map((b) => b.type));
+      if (types.size <= 1) {
+        // All bindings are the same type - this is handled by duplicate detection
+        continue;
+      }
+
+      // Build a message about the conflict
+      const bindingDescriptions = bindings.map((b) => {
+        switch (b.type) {
+          case 'specific':
+            return `[style.${b.originalName}]`;
+          case 'style':
+            return `[style]`;
+          case 'ngStyle':
+            return `[ngStyle]`;
+        }
+      });
+
+      // Get the property name for the message (prefer camelCase for readability)
+      const propertyName = bindings[0].originalName;
+
+      // Emit a diagnostic for all but the highest-precedence binding
+      // Precedence: specific > style > ngStyle
+      const sortedBindings = [...bindings].sort((a, b) => {
+        const precedence = {specific: 3, style: 2, ngStyle: 1};
+        return precedence[b.type] - precedence[a.type];
+      });
+
+      // Warn on all bindings except the first (highest precedence)
+      for (let i = 1; i < sortedBindings.length; i++) {
+        const binding = sortedBindings[i];
+        const higherPrecedenceBinding = sortedBindings[0];
+
+        let higherDesc: string;
+        switch (higherPrecedenceBinding.type) {
+          case 'specific':
+            higherDesc = `[style.${higherPrecedenceBinding.originalName}]`;
+            break;
+          case 'style':
+            higherDesc = `[style]`;
+            break;
+          case 'ngStyle':
+            higherDesc = `[ngStyle]`;
+            break;
+        }
+
+        const message = `CSS property '${propertyName}' is set via multiple bindings (${bindingDescriptions.join(', ')}). The ${higherDesc} binding takes precedence.`;
+
+        const diagnostic = this.templateTypeChecker.makeTemplateDiagnostic(
+          this.component,
+          binding.sourceSpan,
+          this.severity,
+          ErrorCode.CONFLICTING_STYLE_BINDING,
+          message,
+        );
+        this.diagnostics.push(diagnostic);
+      }
+    }
+  }
+
+  /**
+   * Extracts CSS property names from a style or ngStyle binding and adds them to the map.
+   */
+  private extractPropertiesFromBinding(
+    input: TmplAstBoundAttribute,
+    bindingType: 'style' | 'ngStyle',
+    styleBindings: Map<
+      string,
+      Array<{
+        type: 'specific' | 'style' | 'ngStyle';
+        originalName: string;
+        sourceSpan: ParseSourceSpan;
+      }>
+    >,
+  ): void {
+    let expr: AST | null = input.value;
+
+    // Unwrap ASTWithSource
+    if (expr instanceof ASTWithSource) {
+      expr = expr.ast;
+    }
+
+    // Handle LiteralMap directly
+    if (expr instanceof LiteralMap) {
+      for (const key of expr.keys) {
+        if (key.kind === 'spread') {
+          continue;
+        }
+
+        const propertyName = key.key;
+        // Skip CSS custom properties
+        if (propertyName.startsWith('--')) {
+          continue;
+        }
+
+        const normalizedName = propertyName.includes('-')
+          ? kebabToCamelCase(propertyName)
+          : propertyName;
+
+        if (!styleBindings.has(normalizedName)) {
+          styleBindings.set(normalizedName, []);
+        }
+        styleBindings.get(normalizedName)!.push({
+          type: bindingType,
+          originalName: propertyName,
+          sourceSpan: input.sourceSpan,
+        });
+      }
+    }
+    // Note: For PropertyRead (variable references), we could try to resolve the type
+    // but it would require additional type checking. For now we only handle literals.
+  }
+
   // Required visitor methods - must visit children to find nested style bindings
   visitElement(element: TmplAstElement): void {
+    // First, validate individual bindings and collect style property info
     tmplAstVisitAll(this, element.attributes);
     tmplAstVisitAll(this, element.inputs);
+
+    // Then detect conflicting style bindings on this element
+    this.detectConflictingStyleBindings(element);
+
+    // Continue with children
     tmplAstVisitAll(this, element.children);
   }
   visitTemplate(template: TmplAstTemplate): void {

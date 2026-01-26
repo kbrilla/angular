@@ -716,6 +716,19 @@ export enum ErrorCode {
   DUPLICATE_CSS_PROPERTY = 8206,
 
   /**
+   * An element has conflicting style bindings for the same CSS property.
+   *
+   * For example:
+   * ```html
+   * <div [style.backgroundColor]="'red'" [style]="{ backgroundColor: 'blue' }"></div>
+   * ```
+   *
+   * The property `backgroundColor` is set via multiple bindings. The specific binding
+   * `[style.backgroundColor]` will take precedence over the general `[style]` binding.
+   */
+  CONFLICTING_STYLE_BINDING = 8207,
+
+  /**
    * The template type-checking engine would need to generate an inline type check block for a
    * component, but the current type-checking environment doesn't support it.
    */

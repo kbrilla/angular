@@ -903,6 +903,167 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('conflicting style bindings detection', () => {
+    it('should report conflict when [style.prop] and [style]="{prop}" both set same property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.backgroundColor]="\\'red\\'" [style]="{backgroundColor: \\'blue\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      expect(conflictDiags.length).toBe(1);
+      expect(conflictDiags[0].messageText).toContain('set via multiple bindings');
+      expect(conflictDiags[0].messageText).toContain('[style.backgroundColor]');
+      expect(conflictDiags[0].messageText).toContain('takes precedence');
+    });
+
+    it('should report conflict when [style.prop] and [ngStyle]="{prop}" both set same property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [style.color]="\\'red\\'" [ngStyle]="{color: \\'blue\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      expect(conflictDiags.length).toBe(1);
+      expect(conflictDiags[0].messageText).toContain('set via multiple bindings');
+      expect(conflictDiags[0].messageText).toContain('[style.color]');
+      expect(conflictDiags[0].messageText).toContain('takes precedence');
+    });
+
+    it('should report conflict when [style]="{prop}" and [ngStyle]="{prop}" both set same property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [style]="{width: \\'100px\\'}" [ngStyle]="{width: \\'200px\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      expect(conflictDiags.length).toBe(1);
+      expect(conflictDiags[0].messageText).toContain('set via multiple bindings');
+      expect(conflictDiags[0].messageText).toContain('[style]');
+      expect(conflictDiags[0].messageText).toContain('[ngStyle]');
+      expect(conflictDiags[0].messageText).toContain('takes precedence');
+    });
+
+    it('should report conflicts when all three binding types set same property', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+          import {CommonModule} from '@angular/common';
+
+          @Component({
+            imports: [CommonModule],
+            template: '<div [style.fontSize]="\\'14px\\'" [style]="{fontSize: \\'16px\\'}" [ngStyle]="{fontSize: \\'18px\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      // [style] and [ngStyle] are both overridden by [style.fontSize]
+      expect(conflictDiags.length).toBe(2);
+    });
+
+    it('should detect conflict with mixed case property names', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.background-color]="\\'red\\'" [style]="{backgroundColor: \\'blue\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      expect(conflictDiags.length).toBe(1);
+      expect(conflictDiags[0].messageText).toContain('set via multiple bindings');
+    });
+
+    it('should not report conflict when different properties are set', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.color]="\\'red\\'" [style]="{backgroundColor: \\'blue\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      expect(conflictDiags.length).toBe(0);
+    });
+
+    it('should not report conflict for CSS custom properties', () => {
+      const files = {
+        'app.ts': `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: '<div [style.--my-color]="\\'red\\'" [style]="{\\'--my-color\\': \\'blue\\'}"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const conflictDiags = diags.filter(
+        (d) => d.code === ngErrorCode(ErrorCode.CONFLICTING_STYLE_BINDING),
+      );
+      // CSS custom properties are skipped
+      expect(conflictDiags.length).toBe(0);
+    });
+  });
+
   // TODO: Configuration tests require updating the testing infrastructure to support
   // PluginConfig options (cssPropertyValidation). Currently, the test environment
   // always uses default config. Configuration tests should be added in a follow-up PR.
