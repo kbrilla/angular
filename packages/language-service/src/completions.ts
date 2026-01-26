@@ -13,6 +13,7 @@ import {
   BindingType,
   EmptyExpr,
   ImplicitReceiver,
+  LiteralMap,
   LiteralPrimitive,
   ParsedEventType,
   ParseSourceSpan,
@@ -86,6 +87,14 @@ type ElementAnimationCompletionBuilder = CompletionBuilder<
 >;
 
 type LetCompletionBuilder = CompletionBuilder<TmplAstLetDeclaration>;
+
+/**
+ * For style object literal completions like [style]="{|}" or [ngStyle]="{|}"
+ * where we need to provide CSS property name completions.
+ */
+type StyleObjectLiteralCompletionBuilder = CompletionBuilder<
+  EmptyExpr | LiteralPrimitive | LiteralMap
+>;
 
 export enum CompletionNodeContext {
   None,
@@ -191,7 +200,10 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
   getCompletionsAtPosition(
     options: ts.GetCompletionsAtPositionOptions | undefined,
   ): ts.WithMetadata<ts.CompletionInfo> | undefined {
-    if (this.isPropertyExpressionCompletion()) {
+    // Check style object literal completion first (more specific than property expression)
+    if (this.isStyleObjectLiteralCompletion()) {
+      return this.getStyleObjectLiteralCompletions(options);
+    } else if (this.isPropertyExpressionCompletion()) {
       return this.getPropertyExpressionCompletion(options);
     } else if (this.isElementTagCompletion()) {
       return this.getElementTagCompletion(options);
@@ -216,6 +228,86 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
 
   private isLetCompletion(): this is LetCompletionBuilder {
     return this.node instanceof TmplAstLetDeclaration;
+  }
+
+  /**
+   * Checks if we're in a position where CSS property name completions should be provided
+   * inside a style object literal like [style]="{|}" or [ngStyle]="{|}".
+   *
+   * This is true when:
+   * 1. The context is a RawExpression
+   * 2. We're inside or at a LiteralMap
+   * 3. The LiteralMap is the value of a [style] or [ngStyle] binding
+   */
+  private isStyleObjectLiteralCompletion(): this is StyleObjectLiteralCompletionBuilder {
+    // Check if we have a RawExpression context
+    const context = this.targetDetails.context;
+    if (context.kind !== TargetNodeKind.RawExpression) {
+      return false;
+    }
+
+    // Check if we're inside a LiteralMap
+    // Case 1: cursor is inside an empty object literal, node is LiteralMap
+    // Case 2: cursor is inside a quoted key like {'|'}, node is LiteralPrimitive with LiteralMap parent
+    // Case 3: cursor is at empty position inside object, node is EmptyExpr with LiteralMap parent
+
+    const isInLiteralMap =
+      this.node instanceof LiteralMap ||
+      ((this.node instanceof LiteralPrimitive || this.node instanceof EmptyExpr) &&
+        this.nodeParent instanceof LiteralMap);
+
+    if (!isInLiteralMap) {
+      return false;
+    }
+
+    // Check if we're inside a style or ngStyle binding using the containingAttribute
+    const containingAttribute = this.targetDetails.containingAttribute;
+    if (containingAttribute === null) {
+      return false;
+    }
+
+    return containingAttribute.name === 'style' || containingAttribute.name === 'ngStyle';
+  }
+
+  /**
+   * Provides CSS property name completions inside style object literals.
+   * For [style]="{|}" or [ngStyle]="{|}", suggests CSS property names.
+   */
+  private getStyleObjectLiteralCompletions(
+    this: StyleObjectLiteralCompletionBuilder,
+    _options: ts.GetCompletionsAtPositionOptions | undefined,
+  ): ts.WithMetadata<ts.CompletionInfo> | undefined {
+    // Get the prefix from the current node if it's a LiteralPrimitive string
+    let prefix = '';
+    if (this.node instanceof LiteralPrimitive && typeof this.node.value === 'string') {
+      prefix = this.node.value;
+    }
+
+    // Get CSS property completions
+    const cssEntries = getCSSPropertyCompletions(prefix);
+
+    // If we're completing inside a quoted string like {'|'}, add the quote to replacementSpan
+    let replacementSpan: ts.TextSpan | undefined;
+    if (this.node instanceof LiteralPrimitive && typeof this.node.value === 'string') {
+      // The sourceSpan includes the quotes, but we want to replace just the content
+      replacementSpan = {
+        start: this.node.sourceSpan.start + 1, // Skip opening quote
+        length: this.node.value.length,
+      };
+    }
+
+    // Add replacementSpan to each entry
+    const entries = cssEntries.map((entry) => ({
+      ...entry,
+      replacementSpan,
+    }));
+
+    return {
+      isGlobalCompletion: false,
+      isMemberCompletion: false,
+      isNewIdentifierLocation: true, // Allow new property names
+      entries,
+    };
   }
 
   private isBlockCompletion(): this is CompletionBuilder<TmplAstText> {

@@ -88,6 +88,12 @@ export interface TemplateTarget {
    * The immediate parent node of the targeted node.
    */
   parent: TmplAstNode | AST | null;
+
+  /**
+   * If the position is within a bound attribute's value, this is the containing attribute.
+   * Useful for understanding context like [style]="{...}" when inside the value AST.
+   */
+  containingAttribute: TmplAstBoundAttribute | null;
 }
 
 /**
@@ -383,7 +389,17 @@ export function getTargetAtPosition(
     parent = path[path.length - 2];
   }
 
-  return {position, context: nodeInContext, template: context, parent};
+  // Find the containing TmplAstBoundAttribute if we're inside an attribute value
+  let containingAttribute: TmplAstBoundAttribute | null = null;
+  for (let i = path.length - 1; i >= 0; i--) {
+    const node = path[i];
+    if (node instanceof TmplAstBoundAttribute) {
+      containingAttribute = node;
+      break;
+    }
+  }
+
+  return {position, context: nodeInContext, template: context, parent, containingAttribute};
 }
 
 function findFirstMatchingNodeForSourceSpan(

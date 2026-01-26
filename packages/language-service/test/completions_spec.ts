@@ -2199,6 +2199,53 @@ describe('completions', () => {
       expectContain(completions, ts.ScriptElementKind.memberVariableElement, ['title', 'hero']);
     });
   });
+
+  describe('CSS property completions in style object literals', () => {
+    it('should provide CSS property completions inside empty style object literal', () => {
+      const {templateFile} = setup(`<div [style]="{}"></div>`, '');
+      templateFile.moveCursorToText('[style]="{¦}');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include common CSS properties
+      expectContain(completions, ts.ScriptElementKind.memberVariableElement, [
+        'width',
+        'height',
+        'color',
+        'backgroundColor',
+      ]);
+      // Verify we don't just get component properties
+      expectDoesNotContain(completions, ts.ScriptElementKind.memberVariableElement, [
+        'toString',
+        'valueOf',
+      ]);
+    });
+
+    it('should provide CSS property completions inside ngStyle object literal', () => {
+      const {templateFile} = setup(`<div [ngStyle]="{}"></div>`, '');
+      templateFile.moveCursorToText('[ngStyle]="{¦}');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include common CSS properties
+      expectContain(completions, ts.ScriptElementKind.memberVariableElement, [
+        'width',
+        'height',
+        'color',
+        'fontSize',
+      ]);
+    });
+
+    it('should NOT provide CSS completions for non-style object literals', () => {
+      const {templateFile} = setup(`<div [attr.data-config]="{}"></div>`, '');
+      templateFile.moveCursorToText('[attr.data-config]="{¦}');
+      const completions = templateFile.getCompletionsAtPosition();
+      // Should not have CSS properties for non-style attributes
+      if (completions) {
+        const cssPropertyNames = completions.entries.map((e) => e.name);
+        expect(cssPropertyNames).not.toContain('backgroundColor');
+        expect(cssPropertyNames).not.toContain('fontSize');
+      }
+    });
+  });
 });
 
 function expectContainInsertText(
