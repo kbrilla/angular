@@ -9,11 +9,13 @@
 import {
   AST,
   ASTWithSource,
+  BindingPipe,
   BindingType,
   LiteralMap,
   LiteralMapKey,
   LiteralPrimitive,
   ParseSpan,
+  RecursiveAstVisitor,
   SpreadElement,
   TmplAstBoundAttribute,
   TmplAstElement,
@@ -77,6 +79,12 @@ export const enum CssDiagnosticCode {
   PREFER_NUMERIC_UNIT_VALUE = 99015,
   /** Warning when number used without unit in style binding. */
   MISSING_UNIT_FOR_NUMBER = 99016,
+  /** Suggestion to migrate [ngClass] to [class]. */
+  PREFER_CLASS_OVER_NGCLASS = 99017,
+  /** Suggestion to convert [style] object literal to individual bindings. */
+  PREFER_INDIVIDUAL_STYLE_BINDINGS = 99018,
+  /** Suggestion to consolidate multiple individual [style.x] bindings into [style] object. */
+  PREFER_STYLE_OBJECT_BINDING = 99019,
 }
 
 /**
@@ -1123,6 +1131,136 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   }
 
   /**
+   * Checks if an input is an [ngClass] binding and suggests migration to [class].
+   */
+  private checkNgClassBinding(input: TmplAstBoundAttribute): void {
+    if (input.type !== BindingType.Property || input.name !== 'ngClass') {
+      return;
+    }
+    if (!input.keySpan || input.keySpan.start.offset < 0) {
+      return;
+    }
+
+    // Produce a suggestion-level diagnostic
+    this.diagnostics.push({
+      category: ts.DiagnosticCategory.Suggestion,
+      code: CssDiagnosticCode.PREFER_CLASS_OVER_NGCLASS,
+      messageText:
+        `Consider using [class] instead of [ngClass]. ` +
+        `The [class] binding supports all the same value types and is more direct.`,
+      file: this.component.getSourceFile(),
+      start: input.keySpan.start.offset,
+      length: input.keySpan.end.offset - input.keySpan.start.offset,
+      source: 'angular',
+    });
+  }
+
+  /**
+   * Checks if an input is a [style] object binding and suggests individual bindings.
+   */
+  private checkStyleObjectBinding(input: TmplAstBoundAttribute): void {
+    if (input.type !== BindingType.Property || input.name !== 'style') {
+      return;
+    }
+    if (!input.keySpan || input.keySpan.start.offset < 0) {
+      return;
+    }
+
+    // Unwrap to check if this is a literal map (object literal)
+    let ast: AST = input.value;
+    if (ast instanceof ASTWithSource) {
+      ast = ast.ast;
+    }
+
+    // Only suggest for direct object literals (not variable references)
+    if (!(ast instanceof LiteralMap)) {
+      return;
+    }
+
+    // Don't suggest for objects with spread operators (too complex to convert)
+    const hasSpread = ast.keys.some((key) => key.kind === 'spread');
+    if (hasSpread) {
+      return;
+    }
+
+    // Get the properties from the style object
+    const properties = ast.keys
+      .filter((key) => key.kind === 'property')
+      .map((key) => ({name: key.key.split('.')[0], span: key.sourceSpan}));
+
+    // Only suggest conversion for small objects (1-5 properties)
+    if (properties.length === 0 || properties.length > 5) {
+      return;
+    }
+
+    const propNames = properties.map((p) => p.name);
+    const propList = propNames.map((p) => `[style.${p}]`).join(', ');
+
+    this.diagnostics.push({
+      category: ts.DiagnosticCategory.Suggestion,
+      code: CssDiagnosticCode.PREFER_INDIVIDUAL_STYLE_BINDINGS,
+      messageText:
+        `Consider using individual style bindings (${propList}) instead of [style] object. ` +
+        `Individual bindings are more explicit and easier to maintain.`,
+      file: this.component.getSourceFile(),
+      start: input.keySpan.start.offset,
+      length: input.keySpan.end.offset - input.keySpan.start.offset,
+      source: 'angular',
+    });
+  }
+
+  /**
+   * Checks if an element has multiple individual [style.x] bindings and suggests
+   * consolidating them into a single [style] object binding.
+   * Only suggests if none of the bindings use pipes (pipes aren't supported in object literal values).
+   */
+  private checkMultipleIndividualStyleBindings(element: TmplAstElement | TmplAstTemplate): void {
+    // Collect all individual style bindings
+    const styleBindings = element.inputs.filter(
+      (input) =>
+        input.type === BindingType.Style && input.keySpan && input.keySpan.start.offset >= 0,
+    );
+
+    // Only suggest consolidation when there are 3+ bindings (minor benefit for 2)
+    if (styleBindings.length < 3) {
+      return;
+    }
+
+    // Check if any binding uses pipes - if so, skip (can't use pipes in object literals)
+    for (const binding of styleBindings) {
+      if (containsPipe(binding.value)) {
+        // At least one binding uses a pipe - don't suggest consolidation
+        return;
+      }
+    }
+
+    // Also skip if there's already a [style] object binding (avoid conflict)
+    const hasStyleObjectBinding = element.inputs.some(
+      (input) => input.type === BindingType.Property && input.name === 'style',
+    );
+    if (hasStyleObjectBinding) {
+      return;
+    }
+
+    // Report on the first binding as representative
+    const firstBinding = styleBindings[0];
+    const propNames = styleBindings.map((b) => b.name.split('.')[0]);
+    const propList = propNames.join(', ');
+
+    this.diagnostics.push({
+      category: ts.DiagnosticCategory.Suggestion,
+      code: CssDiagnosticCode.PREFER_STYLE_OBJECT_BINDING,
+      messageText:
+        `Consider consolidating ${styleBindings.length} individual style bindings (${propList}) into a single [style] object. ` +
+        `This can make the template more concise.`,
+      file: this.component.getSourceFile(),
+      start: firstBinding.keySpan!.start.offset,
+      length: firstBinding.keySpan!.end.offset - firstBinding.keySpan!.start.offset,
+      source: 'angular',
+    });
+  }
+
+  /**
    * Extracts property names from a style object binding ([style]="{...}" or [ngStyle]="{...}").
    */
   private extractPropertiesFromStyleBinding(
@@ -1192,7 +1330,17 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     // Then, process individual bindings for property/unit validation
     for (const input of element.inputs) {
       this.visitBoundAttribute(input);
+
+      // Check for [ngClass] bindings and suggest migration to [class]
+      this.checkNgClassBinding(input);
+
+      // Check for [style] object bindings and suggest individual bindings
+      this.checkStyleObjectBinding(input);
     }
+
+    // Check for multiple individual style bindings and suggest consolidation
+    this.checkMultipleIndividualStyleBindings(element);
+
     // Recursively visit children
     tmplAstVisitAll(this, element.children);
   }
@@ -1203,7 +1351,17 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     // Process style bindings on template inputs
     for (const input of template.inputs) {
       this.visitBoundAttribute(input);
+
+      // Check for [ngClass] bindings and suggest migration to [class]
+      this.checkNgClassBinding(input);
+
+      // Check for [style] object bindings and suggest individual bindings
+      this.checkStyleObjectBinding(input);
     }
+
+    // Check for multiple individual style bindings and suggest consolidation
+    this.checkMultipleIndividualStyleBindings(template);
+
     // Recursively visit children
     tmplAstVisitAll(this, template.children);
   }
@@ -1231,4 +1389,36 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   visitLetDeclaration(): void {}
   visitComponent(): void {}
   visitDirective(): void {}
+}
+/**
+ * Checks whether an AST expression contains a pipe (BindingPipe).
+ * Used to determine if a style binding value can be safely converted to an object literal.
+ */
+function containsPipe(ast: AST): boolean {
+  // Unwrap ASTWithSource
+  if (ast instanceof ASTWithSource) {
+    ast = ast.ast;
+  }
+
+  // Check if this is a BindingPipe
+  if (ast instanceof BindingPipe) {
+    return true;
+  }
+
+  // Use a visitor to recursively check the AST
+  const checker = new PipeDetectorVisitor();
+  ast.visit(checker);
+  return checker.hasPipe;
+}
+
+/**
+ * AST visitor that checks for the presence of pipes in an expression.
+ */
+class PipeDetectorVisitor extends RecursiveAstVisitor {
+  hasPipe = false;
+
+  override visitPipe(_ast: BindingPipe, _context: any): any {
+    this.hasPipe = true;
+    // Don't need to continue once we find a pipe
+  }
 }
