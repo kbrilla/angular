@@ -105,28 +105,43 @@ export class LanguageService {
   getSemanticDiagnostics(fileName: string): ts.Diagnostic[] {
     return this.withCompilerAndPerfTracing(PerfPhase.LsDiagnostics, (compiler) => {
       let diagnostics: ts.Diagnostic[] = [];
+      // @ts-ignore DEBUG
+      console.log(`[LS_DIAG] getSemanticDiagnostics called for: ${fileName}`);
       if (isTypeScriptFile(fileName)) {
+        // @ts-ignore DEBUG
+        console.log(`[LS_DIAG] TypeScript file detected`);
         const program = compiler.getCurrentProgram();
         const sourceFile = program.getSourceFile(fileName);
         if (sourceFile) {
           const ngDiagnostics = compiler.getDiagnosticsForFile(sourceFile, OptimizeFor.SingleFile);
           diagnostics.push(...filterNgDiagnosticsForFile(ngDiagnostics, sourceFile.fileName));
+          // @ts-ignore DEBUG
+          console.log(`[LS_DIAG] NG diagnostics: ${ngDiagnostics.length}`);
 
           // Add CSS property validation diagnostics for components in this file
           // Note: This pattern (walking class declarations, using ttc.getTemplate) is similar
           // to getInlayHintsAtPosition - could be refactored to share a utility function.
           const cssConfig = this.getCssDiagnosticsConfig();
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] CSS config: enabled=${cssConfig.enabled}, severity=${cssConfig.severity}`,
+          );
           if (cssConfig.enabled) {
             const ttc = compiler.getTemplateTypeChecker();
             // Find all class declarations that are components (have templates)
             const visit = (node: ts.Node): void => {
               if (ts.isClassDeclaration(node)) {
+                const className = node.name?.getText() || '<anonymous>';
                 try {
                   const template = ttc.getTemplate(node);
                   if (template) {
+                    // @ts-ignore DEBUG
+                    console.log(`[LS_DIAG] Found component: ${className} with template`);
                     // This is a component with a template - validate CSS properties
                     const cssDiags = getCssDiagnostics(node, compiler, cssConfig);
                     diagnostics.push(...cssDiags);
+                    // @ts-ignore DEBUG
+                    console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
                   }
                 } catch {
                   // Not a component or error getting template, skip
@@ -138,12 +153,23 @@ export class LanguageService {
           }
         }
       } else {
+        // @ts-ignore DEBUG
+        console.log(`[LS_DIAG] Template file detected`);
         const components = compiler.getComponentsWithTemplateFile(fileName);
+        // @ts-ignore DEBUG
+        console.log(`[LS_DIAG] Found ${components.length} components for template`);
         for (const component of components) {
           if (ts.isClassDeclaration(component)) {
+            const className = component.name?.getText() || '<anonymous>';
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] Processing component: ${className}`);
             diagnostics.push(...compiler.getDiagnosticsForComponent(component));
             // Add CSS property validation diagnostics
-            diagnostics.push(...this.getCssDiagnosticsForComponent(component, compiler));
+            // Pass the template file name so diagnostics point to the correct file
+            const cssDiags = this.getCssDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...cssDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
           }
         }
       }
@@ -155,23 +181,55 @@ export class LanguageService {
       if (enableG3Suppression) {
         diagnostics = diagnostics.filter((diag) => !suppressDiagnosticsInG3.includes(diag.code));
       }
+      // @ts-ignore DEBUG
+      console.log(`[LS_DIAG] TOTAL diagnostics returned: ${diagnostics.length}`);
       return diagnostics;
     });
   }
 
   /**
    * Gets CSS property validation diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
    * @internal
    */
   private getCssDiagnosticsForComponent(
     component: ts.ClassDeclaration,
     compiler: NgCompiler,
+    templateFileName?: string,
   ): ts.Diagnostic[] {
     const cssConfig = this.getCssDiagnosticsConfig();
     if (!cssConfig.enabled) {
       return [];
     }
-    return getCssDiagnostics(component, compiler, cssConfig);
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] Created synthetic source file for external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    return getCssDiagnostics(component, compiler, cssConfig, templateSourceFile);
   }
 
   /**
