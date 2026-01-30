@@ -24,8 +24,20 @@ import {
   TmplAstTemplate,
   tmplAstVisitAll,
   TmplAstVisitor,
+  TmplAstIfBlock,
+  TmplAstIfBlockBranch,
+  TmplAstForLoopBlock,
+  TmplAstForLoopBlockEmpty,
+  TmplAstSwitchBlock,
+  TmplAstSwitchBlockCase,
+  TmplAstSwitchBlockCaseGroup,
+  TmplAstDeferredBlock,
+  TmplAstDeferredBlockPlaceholder,
+  TmplAstDeferredBlockError,
+  TmplAstDeferredBlockLoading,
 } from '@angular/compiler';
 import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
+import {isExternalResource} from '@angular/compiler-cli/src/ngtsc/metadata';
 import {TemplateTypeChecker} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
@@ -122,14 +134,31 @@ export const DEFAULT_CSS_DIAGNOSTICS_CONFIG: CssDiagnosticsConfig = {
  * @param component The component class declaration.
  * @param compiler The Angular compiler instance.
  * @param config Optional configuration for diagnostics.
+ * @param templateSourceFile Optional source file for external templates. If provided, diagnostics
+ *                           will point to this file instead of the component's TypeScript file.
  * @returns Array of CSS diagnostics.
  */
 export function getCssDiagnostics(
   component: ts.ClassDeclaration,
   compiler: NgCompiler,
   config: CssDiagnosticsConfig = DEFAULT_CSS_DIAGNOSTICS_CONFIG,
+  templateSourceFile?: ts.SourceFile,
 ): ts.Diagnostic[] {
+  const componentName = component.name?.getText() || '<anonymous>';
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG] getCssDiagnostics called for component: ${componentName}`);
+  // @ts-ignore DEBUG
+  console.log(
+    `[CSS_DIAG] Config: enabled=${config.enabled}, severity=${config.severity}, strictUnitValues=${config.strictUnitValues}`,
+  );
+  // @ts-ignore DEBUG
+  console.log(
+    `[CSS_DIAG] templateSourceFile provided: ${templateSourceFile ? 'YES (' + templateSourceFile.fileName + ')' : 'NO'}`,
+  );
+
   if (!config.enabled) {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] CSS diagnostics DISABLED, returning empty array`);
     return [];
   }
 
@@ -137,27 +166,53 @@ export function getCssDiagnostics(
   const diagnostics: ts.Diagnostic[] = [];
   const severity = getDiagnosticCategory(config.severity);
 
+  // Determine the source file to use for diagnostics:
+  // - For external templates, use the provided templateSourceFile
+  // - For inline templates, use the component's TypeScript file
+  const diagnosticSourceFile = templateSourceFile ?? component.getSourceFile();
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG] Using source file for diagnostics: ${diagnosticSourceFile.fileName}`);
+
   // Validate template style bindings
   const template = templateTypeChecker.getTemplate(component);
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG] Template retrieved: ${template !== null ? 'YES' : 'NO'}`);
   if (template !== null) {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] Template has ${template.length} root nodes`);
     const visitor = new CssBindingVisitor(
       component,
       templateTypeChecker,
       diagnostics,
       severity,
       config,
+      diagnosticSourceFile,
     );
     tmplAstVisitAll(visitor, template);
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] After visitor: ${diagnostics.length} diagnostics found`);
   }
 
   // Validate host element style bindings (from @Component host: { '[style.prop]': ... })
   const hostElement = templateTypeChecker.getHostElement(component);
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG] Host element retrieved: ${hostElement !== null ? 'YES' : 'NO'}`);
   if (hostElement !== null) {
     validateHostStyleBindings(component, hostElement, diagnostics, severity);
     // Also detect conflicts within host bindings
     detectHostStyleBindingConflicts(component, hostElement, diagnostics, severity);
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] After host validation: ${diagnostics.length} diagnostics`);
   }
 
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG] TOTAL diagnostics returned: ${diagnostics.length}`);
+  for (const diag of diagnostics) {
+    // @ts-ignore DEBUG
+    console.log(
+      `[CSS_DIAG]   - code=${diag.code}, msg=${String(diag.messageText).substring(0, 80)}...`,
+    );
+  }
   return diagnostics;
 }
 
@@ -449,6 +504,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     private readonly diagnostics: ts.Diagnostic[],
     private readonly severity: ts.DiagnosticCategory,
     private readonly config: CssDiagnosticsConfig,
+    private readonly diagnosticSourceFile: ts.SourceFile,
   ) {}
 
   visitBoundAttribute(attribute: TmplAstBoundAttribute): void {
@@ -485,7 +541,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           category: this.severity,
           code: CssDiagnosticCode.INVALID_CSS_UNIT,
           messageText: `Unknown CSS unit '${unit}'. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
-          file: this.component.getSourceFile(),
+          file: this.diagnosticSourceFile,
           start: attribute.keySpan.end.offset - unit.length,
           length: unit.length,
           source: 'angular',
@@ -516,7 +572,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         category: ts.DiagnosticCategory.Warning, // Always warning for obsolete
         code: CssDiagnosticCode.OBSOLETE_CSS_PROPERTY,
         messageText: message,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: attribute.keySpan.start.offset,
         length: attribute.keySpan.end.offset - attribute.keySpan.start.offset,
         source: 'angular',
@@ -545,7 +601,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         category: this.severity,
         code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY,
         messageText: message,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: attribute.keySpan.start.offset,
         length: attribute.keySpan.end.offset - attribute.keySpan.start.offset,
         source: 'angular',
@@ -558,7 +614,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         category: this.severity,
         code: CssDiagnosticCode.INVALID_CSS_UNIT,
         messageText: `Unknown CSS unit '${unit}'. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: attribute.keySpan.end.offset - unit.length,
         length: unit.length,
         source: 'angular',
@@ -655,7 +711,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         messageText:
           `Style binding '[style.${propertyName}]' has a numeric value (${value}) without a unit. ` +
           `Consider using '[style.${propertyName}.px]="${value}"' or '[style.${propertyName}]="'${value}px'"'.`,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: ast.sourceSpan.start,
         length: ast.sourceSpan.end - ast.sourceSpan.start,
         source: 'angular',
@@ -721,7 +777,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             messageText:
               `Style binding '[style.${propertyName}.${unit}]' expects a numeric value. ` +
               `Consider using ${numericValue} instead of '${trimmed}' for better type safety.`,
-            file: this.component.getSourceFile(),
+            file: this.diagnosticSourceFile,
             start: ast.sourceSpan.start,
             length: ast.sourceSpan.end - ast.sourceSpan.start,
             source: 'angular',
@@ -741,7 +797,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           `Invalid value '${value}' for style binding '[style.${propertyName}.${unit}]'. ` +
           `Unit suffix '.${unit}' expects a numeric value. ` +
           `The value '${value}' will result in invalid CSS '${value}${unit}'.`,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: ast.sourceSpan.start,
         length: ast.sourceSpan.end - ast.sourceSpan.start,
         source: 'angular',
@@ -758,7 +814,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         messageText:
           `Invalid value '${value}' for style binding '[style.${propertyName}.${unit}]'. ` +
           `Unit suffix '.${unit}' expects a numeric value, not a boolean.`,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: ast.sourceSpan.start,
         length: ast.sourceSpan.end - ast.sourceSpan.start,
         source: 'angular',
@@ -822,7 +878,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             category: this.severity,
             code: CssDiagnosticCode.DUPLICATE_CSS_PROPERTY,
             messageText: message,
-            file: this.component.getSourceFile(),
+            file: this.diagnosticSourceFile,
             start: key.sourceSpan.start,
             length: key.sourceSpan.end - key.sourceSpan.start,
             source: 'angular',
@@ -841,7 +897,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           category: this.severity,
           code: CssDiagnosticCode.INVALID_CSS_UNIT,
           messageText: `Unknown CSS unit '${unit}'. Valid units include: px, em, rem, %, vh, vw, s, ms, deg, etc.`,
-          file: this.component.getSourceFile(),
+          file: this.diagnosticSourceFile,
           // Position at the unit part of the key
           start: key.sourceSpan.start + propertyName.length + 1,
           length: unit.length,
@@ -940,7 +996,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         category: ts.DiagnosticCategory.Warning, // Always warning for obsolete
         code: CssDiagnosticCode.OBSOLETE_CSS_PROPERTY_IN_OBJECT,
         messageText: message,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: sourceSpan.start,
         length: sourceSpan.end - sourceSpan.start,
         source: 'angular',
@@ -969,7 +1025,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         category: this.severity,
         code: CssDiagnosticCode.UNKNOWN_CSS_PROPERTY_IN_OBJECT,
         messageText: message,
-        file: this.component.getSourceFile(),
+        file: this.diagnosticSourceFile,
         start: sourceSpan.start,
         length: sourceSpan.end - sourceSpan.start,
         source: 'angular',
@@ -981,14 +1037,27 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
    * Collects all style properties being set on an element and detects conflicts.
    */
   private detectStyleBindingConflicts(element: TmplAstElement | TmplAstTemplate): void {
+    const elementName = 'name' in element ? element.name : 'ng-template';
+    // @ts-ignore DEBUG
+    console.log(
+      `[CSS_DIAG] detectStyleBindingConflicts for <${elementName}> with ${element.inputs.length} inputs`,
+    );
+
     // Collect all style bindings by normalized property name
     const bindingsByProperty = new Map<string, StyleBinding[]>();
 
     for (const input of element.inputs) {
+      // @ts-ignore DEBUG
+      console.log(`[CSS_DIAG]   Input: type=${BindingType[input.type]}, name='${input.name}'`);
+
       // Individual style binding: [style.prop]
       if (input.type === BindingType.Style) {
         const propertyName = input.name.split('.')[0];
         const normalized = normalizeCSSPropertyName(propertyName);
+        // @ts-ignore DEBUG
+        console.log(
+          `[CSS_DIAG]     -> Style binding: propertyName='${propertyName}', normalized='${normalized}'`,
+        );
         const binding: StyleBinding = {
           property: normalized,
           bindingType: 'individual',
@@ -1005,6 +1074,10 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           const bindingType = input.name === 'style' ? 'styleObject' : 'ngStyle';
           // Extract properties from the object literal
           const properties = this.extractPropertiesFromStyleBinding(input);
+          // @ts-ignore DEBUG
+          console.log(
+            `[CSS_DIAG]     -> ${bindingType} binding with ${properties.length} properties`,
+          );
           for (const prop of properties) {
             const normalized = normalizeCSSPropertyName(prop.name);
             const binding: StyleBinding = {
@@ -1019,6 +1092,16 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           }
         }
       }
+    }
+
+    // Log all collected bindings
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG]   Collected ${bindingsByProperty.size} unique properties:`);
+    for (const [prop, bindings] of bindingsByProperty) {
+      // @ts-ignore DEBUG
+      console.log(
+        `[CSS_DIAG]     '${prop}' -> ${bindings.map((b) => b.originalPropertyName + '(' + b.bindingType + ')').join(', ')}`,
+      );
     }
 
     // Check for conflicts (same property with different binding types)
@@ -1044,7 +1127,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           category: this.severity,
           code: CssDiagnosticCode.CONFLICTING_STYLE_BINDING,
           messageText: `CSS property '${loser.originalPropertyName}' is set via multiple bindings. The ${winnerDescription} binding takes precedence over ${loserDescription}.`,
-          file: this.component.getSourceFile(),
+          file: this.diagnosticSourceFile,
           start: loser.attribute.keySpan.start.offset,
           length: loser.attribute.keySpan.end.offset - loser.attribute.keySpan.start.offset,
           source: 'angular',
@@ -1066,6 +1149,10 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   private detectShorthandLonghandConflicts(bindingsByProperty: Map<string, StyleBinding[]>): void {
     // Get all unique property names (these are normalized - all lowercase)
     const propertyNames = Array.from(bindingsByProperty.keys());
+    // @ts-ignore DEBUG
+    console.log(
+      `[CSS_DIAG] detectShorthandLonghandConflicts: checking ${propertyNames.length} properties: [${propertyNames.join(', ')}]`,
+    );
 
     // Check each shorthand property for longhand conflicts
     for (const normalizedProperty of propertyNames) {
@@ -1076,21 +1163,37 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       // Get the original property name and convert to camelCase for shorthand lookup
       const originalName = bindings[0].originalPropertyName;
       const camelCaseName = kebabToCamelCase(originalName);
+      const isShorthand = isShorthandProperty(camelCaseName);
+      // @ts-ignore DEBUG
+      console.log(
+        `[CSS_DIAG]   Checking '${normalizedProperty}': original='${originalName}', camelCase='${camelCaseName}', isShorthand=${isShorthand}`,
+      );
 
       // Skip if this property isn't a shorthand
-      if (!isShorthandProperty(camelCaseName)) continue;
+      if (!isShorthand) continue;
 
       const shorthandBindings = bindings;
 
       // Get the longhands for this shorthand
       const longhands = getShorthandLonghands(camelCaseName);
+      // @ts-ignore DEBUG
+      console.log(`[CSS_DIAG]     '${camelCaseName}' has longhands: [${longhands.join(', ')}]`);
 
       // Check if any longhand is also being set
       for (const longhand of longhands) {
         // Normalize the longhand for lookup in the map
         const normalizedLonghand = longhand.toLowerCase();
         const longhandBindings = bindingsByProperty.get(normalizedLonghand);
+        // @ts-ignore DEBUG
+        console.log(
+          `[CSS_DIAG]       Looking for longhand '${longhand}' (normalized: '${normalizedLonghand}'): found=${longhandBindings ? 'YES' : 'NO'}`,
+        );
         if (!longhandBindings || longhandBindings.length === 0) continue;
+
+        // @ts-ignore DEBUG
+        console.log(
+          `[CSS_DIAG]       *** CONFLICT FOUND! shorthand='${camelCaseName}' vs longhand='${longhand}'`,
+        );
 
         // Report conflict - the shorthand will override the longhand
         // Report on the longhand binding since that's the one that will be overridden
@@ -1099,6 +1202,20 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           const shorthandDisplay = camelToKebabCase(shorthandBinding.originalPropertyName);
           const longhandDisplay = camelToKebabCase(longhandBinding.originalPropertyName);
 
+          // @ts-ignore DEBUG
+          console.log(
+            `[CSS_DIAG]       Pushing SHORTHAND_OVERRIDE diagnostic for '${longhandDisplay}'`,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[CSS_DIAG]       Longhand keySpan: start=${longhandBinding.attribute.keySpan?.start.offset}, end=${longhandBinding.attribute.keySpan?.end.offset}`,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[CSS_DIAG]       Shorthand keySpan: start=${shorthandBinding.attribute.keySpan?.start.offset}, end=${shorthandBinding.attribute.keySpan?.end.offset}`,
+          );
+          // @ts-ignore DEBUG
+          console.log(`[CSS_DIAG]       Component file: ${this.diagnosticSourceFile.fileName}`);
           this.diagnostics.push({
             category: ts.DiagnosticCategory.Warning,
             code: CssDiagnosticCode.SHORTHAND_OVERRIDE,
@@ -1106,7 +1223,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
               `CSS property '${longhandDisplay}' will be overridden by the '${shorthandDisplay}' shorthand property. ` +
               `The shorthand resets all of its longhand properties. ` +
               `Consider using only the shorthand or only the longhand properties.`,
-            file: this.component.getSourceFile(),
+            file: this.diagnosticSourceFile,
             start: longhandBinding.attribute.keySpan.start.offset,
             length:
               longhandBinding.attribute.keySpan.end.offset -
@@ -1116,7 +1233,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
               {
                 category: ts.DiagnosticCategory.Message,
                 code: 0,
-                file: this.component.getSourceFile(),
+                file: this.diagnosticSourceFile,
                 start: shorthandBinding.attribute.keySpan.start.offset,
                 length:
                   shorthandBinding.attribute.keySpan.end.offset -
@@ -1148,7 +1265,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       messageText:
         `Consider using [class] instead of [ngClass]. ` +
         `The [class] binding supports all the same value types and is more direct.`,
-      file: this.component.getSourceFile(),
+      file: this.diagnosticSourceFile,
       start: input.keySpan.start.offset,
       length: input.keySpan.end.offset - input.keySpan.start.offset,
       source: 'angular',
@@ -1202,7 +1319,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       messageText:
         `Consider using individual style bindings (${propList}) instead of [style] object. ` +
         `Individual bindings are more explicit and easier to maintain.`,
-      file: this.component.getSourceFile(),
+      file: this.diagnosticSourceFile,
       start: input.keySpan.start.offset,
       length: input.keySpan.end.offset - input.keySpan.start.offset,
       source: 'angular',
@@ -1253,7 +1370,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       messageText:
         `Consider consolidating ${styleBindings.length} individual style bindings (${propList}) into a single [style] object. ` +
         `This can make the template more concise.`,
-      file: this.component.getSourceFile(),
+      file: this.diagnosticSourceFile,
       start: firstBinding.keySpan!.start.offset,
       length: firstBinding.keySpan!.end.offset - firstBinding.keySpan!.start.offset,
       source: 'angular',
@@ -1324,6 +1441,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
   // Required visitor methods
   visitElement(element: TmplAstElement): void {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] visitElement: <${element.name}> with ${element.inputs.length} inputs`);
+
     // First, detect style binding conflicts on this element
     this.detectStyleBindingConflicts(element);
 
@@ -1345,6 +1465,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     tmplAstVisitAll(this, element.children);
   }
   visitTemplate(template: TmplAstTemplate): void {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] visitTemplate with ${template.inputs.length} inputs`);
+
     // Detect style binding conflicts on ng-template
     this.detectStyleBindingConflicts(template);
 
@@ -1373,18 +1496,55 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   visitText(): void {}
   visitIcu(): void {}
   visitBoundEvent(): void {}
-  visitDeferredBlock(): void {}
-  visitDeferredBlockPlaceholder(): void {}
-  visitDeferredBlockError(): void {}
-  visitDeferredBlockLoading(): void {}
+  visitDeferredBlock(block: TmplAstDeferredBlock): void {
+    // Visit the main content and all sub-blocks
+    tmplAstVisitAll(this, block.children);
+    if (block.placeholder) this.visitDeferredBlockPlaceholder(block.placeholder);
+    if (block.loading) this.visitDeferredBlockLoading(block.loading);
+    if (block.error) this.visitDeferredBlockError(block.error);
+  }
+  visitDeferredBlockPlaceholder(block: TmplAstDeferredBlockPlaceholder): void {
+    tmplAstVisitAll(this, block.children);
+  }
+  visitDeferredBlockError(block: TmplAstDeferredBlockError): void {
+    tmplAstVisitAll(this, block.children);
+  }
+  visitDeferredBlockLoading(block: TmplAstDeferredBlockLoading): void {
+    tmplAstVisitAll(this, block.children);
+  }
   visitDeferredTrigger(): void {}
-  visitSwitchBlock(): void {}
+  visitSwitchBlock(block: TmplAstSwitchBlock): void {
+    // Visit all case groups
+    for (const group of block.groups) {
+      this.visitSwitchBlockCaseGroup(group);
+    }
+  }
   visitSwitchBlockCase(): void {}
-  visitSwitchBlockCaseGroup(): void {}
-  visitForLoopBlock(): void {}
+  visitSwitchBlockCaseGroup(group: TmplAstSwitchBlockCaseGroup): void {
+    tmplAstVisitAll(this, group.children);
+  }
+  visitForLoopBlock(block: TmplAstForLoopBlock): void {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] visitForLoopBlock with ${block.children.length} children`);
+    tmplAstVisitAll(this, block.children);
+    if (block.empty) {
+      tmplAstVisitAll(this, block.empty.children);
+    }
+  }
   visitForLoopBlockEmpty(): void {}
-  visitIfBlock(): void {}
-  visitIfBlockBranch(): void {}
+  visitIfBlock(block: TmplAstIfBlock): void {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] visitIfBlock with ${block.branches.length} branches`);
+    // Visit all branches
+    for (const branch of block.branches) {
+      this.visitIfBlockBranch(branch);
+    }
+  }
+  visitIfBlockBranch(branch: TmplAstIfBlockBranch): void {
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] visitIfBlockBranch with ${branch.children.length} children`);
+    tmplAstVisitAll(this, branch.children);
+  }
   visitUnknownBlock(): void {}
   visitLetDeclaration(): void {}
   visitComponent(): void {}
