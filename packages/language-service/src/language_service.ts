@@ -59,6 +59,11 @@ import {getInlayHintsForTemplate} from './inlay_hints';
 import type {AngularInlayHint, InlayHintsConfig, CssDiagnosticsConfig} from '../api';
 import {getCssDiagnostics, DEFAULT_CSS_DIAGNOSTICS_CONFIG} from './css';
 import {getAriaDiagnostics, AriaDiagnosticsConfig, DEFAULT_ARIA_DIAGNOSTICS_CONFIG} from './aria';
+import {
+  getEventDiagnostics,
+  EventDiagnosticsConfig,
+  DEFAULT_EVENT_DIAGNOSTICS_CONFIG,
+} from './events';
 
 type LanguageServiceConfig = Omit<PluginConfig, 'angularOnly'>;
 
@@ -124,11 +129,12 @@ export class LanguageService {
           // to getInlayHintsAtPosition - could be refactored to share a utility function.
           const cssConfig = this.getCssDiagnosticsConfig();
           const ariaConfig = this.getAriaDiagnosticsConfig();
+          const eventConfig = this.getEventDiagnosticsConfig();
 
-          if (cssConfig.enabled || ariaConfig.enabled) {
+          if (cssConfig.enabled || ariaConfig.enabled || eventConfig.enabled) {
             const ttc = compiler.getTemplateTypeChecker();
             // Find all class declarations that are components (have templates)
-            // Walk the AST once to collect both CSS and ARIA diagnostics
+            // Walk the AST once to collect CSS, ARIA, and Event diagnostics
             const visit = (node: ts.Node): void => {
               if (ts.isClassDeclaration(node)) {
                 const className = node.name?.getText() || '<anonymous>';
@@ -153,6 +159,16 @@ export class LanguageService {
                       // @ts-ignore DEBUG
                       console.log(
                         `[LS_DIAG] ARIA diagnostics for ${className}: ${ariaDiags.length}`,
+                      );
+                    }
+
+                    // Collect Event diagnostics
+                    if (eventConfig.enabled) {
+                      const eventDiags = getEventDiagnostics(node, compiler, eventConfig);
+                      diagnostics.push(...eventDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`,
                       );
                     }
                   }
@@ -189,6 +205,12 @@ export class LanguageService {
             diagnostics.push(...ariaDiags);
             // @ts-ignore DEBUG
             console.log(`[LS_DIAG] ARIA diagnostics for ${className}: ${ariaDiags.length}`);
+            // Add Event diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const eventDiags = this.getEventDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...eventDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`);
           }
         }
       }
@@ -341,6 +363,61 @@ export class LanguageService {
     // For now, use default configuration
     // TODO: Add configuration options to plugin config API
     return DEFAULT_ARIA_DIAGNOSTICS_CONFIG;
+  }
+
+  /**
+   * Gets Event binding diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  private getEventDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const eventConfig = this.getEventDiagnosticsConfig();
+    if (!eventConfig.enabled) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] Created synthetic source file for Event external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    return getEventDiagnostics(component, compiler, eventConfig, templateSourceFile);
+  }
+
+  /**
+   * Normalizes the Event diagnostics configuration from the plugin config.
+   * @internal
+   */
+  private getEventDiagnosticsConfig(): EventDiagnosticsConfig {
+    // For now, use default configuration
+    // TODO: Add configuration options to plugin config API
+    return DEFAULT_EVENT_DIAGNOSTICS_CONFIG;
   }
 
   getSuggestionDiagnostics(fileName: string): ts.DiagnosticWithLocation[] {
