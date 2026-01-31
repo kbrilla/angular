@@ -97,6 +97,8 @@ export const enum CssDiagnosticCode {
   PREFER_INDIVIDUAL_STYLE_BINDINGS = 99018,
   /** Suggestion to consolidate multiple individual [style.x] bindings into [style] object. */
   PREFER_STYLE_OBJECT_BINDING = 99019,
+  /** Duplicate CSS property across multiple individual style bindings. */
+  DUPLICATE_STYLE_BINDING = 99020,
 }
 
 /**
@@ -1105,7 +1107,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     }
 
     // Check for conflicts (same property with different binding types)
-    for (const [_property, bindings] of bindingsByProperty) {
+    for (const [property, bindings] of bindingsByProperty) {
       if (bindings.length <= 1) continue;
 
       // Find the highest precedence binding
@@ -1117,8 +1119,31 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       // Report diagnostics on lower precedence bindings
       for (let i = 1; i < sorted.length; i++) {
         const loser = sorted[i];
-        // Skip if same binding type (handled by duplicate detection)
-        if (loser.bindingType === winner.bindingType) continue;
+
+        // DUPLICATE DETECTION: Same binding type means duplicate
+        if (loser.bindingType === winner.bindingType) {
+          // Report duplicate binding
+          this.diagnostics.push({
+            category: this.severity,
+            code: CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
+            messageText: `Duplicate CSS property '${loser.originalPropertyName}'. This property is set multiple times on the same element.`,
+            file: this.diagnosticSourceFile,
+            start: loser.attribute.keySpan.start.offset,
+            length: loser.attribute.keySpan.end.offset - loser.attribute.keySpan.start.offset,
+            source: 'angular',
+            relatedInformation: [
+              {
+                category: ts.DiagnosticCategory.Message,
+                code: 0,
+                file: this.diagnosticSourceFile,
+                start: winner.attribute.keySpan.start.offset,
+                length: winner.attribute.keySpan.end.offset - winner.attribute.keySpan.start.offset,
+                messageText: `First occurrence of '${winner.originalPropertyName}' here`,
+              },
+            ],
+          });
+          continue;
+        }
 
         const winnerDescription = getBindingDescription(winner.bindingType);
         const loserDescription = getBindingDescription(loser.bindingType);
