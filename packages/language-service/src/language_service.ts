@@ -58,6 +58,7 @@ import {isExternalResource} from '@angular/compiler-cli/src/ngtsc/metadata';
 import {getInlayHintsForTemplate} from './inlay_hints';
 import type {AngularInlayHint, InlayHintsConfig, CssDiagnosticsConfig} from '../api';
 import {getCssDiagnostics, DEFAULT_CSS_DIAGNOSTICS_CONFIG} from './css';
+import {getAriaDiagnostics, AriaDiagnosticsConfig, DEFAULT_ARIA_DIAGNOSTICS_CONFIG} from './aria';
 
 type LanguageServiceConfig = Omit<PluginConfig, 'angularOnly'>;
 
@@ -118,17 +119,16 @@ export class LanguageService {
           // @ts-ignore DEBUG
           console.log(`[LS_DIAG] NG diagnostics: ${ngDiagnostics.length}`);
 
-          // Add CSS property validation diagnostics for components in this file
+          // Add CSS and ARIA diagnostics for components in this file
           // Note: This pattern (walking class declarations, using ttc.getTemplate) is similar
           // to getInlayHintsAtPosition - could be refactored to share a utility function.
           const cssConfig = this.getCssDiagnosticsConfig();
-          // @ts-ignore DEBUG
-          console.log(
-            `[LS_DIAG] CSS config: enabled=${cssConfig.enabled}, severity=${cssConfig.severity}`,
-          );
-          if (cssConfig.enabled) {
+          const ariaConfig = this.getAriaDiagnosticsConfig();
+
+          if (cssConfig.enabled || ariaConfig.enabled) {
             const ttc = compiler.getTemplateTypeChecker();
             // Find all class declarations that are components (have templates)
+            // Walk the AST once to collect both CSS and ARIA diagnostics
             const visit = (node: ts.Node): void => {
               if (ts.isClassDeclaration(node)) {
                 const className = node.name?.getText() || '<anonymous>';
@@ -137,11 +137,24 @@ export class LanguageService {
                   if (template) {
                     // @ts-ignore DEBUG
                     console.log(`[LS_DIAG] Found component: ${className} with template`);
-                    // This is a component with a template - validate CSS properties
-                    const cssDiags = getCssDiagnostics(node, compiler, cssConfig);
-                    diagnostics.push(...cssDiags);
-                    // @ts-ignore DEBUG
-                    console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
+
+                    // Collect CSS diagnostics
+                    if (cssConfig.enabled) {
+                      const cssDiags = getCssDiagnostics(node, compiler, cssConfig);
+                      diagnostics.push(...cssDiags);
+                      // @ts-ignore DEBUG
+                      console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
+                    }
+
+                    // Collect ARIA diagnostics
+                    if (ariaConfig.enabled) {
+                      const ariaDiags = getAriaDiagnostics(node, compiler, ariaConfig);
+                      diagnostics.push(...ariaDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] ARIA diagnostics for ${className}: ${ariaDiags.length}`,
+                      );
+                    }
                   }
                 } catch {
                   // Not a component or error getting template, skip
@@ -170,6 +183,12 @@ export class LanguageService {
             diagnostics.push(...cssDiags);
             // @ts-ignore DEBUG
             console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
+            // Add ARIA diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const ariaDiags = this.getAriaDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...ariaDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] ARIA diagnostics for ${className}: ${ariaDiags.length}`);
           }
         }
       }
@@ -259,6 +278,69 @@ export class LanguageService {
       severity: cssValidation.severity ?? 'warning',
       strictUnitValues: cssValidation.strictUnitValues ?? false,
     };
+  }
+
+  /**
+   * Gets ARIA diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  /**
+   * Gets ARIA diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  private getAriaDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const ariaConfig = this.getAriaDiagnosticsConfig();
+    if (!ariaConfig.enabled) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] Created synthetic source file for ARIA external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    return getAriaDiagnostics(component, compiler, ariaConfig, templateSourceFile);
+  }
+
+  /**
+   * Normalizes the ARIA diagnostics configuration from the plugin config.
+   * @internal
+   */
+  private getAriaDiagnosticsConfig(): AriaDiagnosticsConfig {
+    // For now, use default configuration
+    // TODO: Add configuration options to plugin config API
+    return DEFAULT_ARIA_DIAGNOSTICS_CONFIG;
   }
 
   getSuggestionDiagnostics(fileName: string): ts.DiagnosticWithLocation[] {
