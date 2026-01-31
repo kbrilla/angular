@@ -1106,56 +1106,83 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       );
     }
 
-    // Check for conflicts (same property with different binding types)
+    // Check for conflicts - produce ONE diagnostic per property that lists ALL conflicts
     for (const [property, bindings] of bindingsByProperty) {
       if (bindings.length <= 1) continue;
 
-      // Find the highest precedence binding
+      // Sort by precedence (lowest number = highest precedence = wins)
       const sorted = [...bindings].sort(
         (a, b) => BINDING_PRECEDENCE[a.bindingType] - BINDING_PRECEDENCE[b.bindingType],
       );
       const winner = sorted[0];
+      const losers = sorted.slice(1);
 
-      // Report diagnostics on lower precedence bindings
-      for (let i = 1; i < sorted.length; i++) {
-        const loser = sorted[i];
+      // Check if ALL bindings are the same type (pure duplicates) vs mixed types (conflicts)
+      const allSameType = bindings.every((b) => b.bindingType === winner.bindingType);
 
-        // DUPLICATE DETECTION: Same binding type means duplicate
-        if (loser.bindingType === winner.bindingType) {
-          // Report duplicate binding
-          this.diagnostics.push({
-            category: this.severity,
-            code: CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
-            messageText: `Duplicate CSS property '${loser.originalPropertyName}'. This property is set multiple times on the same element.`,
+      if (allSameType) {
+        // PURE DUPLICATES: All bindings are the same type
+        // Build a comprehensive message showing all occurrences
+        const bindingDescription = getBindingDescription(winner.bindingType);
+        const allOccurrences = sorted
+          .map((b, idx) => `${idx + 1}. [style.${b.originalPropertyName}]`)
+          .join('\n');
+
+        // Report on the LAST occurrence (which gets overridden by all previous)
+        const lastBinding = sorted[sorted.length - 1];
+        this.diagnostics.push({
+          category: this.severity,
+          code: CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
+          messageText:
+            `CSS property '${property}' is set ${bindings.length} times via ${bindingDescription}.\n` +
+            `The first occurrence wins, subsequent bindings are ignored:\n${allOccurrences}`,
+          file: this.diagnosticSourceFile,
+          start: lastBinding.attribute.keySpan.start.offset,
+          length:
+            lastBinding.attribute.keySpan.end.offset - lastBinding.attribute.keySpan.start.offset,
+          source: 'angular',
+          relatedInformation: sorted.slice(0, -1).map((b, idx) => ({
+            category: ts.DiagnosticCategory.Message,
+            code: 0,
             file: this.diagnosticSourceFile,
-            start: loser.attribute.keySpan.start.offset,
-            length: loser.attribute.keySpan.end.offset - loser.attribute.keySpan.start.offset,
-            source: 'angular',
-            relatedInformation: [
-              {
-                category: ts.DiagnosticCategory.Message,
-                code: 0,
-                file: this.diagnosticSourceFile,
-                start: winner.attribute.keySpan.start.offset,
-                length: winner.attribute.keySpan.end.offset - winner.attribute.keySpan.start.offset,
-                messageText: `First occurrence of '${winner.originalPropertyName}' here`,
-              },
-            ],
-          });
-          continue;
-        }
+            start: b.attribute.keySpan.start.offset,
+            length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
+            messageText: `Occurrence #${idx + 1}: [style.${b.originalPropertyName}]${idx === 0 ? ' (WINS)' : ''}`,
+          })),
+        });
+      } else {
+        // MIXED TYPES: Different binding types with different precedence
+        // Build a comprehensive message showing precedence order
+        const precedenceList = sorted
+          .map((b, idx) => {
+            const desc = getBindingDescription(b.bindingType);
+            const status = idx === 0 ? 'WINS' : 'overridden';
+            return `${idx + 1}. [style.${b.originalPropertyName}] (${desc}) - ${status}`;
+          })
+          .join('\n');
 
-        const winnerDescription = getBindingDescription(winner.bindingType);
-        const loserDescription = getBindingDescription(loser.bindingType);
-
+        // Report on the LOWEST precedence binding (most likely to confuse user)
+        const lowestPrecedence = sorted[sorted.length - 1];
         this.diagnostics.push({
           category: this.severity,
           code: CssDiagnosticCode.CONFLICTING_STYLE_BINDING,
-          messageText: `CSS property '${loser.originalPropertyName}' is set via multiple bindings. The ${winnerDescription} binding takes precedence over ${loserDescription}.`,
+          messageText:
+            `CSS property '${property}' is set via ${bindings.length} different bindings with conflicting precedence.\n` +
+            `Precedence order (first wins):\n${precedenceList}`,
           file: this.diagnosticSourceFile,
-          start: loser.attribute.keySpan.start.offset,
-          length: loser.attribute.keySpan.end.offset - loser.attribute.keySpan.start.offset,
+          start: lowestPrecedence.attribute.keySpan.start.offset,
+          length:
+            lowestPrecedence.attribute.keySpan.end.offset -
+            lowestPrecedence.attribute.keySpan.start.offset,
           source: 'angular',
+          relatedInformation: sorted.slice(0, -1).map((b, idx) => ({
+            category: ts.DiagnosticCategory.Message,
+            code: 0,
+            file: this.diagnosticSourceFile,
+            start: b.attribute.keySpan.start.offset,
+            length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
+            messageText: `[style.${b.originalPropertyName}] (${getBindingDescription(b.bindingType)})${idx === 0 ? ' - WINS' : ''}`,
+          })),
         });
       }
     }
