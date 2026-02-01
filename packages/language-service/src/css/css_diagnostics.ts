@@ -1129,12 +1129,27 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           // Get the directive name for error messages
           const directiveName = dirNode.name?.text ?? 'unknown';
 
-          // Collect style bindings from the directive's host element
-          // Store the element span for diagnostic location (directive host spans point to definition file)
-          const elementSpan = {
-            start: element.sourceSpan.start.offset,
-            end: element.sourceSpan.end.offset,
-          };
+          // Find the directive's selector attribute on the element for precise span
+          // Parse selector like '[appBackgroundColorApplier]' to extract 'appBackgroundColorApplier'
+          let directiveAttrSpan: {start: number; end: number} | undefined;
+          if (directive.selector) {
+            // Extract attribute name from selector (e.g., '[myAttr]' -> 'myAttr')
+            const attrMatch = directive.selector.match(/\[([^\]]+)\]/);
+            if (attrMatch) {
+              const attrName = attrMatch[1];
+              // Find matching attribute on element
+              const matchingAttr = element.attributes.find((a) => a.name === attrName);
+              if (matchingAttr) {
+                directiveAttrSpan = {
+                  start: matchingAttr.sourceSpan.start.offset,
+                  end: matchingAttr.sourceSpan.end.offset,
+                };
+              }
+            }
+          }
+
+          // Fallback to template binding that wins (first input with style binding for this property)
+          // This ensures diagnostic shows on the template side, not directive definition
 
           for (const binding of hostElement.bindings) {
             if (binding.type === BindingType.Style) {
@@ -1150,7 +1165,8 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
                 attribute: binding,
                 originalPropertyName: propertyName,
                 directiveName,
-                elementSpan, // Use element span for diagnostic location
+                // Use directive attribute span if found, otherwise undefined (will use winner's span)
+                elementSpan: directiveAttrSpan,
               };
               const existing = bindingsByProperty.get(normalized) || [];
               existing.push(styleBinding);
@@ -1217,12 +1233,23 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
         const allOccurrences = sorted.map((b, idx) => render(b, idx)).join('\n');
         const lastBinding = sorted[sorted.length - 1];
+        const firstBinding = sorted[0]; // Winner for fallback
 
         // For directive host bindings, use the element span (where directive is applied in template)
         // NOT the directive definition span. For template bindings, use the attribute keySpan.
-        const getBindingSpan = (b: StyleBinding) => {
-          if (b.elementSpan && b.bindingType === 'directiveHostIndividual') {
-            return b.elementSpan;
+        // If elementSpan is undefined for directive, use the winner's span (keep diagnostic in template file)
+        const getBindingSpan = (b: StyleBinding, fallbackBinding?: StyleBinding) => {
+          if (b.bindingType === 'directiveHostIndividual') {
+            if (b.elementSpan) {
+              return b.elementSpan;
+            }
+            // Fallback: use winner's span to keep diagnostic in template
+            if (fallbackBinding && fallbackBinding.bindingType !== 'directiveHostIndividual') {
+              return {
+                start: fallbackBinding.attribute.keySpan.start.offset,
+                end: fallbackBinding.attribute.keySpan.end.offset,
+              };
+            }
           }
           return {
             start: b.attribute.keySpan.start.offset,
@@ -1230,7 +1257,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           };
         };
 
-        const lastSpan = getBindingSpan(lastBinding);
+        const lastSpan = getBindingSpan(lastBinding, firstBinding);
 
         this.diagnostics.push({
           category: this.severity,
@@ -1295,9 +1322,19 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
         // For directive host bindings, use the element span (where directive is applied in template)
         // NOT the directive definition span. For template bindings, use the attribute keySpan.
-        const getBindingSpan = (b: StyleBinding) => {
-          if (b.elementSpan && b.bindingType === 'directiveHostIndividual') {
-            return b.elementSpan;
+        // If elementSpan is undefined for directive, use the winner's span (keep diagnostic in template file)
+        const getBindingSpan = (b: StyleBinding, fallbackBinding?: StyleBinding) => {
+          if (b.bindingType === 'directiveHostIndividual') {
+            if (b.elementSpan) {
+              return b.elementSpan;
+            }
+            // Fallback: use winner's span to keep diagnostic in template
+            if (fallbackBinding && fallbackBinding.bindingType !== 'directiveHostIndividual') {
+              return {
+                start: fallbackBinding.attribute.keySpan.start.offset,
+                end: fallbackBinding.attribute.keySpan.end.offset,
+              };
+            }
           }
           return {
             start: b.attribute.keySpan.start.offset,
@@ -1305,7 +1342,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           };
         };
 
-        const lowestSpan = getBindingSpan(lowestPrecedence);
+        const lowestSpan = getBindingSpan(lowestPrecedence, winner);
 
         this.diagnostics.push({
           category: this.severity,

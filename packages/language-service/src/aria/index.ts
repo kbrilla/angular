@@ -6,28 +6,64 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-export {
-  getAriaDiagnostics,
-  AriaDiagnosticCode,
-  AriaDiagnosticsConfig,
-  DEFAULT_ARIA_DIAGNOSTICS_CONFIG,
-  getAllAriaAttributes,
-  getAllAriaRoles,
-} from './aria_diagnostics';
+/**
+ * ARIA Intellisense Module
+ *
+ * This module provides ARIA attribute and role validation, completions, and quick info
+ * for Angular templates.
+ *
+ * Features:
+ * - ARIA attribute name validation (aria-label, aria-hidden, etc.)
+ * - ARIA attribute value validation (boolean, token, integer types)
+ * - ARIA role validation (button, dialog, navigation, etc.)
+ * - Typo suggestions using Levenshtein distance
+ * - Support for WAI-ARIA 1.2 specification
+ * - Support for DPUB-ARIA roles (doc-*)
+ * - Support for Graphics ARIA roles (graphics-*)
+ *
+ * Diagnostic Codes:
+ * - 99201: Unknown ARIA attribute
+ * - 99202: Invalid ARIA attribute value
+ * - 99203: Unknown ARIA role
+ * - 99204: Deprecated ARIA attribute
+ * - 99205: Invalid ARIA role value
+ */
 
-export {getAriaCompletions, getAriaQuickInfo} from './aria_completions';
-
+// ARIA data and utilities
 export {
-  isValidAriaAttribute,
-  isValidAriaRole,
-  validateAriaValue,
-  findSimilarAriaAttributes,
-  findSimilarAriaRoles,
-  getAriaAttributeValues,
-  getAriaAttributeDocumentation,
-  getAriaAttributeType,
-  VALID_ARIA_ATTRIBUTES,
-  VALID_ARIA_ROLES,
   ARIA_ATTRIBUTES,
   ARIA_ROLES,
+  VALID_ARIA_ATTRIBUTES,
+  VALID_ARIA_ROLES,
+  isValidAriaAttribute,
+  isValidAriaRole,
+  getAriaAttributeDocumentation,
+  getAriaAttributeValues,
+  getAriaAttributeType,
+  findSimilarAriaAttributes,
+  findSimilarAriaRoles,
+  validateAriaValue,
+  type AriaAttributeDefinition,
+  type AriaAttributeType,
 } from './aria_data';
+
+// ARIA diagnostics
+export {
+  getAriaDiagnostics,
+  getAllAriaAttributes,
+  getAllAriaRoles,
+  AriaDiagnosticCode,
+  DEFAULT_ARIA_DIAGNOSTICS_CONFIG,
+  type AriaDiagnosticsConfig,
+} from './aria_diagnostics';
+
+// ARIA completions
+export {
+  getAriaAttributeCompletions,
+  getAriaRoleCompletions,
+  getAriaValueCompletions,
+  getAriaAttributeQuickInfo,
+  getAriaRoleQuickInfo,
+  DEFAULT_ARIA_COMPLETIONS_CONFIG,
+  type AriaCompletionsConfig,
+} from './aria_completions';

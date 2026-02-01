@@ -19,35 +19,45 @@
  * - Invalid property name diagnostics with suggestions
  * - Code fixes to correct typos
  * - Quick info (hover) for CSS properties
+ *
+ * Implementation:
+ * - Uses vscode-css-languageservice for W3C-accurate CSS data (2000+ properties)
+ * - Angular-specific pseudo-class support (:host, :host-context, ::ng-deep)
+ * - SCSS/LESS support for component styles
  */
 
+// Angular-specific style binding utilities
 export {
-  // CSS Property Data
-  getCSSPropertyNames,
-  getCSSPropertyNameSet,
-  getCSSPropertyValues,
+  // Unit suffix utilities (Angular-specific)
   getCSSUnitSuffixes,
-  isValidCSSProperty,
   isValidCSSUnit,
-  findSimilarCSSProperties,
+  CSS_UNIT_SUFFIXES,
+  type CSSUnitSuffix,
+  // Style binding analysis (Angular-specific)
   analyzeStyleBinding,
-  kebabToCamelCase,
-  camelToKebabCase,
-  // Obsolete property utilities
+  type StyleBindingAnalysis,
+  // Obsolete property utilities (has replacement info not in vscode-css-languageservice)
   isObsoleteCSSProperty,
   getObsoleteCSSPropertyInfo,
-  getObsoleteCSSPropertySet,
-  // Shorthand property utilities
+  type ObsoleteCSSProperty,
+  // Shorthand property utilities (for conflict detection)
   getShorthandLonghands,
   isShorthandProperty,
   getShorthandForLonghand,
   CSS_SHORTHAND_LONGHANDS,
-  CSS_UNIT_SUFFIXES,
+  // Legacy exports for backwards compatibility
+  getCSSPropertyNames,
+  getCSSPropertyNameSet,
+  getCSSPropertyValues,
+  isValidCSSProperty,
+  getObsoleteCSSPropertySet,
   CSS_PROPERTY_VALUES,
   type CSSPropertyName,
-  type CSSUnitSuffix,
-  type StyleBindingAnalysis,
-  type ObsoleteCSSProperty,
+  // Utility functions
+  kebabToCamelCase,
+  camelToKebabCase,
+  // Fuzzy matching utilities
+  findSimilarCSSProperties,
 } from './css_properties';
 
 export {
@@ -70,3 +80,51 @@ export {
   CssDiagnosticCode,
   type CssDiagnosticsConfig,
 } from './css_diagnostics';
+
+// TEMPORARILY DISABLED: vscode-css-languageservice integration
+// Uncomment when ready to test incrementally
+// export {
+//   // Utility functions
+//   kebabToCamelCase,
+//   camelToKebabCase,
+//   levenshteinDistance,
+//   isVendorPrefixedProperty,
+//   // Property validation
+//   isValidCSSPropertyVSCode,
+//   validateCSSValue,
+//   validateCSSDocument,
+//   // Property data
+//   getAllCSSProperties,
+//   getCSSPropertyNamesVSCode,
+//   getCSSPropertyNameSetVSCode,
+//   getCSSPropertyValuesVSCode,
+//   getPropertyUnitCategory,
+//   isUnitlessNumericProperty,
+//   // Fuzzy matching
+//   findSimilarCSSProperties,
+//   findSimilarCSSValues,
+//   // Hover/Quick Info
+//   getCSSPropertyHover,
+//   getCSSValueHover,
+//   getCSSValueDocumentation,
+//   getCSSValueHoverAtOffset,
+//   getCSSValueTokens,
+//   // Color detection and presentation
+//   findCSSColors,
+//   parseColorValue,
+//   isColorProperty,
+//   getColorPresentations,
+//   // Obsolete detection
+//   isObsoleteCSSPropertyVSCode,
+//   // Service access for advanced use
+//   getServiceForLanguage,
+//   // Types
+//   type CSSPropertyInfo,
+//   type CSSValidationResult,
+//   type CSSHoverInfo,
+//   type CSSValueHoverInfo,
+//   type CSSValueTokenInfo,
+//   type CSSUnitCategory,
+//   type CSSValueCompletionInfo,
+//   type CSSColorInfo,
+// } from './css_language_service';

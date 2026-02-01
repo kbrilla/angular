@@ -7,472 +7,443 @@
  */
 
 import ts from 'typescript';
-import {NgCompiler} from '@angular/compiler-cli/src/ngtsc/core';
-import * as t from '@angular/compiler';
-import {tmplAstVisitAll, TmplAstRecursiveVisitor} from '@angular/compiler';
+
 import {
-  isValidAriaAttribute,
-  isValidAriaRole,
-  getAriaAttributeValues,
-  getAriaAttributeDocumentation,
-  VALID_ARIA_ATTRIBUTES,
-  VALID_ARIA_ROLES,
   ARIA_ATTRIBUTES,
   ARIA_ROLES,
+  VALID_ARIA_ATTRIBUTES,
+  VALID_ARIA_ROLES,
+  getAriaAttributeDocumentation,
+  getAriaAttributeValues,
+  getAriaAttributeType,
+  AriaAttributeDefinition,
 } from './aria_data';
 
 /**
- * Gets ARIA completions for a position in a template.
- *
- * @param fileName The template file name.
- * @param position The position in the template.
- * @param compiler The Angular compiler instance.
- * @returns Array of completion entries.
+ * Priority values for ARIA completions.
+ * Lower numbers = higher priority in completion list.
  */
-export function getAriaCompletions(
-  fileName: string,
-  position: number,
-  compiler: NgCompiler,
+const enum AriaCompletionPriority {
+  /** Exact prefix match (e.g., 'lab' matches 'aria-label') */
+  PrefixMatch = '0',
+  /** Substring match (e.g., 'des' matches 'aria-describedby') */
+  SubstringMatch = '1',
+  /** Other attributes */
+  Default = '2',
+}
+
+/**
+ * Configuration for ARIA completions.
+ */
+export interface AriaCompletionsConfig {
+  /** Whether ARIA attribute completions are enabled. */
+  enabled: boolean;
+  /** Whether to show role completions. */
+  includeRoles: boolean;
+}
+
+/**
+ * Default configuration for ARIA completions.
+ */
+export const DEFAULT_ARIA_COMPLETIONS_CONFIG: AriaCompletionsConfig = {
+  enabled: true,
+  includeRoles: true,
+};
+
+/**
+ * Generates TypeScript completion entries for ARIA attribute names.
+ * This is used when the cursor is after `[attr.aria-` or `aria-` to provide attribute suggestions.
+ *
+ * @param prefix The typed prefix to filter completions (e.g., 'lab' for 'aria-label').
+ *               Can include 'aria-' prefix or not.
+ * @param config Optional configuration for completions.
+ * @returns Array of TypeScript completion entries.
+ */
+export function getAriaAttributeCompletions(
+  prefix: string = '',
+  config: AriaCompletionsConfig = DEFAULT_ARIA_COMPLETIONS_CONFIG,
 ): ts.CompletionEntry[] {
-  const completions: ts.CompletionEntry[] = [];
-  const ttc = compiler.getTemplateTypeChecker();
-
-  // Find the component containing this template position
-  const components = compiler.getComponentsWithTemplateFile(fileName);
-
-  for (const component of components) {
-    try {
-      if (!ts.isClassDeclaration(component)) {
-        continue;
-      }
-      const template = ttc.getTemplate(component);
-      if (!template) {
-        continue;
-      }
-
-      // Find the node at the position
-      const visitor = new AriaCompletionVisitor(position, completions);
-      tmplAstVisitAll(visitor, template);
-    } catch {
-      // Skip components with compilation errors
-    }
+  if (!config.enabled) {
+    return [];
   }
 
-  return completions;
+  // Normalize prefix - remove 'aria-' prefix if present for matching
+  let normalizedPrefix = prefix.toLowerCase();
+  const hasAriaPrefix = normalizedPrefix.startsWith('aria-');
+  if (hasAriaPrefix) {
+    normalizedPrefix = normalizedPrefix.substring(5); // Remove 'aria-'
+  }
+
+  const entries: ts.CompletionEntry[] = [];
+
+  for (const attrName of VALID_ARIA_ATTRIBUTES) {
+    const attr = ARIA_ATTRIBUTES[attrName];
+    if (!attr) continue;
+
+    // Match against the part after 'aria-'
+    const attrSuffix = attrName.substring(5).toLowerCase(); // Remove 'aria-' for matching
+    const isExactPrefix = attrSuffix.startsWith(normalizedPrefix);
+    const isSubstring = attrSuffix.includes(normalizedPrefix);
+
+    if (normalizedPrefix && !isExactPrefix && !isSubstring) {
+      continue;
+    }
+
+    const documentation = getAriaAttributeDocumentation(attrName);
+    const typeInfo = getAriaTypeDescription(attr);
+
+    entries.push({
+      name: attrName,
+      kind: ts.ScriptElementKind.memberVariableElement,
+      kindModifiers: '',
+      sortText: isExactPrefix
+        ? AriaCompletionPriority.PrefixMatch
+        : isSubstring
+          ? AriaCompletionPriority.SubstringMatch
+          : AriaCompletionPriority.Default,
+      insertText: attrName,
+      labelDetails: {
+        description: `ARIA ${typeInfo}`,
+      },
+    });
+  }
+
+  return entries;
 }
 
 /**
- * Visitor that walks the template AST and provides ARIA completions.
- */
-class AriaCompletionVisitor extends TmplAstRecursiveVisitor {
-  constructor(
-    private readonly position: number,
-    private readonly completions: ts.CompletionEntry[],
-  ) {
-    super();
-  }
-
-  /**
-   * Visit an element node and check if we're inside an attribute.
-   */
-  override visitElement(element: t.TmplAstElement): void {
-    // Check if position is in the start tag
-    const startTagEnd = element.startSourceSpan?.end.offset ?? element.sourceSpan.start.offset;
-    if (this.position >= element.sourceSpan.start.offset && this.position <= startTagEnd) {
-      // We're in the start tag - provide attribute completions
-      this.addAriaAttributeCompletions(element);
-      this.addRoleCompletions(element);
-    }
-
-    // Check static attributes for value completions
-    for (const attr of element.attributes) {
-      if (this.isInAttributeValue(attr, this.position)) {
-        if (attr.name.startsWith('aria-')) {
-          this.addAriaValueCompletions(attr.name, attr.value);
-        } else if (attr.name === 'role') {
-          this.addRoleValueCompletions();
-        }
-      }
-    }
-
-    // Visit children
-    super.visitElement(element);
-  }
-
-  /**
-   * Visit a template node and check for ARIA attribute opportunities.
-   */
-  override visitTemplate(template: t.TmplAstTemplate): void {
-    // Check if position is in the start tag
-    const startTagEnd = template.startSourceSpan?.end.offset ?? template.sourceSpan.start.offset;
-    if (this.position >= template.sourceSpan.start.offset && this.position <= startTagEnd) {
-      // We're in the ng-template tag - provide attribute completions
-      this.addAriaAttributeCompletionsForTemplate();
-    }
-
-    // Check static attributes for value completions
-    for (const attr of template.attributes) {
-      if (this.isInAttributeValue(attr, this.position)) {
-        if (attr.name.startsWith('aria-')) {
-          this.addAriaValueCompletions(attr.name, attr.value);
-        } else if (attr.name === 'role') {
-          this.addRoleValueCompletions();
-        }
-      }
-    }
-
-    // Visit children
-    super.visitTemplate(template);
-  }
-
-  /**
-   * Check if position is inside an attribute value.
-   */
-  private isInAttributeValue(attr: t.TmplAstTextAttribute, position: number): boolean {
-    const valueSpan = attr.valueSpan;
-    if (!valueSpan) {
-      return false;
-    }
-    return position >= valueSpan.start.offset && position <= valueSpan.end.offset;
-  }
-
-  /**
-   * Add ARIA attribute completions for an element.
-   */
-  private addAriaAttributeCompletions(element: t.TmplAstElement): void {
-    // Get existing aria attributes to filter them out
-    const existingAriaAttrs = new Set<string>();
-    for (const attr of element.attributes) {
-      if (attr.name.startsWith('aria-')) {
-        existingAriaAttrs.add(attr.name);
-      }
-    }
-    for (const input of element.inputs) {
-      if (input.name.startsWith('aria-')) {
-        existingAriaAttrs.add(input.name);
-      }
-    }
-
-    // Add completions for all valid ARIA attributes not already present
-    for (const ariaAttr of VALID_ARIA_ATTRIBUTES) {
-      if (!existingAriaAttrs.has(ariaAttr)) {
-        this.completions.push({
-          name: ariaAttr,
-          kind: ts.ScriptElementKind.memberVariableElement,
-          kindModifiers: 'aria',
-          sortText: `0_${ariaAttr}`, // Sort ARIA attributes higher
-          insertText: `${ariaAttr}=""`,
-          replacementSpan: undefined,
-        });
-      }
-    }
-  }
-
-  /**
-   * Add role attribute completion.
-   */
-  private addRoleCompletions(element: t.TmplAstElement): void {
-    // Check if role already exists
-    const hasRole =
-      element.attributes.some((attr) => attr.name === 'role') ||
-      element.inputs.some((input) => input.name === 'role');
-
-    if (!hasRole) {
-      this.completions.push({
-        name: 'role',
-        kind: ts.ScriptElementKind.memberVariableElement,
-        kindModifiers: 'aria',
-        sortText: '0_role',
-        insertText: 'role=""',
-        replacementSpan: undefined,
-      });
-    }
-  }
-
-  /**
-   * Add ARIA attribute completions for a template node.
-   */
-  private addAriaAttributeCompletionsForTemplate(): void {
-    // ng-template can have ARIA attributes too
-    for (const ariaAttr of VALID_ARIA_ATTRIBUTES) {
-      this.completions.push({
-        name: ariaAttr,
-        kind: ts.ScriptElementKind.memberVariableElement,
-        kindModifiers: 'aria',
-        sortText: `0_${ariaAttr}`,
-        insertText: `${ariaAttr}=""`,
-        replacementSpan: undefined,
-      });
-    }
-  }
-
-  /**
-   * Add value completions for an ARIA attribute.
-   */
-  private addAriaValueCompletions(attrName: string, currentValue: string): void {
-    const suggestions = getAriaAttributeValues(attrName);
-    if (!suggestions || suggestions.length === 0) {
-      return;
-    }
-
-    for (const suggestion of suggestions) {
-      this.completions.push({
-        name: suggestion,
-        kind: ts.ScriptElementKind.string,
-        kindModifiers: '',
-        sortText: `1_${suggestion}`,
-        insertText: suggestion,
-        replacementSpan: undefined,
-      });
-    }
-  }
-
-  /**
-   * Add value completions for the role attribute.
-   */
-  private addRoleValueCompletions(): void {
-    for (const role of ARIA_ROLES) {
-      this.completions.push({
-        name: role,
-        kind: ts.ScriptElementKind.string,
-        kindModifiers: '',
-        sortText: `1_${role}`,
-        insertText: role,
-        replacementSpan: undefined,
-      });
-    }
-  }
-}
-
-/**
- * Gets quick info (hover) for an ARIA attribute or role.
+ * Generates TypeScript completion entries for ARIA role values.
+ * This is used when the cursor is in a `role="..."` attribute.
  *
- * @param fileName The template file name.
- * @param position The position in the template.
- * @param compiler The Angular compiler instance.
- * @returns Quick info or undefined.
+ * @param prefix The typed prefix to filter completions (e.g., 'but' for 'button').
+ * @param config Optional configuration for completions.
+ * @returns Array of TypeScript completion entries.
  */
-export function getAriaQuickInfo(
-  fileName: string,
-  position: number,
-  compiler: NgCompiler,
-): ts.QuickInfo | undefined {
-  const ttc = compiler.getTemplateTypeChecker();
-  const components = compiler.getComponentsWithTemplateFile(fileName);
-
-  for (const component of components) {
-    try {
-      if (!ts.isClassDeclaration(component)) {
-        continue;
-      }
-      const template = ttc.getTemplate(component);
-      if (!template) {
-        continue;
-      }
-
-      // Find the node at the position
-      const visitor = new AriaQuickInfoVisitor(position);
-      tmplAstVisitAll(visitor, template);
-
-      if (visitor.quickInfo) {
-        return visitor.quickInfo;
-      }
-    } catch {
-      // Skip components with compilation errors
-    }
+export function getAriaRoleCompletions(
+  prefix: string = '',
+  config: AriaCompletionsConfig = DEFAULT_ARIA_COMPLETIONS_CONFIG,
+): ts.CompletionEntry[] {
+  if (!config.enabled || !config.includeRoles) {
+    return [];
   }
 
-  return undefined;
+  const prefixLower = prefix.toLowerCase();
+  const entries: ts.CompletionEntry[] = [];
+
+  for (const role of VALID_ARIA_ROLES) {
+    const roleLower = role.toLowerCase();
+    const isExactPrefix = roleLower.startsWith(prefixLower);
+    const isSubstring = roleLower.includes(prefixLower);
+
+    if (prefixLower && !isExactPrefix && !isSubstring) {
+      continue;
+    }
+
+    // Categorize the role for display
+    const category = getRoleCategory(role);
+
+    entries.push({
+      name: role,
+      kind: ts.ScriptElementKind.enumMemberElement,
+      kindModifiers: '',
+      sortText: isExactPrefix
+        ? AriaCompletionPriority.PrefixMatch
+        : isSubstring
+          ? AriaCompletionPriority.SubstringMatch
+          : AriaCompletionPriority.Default,
+      insertText: role,
+      labelDetails: {
+        description: `ARIA role (${category})`,
+      },
+    });
+  }
+
+  return entries;
 }
 
 /**
- * Visitor that provides quick info for ARIA attributes and roles.
+ * Generates TypeScript completion entries for ARIA attribute values.
+ * This is used when the cursor is in an ARIA attribute value (e.g., `aria-hidden="|"`).
+ *
+ * @param attrName The ARIA attribute name (e.g., 'aria-hidden').
+ * @param prefix The typed prefix to filter completions.
+ * @returns Array of TypeScript completion entries.
  */
-class AriaQuickInfoVisitor extends TmplAstRecursiveVisitor {
-  quickInfo: ts.QuickInfo | undefined;
-
-  constructor(private readonly position: number) {
-    super();
+export function getAriaValueCompletions(
+  attrName: string,
+  prefix: string = '',
+): ts.CompletionEntry[] {
+  const attr = ARIA_ATTRIBUTES[attrName];
+  if (!attr) {
+    return [];
   }
 
-  /**
-   * Visit an element and check ARIA attributes.
-   */
-  override visitElement(element: t.TmplAstElement): void {
-    // Check static attributes
-    for (const attr of element.attributes) {
-      if (this.isInAttributeName(attr, this.position)) {
-        if (attr.name.startsWith('aria-')) {
-          this.quickInfo = this.createAriaAttributeQuickInfo(attr.name, attr.sourceSpan);
-          return;
-        } else if (attr.name === 'role') {
-          this.quickInfo = this.createRoleQuickInfo(attr.sourceSpan);
-          return;
-        }
-      } else if (this.isInAttributeValue(attr, this.position)) {
-        if (attr.name === 'role') {
-          // Try to get quick info for the specific role value
-          const roleValue = this.extractRoleAtPosition(attr.value, this.position, attr.valueSpan!);
-          if (roleValue) {
-            this.quickInfo = this.createRoleValueQuickInfo(roleValue, attr.valueSpan!);
-            return;
-          }
-        }
-      }
+  const prefixLower = prefix.toLowerCase();
+  const entries: ts.CompletionEntry[] = [];
+
+  // Get possible values based on type
+  let values: readonly (string | boolean)[] = [];
+
+  switch (attr.type) {
+    case 'boolean':
+      values = ['true', 'false'];
+      break;
+    case 'tristate':
+      values = ['true', 'false', 'mixed'];
+      break;
+    case 'token':
+    case 'tokenlist':
+      values = attr.values ?? [];
+      break;
+    default:
+      // No completions for string, id, idlist, integer, number types
+      return [];
+  }
+
+  for (const value of values) {
+    const valueStr = String(value);
+    const valueLower = valueStr.toLowerCase();
+    const isExactPrefix = valueLower.startsWith(prefixLower);
+    const isSubstring = valueLower.includes(prefixLower);
+
+    if (prefixLower && !isExactPrefix && !isSubstring) {
+      continue;
     }
 
-    // Check bound attributes
-    for (const input of element.inputs) {
-      if (input.keySpan && this.isInSpan(input.keySpan, this.position)) {
-        if (input.name.startsWith('aria-')) {
-          this.quickInfo = this.createAriaAttributeQuickInfo(input.name, input.sourceSpan);
-          return;
-        }
-      }
-    }
-
-    // Visit children
-    super.visitElement(element);
-  }
-
-  /**
-   * Visit a template node and check ARIA attributes.
-   */
-  override visitTemplate(template: t.TmplAstTemplate): void {
-    // Check static attributes
-    for (const attr of template.attributes) {
-      if (this.isInAttributeName(attr, this.position)) {
-        if (attr.name.startsWith('aria-')) {
-          this.quickInfo = this.createAriaAttributeQuickInfo(attr.name, attr.sourceSpan);
-          return;
-        } else if (attr.name === 'role') {
-          this.quickInfo = this.createRoleQuickInfo(attr.sourceSpan);
-          return;
-        }
-      }
-    }
-
-    // Visit children
-    super.visitTemplate(template);
-  }
-
-  /**
-   * Check if position is in an attribute name.
-   */
-  private isInAttributeName(attr: t.TmplAstTextAttribute, position: number): boolean {
-    // Attribute name span is from start to the '=' or to the end if no value
-    const nameEnd = attr.valueSpan ? attr.valueSpan.start.offset - 2 : attr.sourceSpan.end.offset;
-    return position >= attr.sourceSpan.start.offset && position <= nameEnd;
-  }
-
-  /**
-   * Check if position is in an attribute value.
-   */
-  private isInAttributeValue(attr: t.TmplAstTextAttribute, position: number): boolean {
-    const valueSpan = attr.valueSpan;
-    if (!valueSpan) {
-      return false;
-    }
-    return position >= valueSpan.start.offset && position <= valueSpan.end.offset;
-  }
-
-  /**
-   * Check if position is within a span.
-   */
-  private isInSpan(span: t.ParseSourceSpan, position: number): boolean {
-    return position >= span.start.offset && position <= span.end.offset;
-  }
-
-  /**
-   * Extract the role value at a specific position (for space-separated roles).
-   */
-  private extractRoleAtPosition(
-    fullValue: string,
-    position: number,
-    valueSpan: t.ParseSourceSpan,
-  ): string | null {
-    const roles = fullValue.split(/\s+/);
-    let currentOffset = valueSpan.start.offset;
-
-    for (const role of roles) {
-      const roleStart = currentOffset;
-      const roleEnd = roleStart + role.length;
-
-      if (position >= roleStart && position <= roleEnd) {
-        return role;
-      }
-
-      // Move past this role and any whitespace
-      currentOffset = roleEnd + 1;
-    }
-
-    return null;
-  }
-
-  /**
-   * Create quick info for an ARIA attribute.
-   */
-  private createAriaAttributeQuickInfo(attrName: string, span: t.ParseSourceSpan): ts.QuickInfo {
-    const description = getAriaAttributeDocumentation(attrName);
-    const text = description || `ARIA attribute: ${attrName}`;
-
-    return {
-      kind: ts.ScriptElementKind.memberVariableElement,
-      kindModifiers: 'aria',
-      textSpan: {
-        start: span.start.offset,
-        length: span.end.offset - span.start.offset,
-      },
-      displayParts: [
-        {text: '(aria attribute) ', kind: 'text'},
-        {text: attrName, kind: 'parameterName'},
-      ],
-      documentation: [{text, kind: 'text'}],
-    };
-  }
-
-  /**
-   * Create quick info for the role attribute.
-   */
-  private createRoleQuickInfo(span: t.ParseSourceSpan): ts.QuickInfo {
-    return {
-      kind: ts.ScriptElementKind.memberVariableElement,
-      kindModifiers: 'aria',
-      textSpan: {
-        start: span.start.offset,
-        length: span.end.offset - span.start.offset,
-      },
-      displayParts: [
-        {text: '(aria attribute) ', kind: 'text'},
-        {text: 'role', kind: 'parameterName'},
-      ],
-      documentation: [
-        {
-          text: 'Defines the role of an element in the accessibility tree.',
-          kind: 'text',
-        },
-      ],
-    };
-  }
-
-  /**
-   * Create quick info for a specific role value.
-   */
-  private createRoleValueQuickInfo(roleValue: string, span: t.ParseSourceSpan): ts.QuickInfo {
-    const text = `ARIA role: ${roleValue}`;
-
-    return {
+    entries.push({
+      name: valueStr,
       kind: ts.ScriptElementKind.string,
       kindModifiers: '',
-      textSpan: {
-        start: span.start.offset,
-        length: span.end.offset - span.start.offset,
-      },
-      displayParts: [
-        {text: '(aria role) ', kind: 'text'},
-        {text: roleValue, kind: 'string'},
-      ],
-      documentation: [{text, kind: 'text'}],
-    };
+      sortText: isExactPrefix
+        ? AriaCompletionPriority.PrefixMatch
+        : AriaCompletionPriority.SubstringMatch,
+      insertText: valueStr,
+    });
   }
+
+  return entries;
+}
+
+/**
+ * Get quick info/hover documentation for an ARIA attribute.
+ *
+ * @param attrName The ARIA attribute name (e.g., 'aria-label').
+ * @returns Quick info with documentation, or undefined if not found.
+ */
+export function getAriaAttributeQuickInfo(attrName: string): ts.QuickInfo | undefined {
+  const attr = ARIA_ATTRIBUTES[attrName];
+  if (!attr) {
+    return undefined;
+  }
+
+  const documentation = getAriaAttributeDocumentation(attrName);
+  const typeInfo = getAriaTypeDescription(attr);
+  const valuesInfo =
+    attr.values && attr.values.length > 0 ? `\n\nAllowed values: ${attr.values.join(', ')}` : '';
+
+  const displayParts: ts.SymbolDisplayPart[] = [
+    {text: attrName, kind: 'aliasName'},
+    {text: ': ', kind: 'punctuation'},
+    {text: typeInfo, kind: 'keyword'},
+  ];
+
+  const documentationParts: ts.SymbolDisplayPart[] = [
+    {text: documentation + valuesInfo, kind: 'text'},
+  ];
+
+  if (attr.reference) {
+    documentationParts.push({text: '\n\n', kind: 'lineBreak'});
+    documentationParts.push({text: `[WAI-ARIA Reference](${attr.reference})`, kind: 'text'});
+  }
+
+  return {
+    kind: ts.ScriptElementKind.memberVariableElement,
+    kindModifiers: '',
+    textSpan: {start: 0, length: attrName.length},
+    displayParts,
+    documentation: documentationParts,
+  };
+}
+
+/**
+ * Get quick info/hover documentation for an ARIA role.
+ *
+ * @param role The ARIA role name (e.g., 'button').
+ * @returns Quick info with documentation, or undefined if not found.
+ */
+export function getAriaRoleQuickInfo(role: string): ts.QuickInfo | undefined {
+  if (!VALID_ARIA_ROLES.has(role)) {
+    return undefined;
+  }
+
+  const category = getRoleCategory(role);
+
+  const displayParts: ts.SymbolDisplayPart[] = [
+    {text: 'role', kind: 'keyword'},
+    {text: '=', kind: 'punctuation'},
+    {text: `"${role}"`, kind: 'stringLiteral'},
+  ];
+
+  const documentationParts: ts.SymbolDisplayPart[] = [
+    {text: `ARIA role: ${role}`, kind: 'text'},
+    {text: '\n', kind: 'lineBreak'},
+    {text: `Category: ${category}`, kind: 'text'},
+  ];
+
+  return {
+    kind: ts.ScriptElementKind.enumMemberElement,
+    kindModifiers: '',
+    textSpan: {start: 0, length: role.length},
+    displayParts,
+    documentation: documentationParts,
+  };
+}
+
+/**
+ * Gets a human-readable type description for an ARIA attribute.
+ */
+function getAriaTypeDescription(attr: AriaAttributeDefinition): string {
+  switch (attr.type) {
+    case 'boolean':
+      return 'boolean';
+    case 'tristate':
+      return 'true | false | mixed';
+    case 'integer':
+      return 'integer';
+    case 'number':
+      return 'number';
+    case 'string':
+      return 'string';
+    case 'id':
+      return 'ID reference';
+    case 'idlist':
+      return 'ID reference list';
+    case 'token':
+      return attr.values ? attr.values.join(' | ') : 'token';
+    case 'tokenlist':
+      return attr.values ? `(${attr.values.join(' | ')})*` : 'token list';
+    default:
+      return 'string';
+  }
+}
+
+/**
+ * Categorizes an ARIA role for display purposes.
+ */
+function getRoleCategory(role: string): string {
+  // Widget roles
+  const widgetRoles = new Set([
+    'alert',
+    'alertdialog',
+    'button',
+    'checkbox',
+    'combobox',
+    'dialog',
+    'gridcell',
+    'link',
+    'listbox',
+    'log',
+    'marquee',
+    'menu',
+    'menubar',
+    'menuitem',
+    'menuitemcheckbox',
+    'menuitemradio',
+    'option',
+    'progressbar',
+    'radio',
+    'radiogroup',
+    'scrollbar',
+    'searchbox',
+    'slider',
+    'spinbutton',
+    'status',
+    'switch',
+    'tab',
+    'tablist',
+    'tabpanel',
+    'textbox',
+    'timer',
+    'tooltip',
+    'tree',
+    'treegrid',
+    'treeitem',
+  ]);
+
+  // Landmark roles
+  const landmarkRoles = new Set([
+    'banner',
+    'complementary',
+    'contentinfo',
+    'form',
+    'main',
+    'navigation',
+    'region',
+    'search',
+  ]);
+
+  // Document structure roles
+  const structureRoles = new Set([
+    'application',
+    'article',
+    'blockquote',
+    'caption',
+    'cell',
+    'code',
+    'columnheader',
+    'definition',
+    'deletion',
+    'directory',
+    'document',
+    'emphasis',
+    'feed',
+    'figure',
+    'generic',
+    'grid',
+    'group',
+    'heading',
+    'img',
+    'insertion',
+    'list',
+    'listitem',
+    'math',
+    'meter',
+    'none',
+    'note',
+    'paragraph',
+    'presentation',
+    'row',
+    'rowgroup',
+    'rowheader',
+    'separator',
+    'strong',
+    'subscript',
+    'superscript',
+    'table',
+    'term',
+    'time',
+    'toolbar',
+  ]);
+
+  // DPUB roles
+  if (role.startsWith('doc-')) {
+    return 'DPUB-ARIA';
+  }
+
+  // Graphics roles
+  if (role.startsWith('graphics-')) {
+    return 'Graphics-ARIA';
+  }
+
+  if (widgetRoles.has(role)) {
+    return 'widget';
+  }
+  if (landmarkRoles.has(role)) {
+    return 'landmark';
+  }
+  if (structureRoles.has(role)) {
+    return 'structure';
+  }
+
+  return 'role';
 }
