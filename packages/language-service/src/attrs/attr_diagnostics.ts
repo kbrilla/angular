@@ -86,17 +86,91 @@ export function computeAttrDiagnostics(
     `[ATTR_DIAG] computeAttrDiagnostics called for component in ${diagnosticSourceFile.fileName}`,
   );
   const diagnostics: AttrDiagnostic[] = [];
+  const templateTypeChecker = compiler.getTemplateTypeChecker();
   const visitor = new AttrDiagnosticVisitor(
     component,
     diagnostics,
     severity,
     diagnosticSourceFile,
-    compiler.getTemplateTypeChecker(),
+    templateTypeChecker,
   );
   tmplAstVisitAll(visitor, templateNodes);
+
+  // Validate host element attribute bindings (from @Component host: { '[attr.x]': ... } or @HostBinding('attr.x'))
+  const hostElement = templateTypeChecker.getHostElement(component);
+  if (hostElement !== null) {
+    detectHostAttributeBindingConflicts(component, hostElement, diagnostics, severity);
+  }
+
   // @ts-ignore DEBUG
   console.log(`[ATTR_DIAG] TOTAL diagnostics: ${diagnostics.length}`);
   return diagnostics;
+}
+
+/**
+ * Detects conflicts between attribute bindings in component host metadata.
+ * Reports conflicts between host: {'[attr.x]': ...} and @HostBinding('attr.x').
+ * Creates diagnostics in the component TypeScript file.
+ */
+function detectHostAttributeBindingConflicts(
+  component: ts.ClassDeclaration,
+  hostElement: TmplAstHostElement,
+  diagnostics: AttrDiagnostic[],
+  severity: ts.DiagnosticCategory,
+): void {
+  // Collect all host attribute bindings by normalized attribute name
+  const bindingsByAttr = new Map<
+    string,
+    Array<{
+      name: string;
+      binding: TmplAstBoundAttribute;
+    }>
+  >();
+
+  for (const binding of hostElement.bindings) {
+    // Individual host attribute binding: [attr.x]
+    if (binding.type === BindingType.Attribute) {
+      // Skip bindings with invalid spans
+      if (!binding.keySpan || binding.keySpan.start.offset < 0) {
+        continue;
+      }
+
+      const normalized = binding.name.toLowerCase();
+      const entry = {
+        name: binding.name,
+        binding,
+      };
+      const existing = bindingsByAttr.get(normalized) || [];
+      existing.push(entry);
+      bindingsByAttr.set(normalized, existing);
+    }
+  }
+
+  // Check for conflicts (same attribute defined multiple times)
+  // For host bindings, we report conflicts even for the same binding type
+  // because they come from different sources (host: {} vs @HostBinding)
+  for (const [attrName, bindings] of bindingsByAttr) {
+    if (bindings.length <= 1) continue;
+
+    // For host bindings with the same attribute, report all but the first as conflicts
+    // The first binding takes precedence (order-dependent at runtime)
+    const first = bindings[0];
+
+    // Report diagnostics on subsequent bindings (they will be overridden)
+    for (let i = 1; i < bindings.length; i++) {
+      const subsequent = bindings[i];
+
+      diagnostics.push({
+        category: severity,
+        code: AttrDiagnosticCode.CONFLICTING_ATTRIBUTE_BINDING,
+        messageText: `Attribute '${subsequent.name}' is set via multiple host bindings. Only one value will be applied at runtime.`,
+        file: component.getSourceFile(),
+        start: subsequent.binding.keySpan!.start.offset,
+        length: subsequent.binding.keySpan!.end.offset - subsequent.binding.keySpan!.start.offset,
+        source: 'angular',
+      });
+    }
+  }
 }
 
 class AttrDiagnosticVisitor implements TmplAstVisitor {
