@@ -19,7 +19,8 @@ export type BaseBindingType =
   | 'directive' // Template structural directive binding (e.g., [ngStyle], [ngClass])
   | 'hostIndividual' // Component host individual binding
   | 'hostObjectLiteral' // Component host object binding
-  | 'directiveHostIndividual'; // Directive host individual binding
+  | 'hostDirectiveIndividual' // Host directive individual binding (from hostDirectives: [...])
+  | 'directiveHostIndividual'; // Directive host individual binding (from regular directives in template)
 
 /**
  * Maps binding types to their precedence order.
@@ -32,7 +33,8 @@ export const BASE_BINDING_PRECEDENCE: Record<BaseBindingType, number> = {
   directive: 3,
   hostIndividual: 4,
   hostObjectLiteral: 5,
-  directiveHostIndividual: 6,
+  hostDirectiveIndividual: 6,
+  directiveHostIndividual: 7,
 };
 
 /**
@@ -73,6 +75,8 @@ export function getBindingTypeDescription(
       return `component host [${prefix}.property]`;
     case 'hostObjectLiteral':
       return `component host [${prefix}]`;
+    case 'hostDirectiveIndividual':
+      return directiveName ? `host directive ${directiveName} binding` : 'host directive binding';
     case 'directiveHostIndividual':
       return directiveName ? `directive ${directiveName} host binding` : 'directive host binding';
   }
