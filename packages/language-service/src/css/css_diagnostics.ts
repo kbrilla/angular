@@ -466,6 +466,8 @@ interface StyleBinding {
   // For directive host bindings: span of the element in template where directive is applied
   // This is used for diagnostic location since directive host spans point to directive definition
   elementSpan?: {start: number; end: number};
+  // For directive/component host bindings: source file containing the host definition
+  hostSourceFile?: ts.SourceFile;
 }
 
 /**
@@ -1129,6 +1131,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           // Get the directive name for error messages
           const directiveName = dirNode.name?.text ?? 'unknown';
 
+          // Get the directive's source file for reading host binding values
+          const directiveSourceFile = dirNode.getSourceFile();
+
           // Find the directive's selector attribute on the element for precise span
           // Parse selector like '[appBackgroundColorApplier]' to extract 'appBackgroundColorApplier'
           let directiveAttrSpan: {start: number; end: number} | undefined;
@@ -1167,6 +1172,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
                 directiveName,
                 // Use directive attribute span if found, otherwise undefined (will use winner's span)
                 elementSpan: directiveAttrSpan,
+                hostSourceFile: directiveSourceFile,
               };
               const existing = bindingsByProperty.get(normalized) || [];
               existing.push(styleBinding);
@@ -1213,7 +1219,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           // Try to get a value snippet for individual bindings
           let valueSnippet = '';
           if (b.attribute.valueSpan) {
-            const text = this.diagnosticSourceFile.getFullText();
+            // For directive/component host bindings, use their source file
+            // For template bindings, use the template source file
+            const text = (b.hostSourceFile || this.diagnosticSourceFile).getFullText();
             const start = b.attribute.valueSpan.start.offset;
             const end = b.attribute.valueSpan.end.offset;
             const raw = text.slice(start, end).trim();
@@ -1302,7 +1310,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           // Individual binding
           let valueSnippet = '';
           if (b.attribute.valueSpan) {
-            const text = this.diagnosticSourceFile.getFullText();
+            // For directive/component host bindings, use their source file
+            // For template bindings, use the template source file
+            const text = (b.hostSourceFile || this.diagnosticSourceFile).getFullText();
             const start = b.attribute.valueSpan.start.offset;
             const end = b.attribute.valueSpan.end.offset;
             const raw = text.slice(start, end).trim();
