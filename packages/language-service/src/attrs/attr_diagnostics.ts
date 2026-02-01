@@ -33,6 +33,14 @@ import {isExternalResource} from '@angular/compiler-cli/src/ngtsc/metadata';
 import {TemplateTypeChecker} from '@angular/compiler-cli/src/ngtsc/typecheck/api';
 import ts from 'typescript';
 
+import {
+  BaseBinding,
+  BaseBindingType,
+  createConflictDiagnostic,
+  detectConflicts,
+  groupBindingsByName,
+} from '../binding_conflict_utils';
+
 /**
  * Attribute diagnostic codes for the Angular Language Service.
  */
@@ -47,21 +55,14 @@ export interface AttrDiagnostic extends ts.Diagnostic {
   code: AttrDiagnosticCode;
 }
 
-type AttributeBindingType =
-  | 'static'
-  | 'attrBinding'
-  | 'hostStatic'
-  | 'hostAttrBinding'
-  | 'directiveHostStatic'
-  | 'directiveHostAttrBinding';
-
-interface AttributeBindingInfo {
-  name: string;
-  bindingType: AttributeBindingType;
-  node: TmplAstTextAttribute | TmplAstBoundAttribute;
-  sourceSpan: {start: number; end: number};
-  directiveName?: string;
-  elementSpan?: {start: number; end: number};
+/**
+ * Attribute binding information that extends the base binding interface.
+ */
+interface AttributeBinding extends BaseBinding {
+  /** Whether this is a static attribute (e.g., disabled="") or bound (e.g., [attr.disabled]) */
+  isStatic: boolean;
+  /** The original node (either static attribute or bound attribute) */
+  originalNode: TmplAstTextAttribute | TmplAstBoundAttribute;
 }
 
 /**
@@ -124,49 +125,58 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
   }
 
   private detectAttributeConflicts(element: TmplAstElement | TmplAstTemplate) {
-    const attributeBindings = new Map<string, AttributeBindingInfo[]>();
+    const allBindings: AttributeBinding[] = [];
 
-    // Collect static attributes
+    // Helper to create a TmplAstBoundAttribute for the BaseBinding interface
+    const createBoundAttrForStatic = (attr: TmplAstTextAttribute): TmplAstBoundAttribute => {
+      // For static attributes, we need to create a minimal BoundAttribute
+      // to satisfy the BaseBinding interface
+      return {
+        name: attr.name,
+        type: BindingType.Attribute,
+        securityContext: null as any,
+        value: null as any,
+        unit: null,
+        sourceSpan: attr.sourceSpan,
+        keySpan: attr.keySpan || attr.sourceSpan,
+        valueSpan: attr.valueSpan || null,
+        i18n: attr.i18n,
+      } as any as TmplAstBoundAttribute;
+    };
+
+    // Collect static attributes (disabled="", title="foo")
     for (const attr of element.attributes) {
-      const normalized = attr.name.toLowerCase();
-      if (!attributeBindings.has(normalized)) {
-        attributeBindings.set(normalized, []);
-      }
+      allBindings.push({
+        bindingType: 'individual', // Static attributes are treated like individual bindings
+        originalName: attr.name,
+        normalizedName: attr.name.toLowerCase(),
+        attribute: createBoundAttrForStatic(attr),
+        isStatic: true,
+        originalNode: attr,
+      });
+
       // @ts-ignore DEBUG
       console.log(
         `[ATTR_DIAG] Static attr '${attr.name}' at offset ${attr.sourceSpan.start.offset}-${attr.sourceSpan.end.offset}`,
       );
-      attributeBindings.get(normalized)!.push({
-        name: attr.name,
-        bindingType: 'static',
-        node: attr,
-        sourceSpan: {
-          start: attr.sourceSpan.start.offset,
-          end: attr.sourceSpan.end.offset,
-        },
-      });
     }
 
-    // Collect attribute bindings ([attr.x])
+    // Collect attribute bindings ([attr.disabled]="value")
     for (const input of element.inputs) {
       if (input.type === BindingType.Attribute) {
-        const normalized = input.name.toLowerCase();
-        if (!attributeBindings.has(normalized)) {
-          attributeBindings.set(normalized, []);
-        }
+        allBindings.push({
+          bindingType: 'individual', // [attr.x] bindings are individual
+          originalName: input.name,
+          normalizedName: input.name.toLowerCase(),
+          attribute: input,
+          isStatic: false,
+          originalNode: input,
+        });
+
         // @ts-ignore DEBUG
         console.log(
-          `[ATTR_DIAG] Attr binding '[attr.${input.name}]' at offset ${input.sourceSpan.start.offset}-${input.sourceSpan.end.offset}, keySpan: ${input.keySpan?.start.offset}-${input.keySpan?.end.offset}`,
+          `[ATTR_DIAG] Attr binding '[attr.${input.name}]' at offset ${input.sourceSpan.start.offset}-${input.sourceSpan.end.offset}`,
         );
-        attributeBindings.get(normalized)!.push({
-          name: input.name,
-          bindingType: 'attrBinding',
-          node: input,
-          sourceSpan: {
-            start: input.keySpan ? input.keySpan.start.offset : input.sourceSpan.start.offset,
-            end: input.keySpan ? input.keySpan.end.offset : input.sourceSpan.end.offset,
-          },
-        });
       }
     }
 
@@ -176,7 +186,7 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
       const directives = this.templateTypeChecker.getDirectivesOfNode(this.component, element);
       if (directives) {
         for (const directive of directives) {
-          // Skip the component itself - we're looking for  attribute directives
+          // Skip the component itself - we're looking for attribute directives
           if (directive.isComponent) continue;
 
           // Get the class declaration from the directive reference
@@ -191,7 +201,6 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
           const directiveName = dirNode.name?.text ?? 'unknown';
 
           // Find the directive's selector attribute on the element for precise span
-          // Parse selector like '[appBackgroundColorApplier]' to extract 'appBackgroundColorApplier'
           let directiveAttrSpan: {start: number; end: number} | undefined;
           if (directive.selector) {
             // Extract attribute name from selector (e.g., '[myAttr]' -> 'myAttr')
@@ -212,134 +221,64 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
           // Collect attribute bindings from host
           for (const binding of hostElement.bindings) {
             if (binding.type === BindingType.Attribute) {
-              const normalized = binding.name.toLowerCase();
+              allBindings.push({
+                bindingType: 'directiveHostIndividual',
+                originalName: binding.name,
+                normalizedName: binding.name.toLowerCase(),
+                attribute: binding,
+                directiveName,
+                elementSpan: directiveAttrSpan,
+                isStatic: false,
+                originalNode: binding,
+              });
+
               // @ts-ignore DEBUG
               console.log(
                 `[ATTR_DIAG]     -> Directive '${directiveName}' host attr binding '[attr.${binding.name}]'`,
               );
-              const attrBinding: AttributeBindingInfo = {
-                name: binding.name,
-                bindingType: 'directiveHostAttrBinding',
-                node: binding,
-                sourceSpan: {
-                  start: binding.keySpan
-                    ? binding.keySpan.start.offset
-                    : binding.sourceSpan.start.offset,
-                  end: binding.keySpan ? binding.keySpan.end.offset : binding.sourceSpan.end.offset,
-                },
-                directiveName,
-                elementSpan: directiveAttrSpan,
-              };
-              const existing = attributeBindings.get(normalized) || [];
-              existing.push(attrBinding);
-              attributeBindings.set(normalized, existing);
             }
           }
         }
       }
     }
 
-    // Check for conflicts
-    for (const [attrName, bindings] of attributeBindings.entries()) {
-      if (bindings.length <= 1) continue;
+    // Group bindings by normalized name
+    const grouped = groupBindingsByName(allBindings);
 
-      // @ts-ignore DEBUG
-      console.log(`[ATTR_DIAG] Checking ${bindings.length} bindings for '${attrName}'`);
-
-      // Group bindings by type
-      const templateBindings = bindings.filter(
-        (b) => b.bindingType === 'static' || b.bindingType === 'attrBinding',
-      );
-      const hostBindings = bindings.filter(
-        (b) =>
-          b.bindingType === 'directiveHostStatic' || b.bindingType === 'directiveHostAttrBinding',
-      );
-
-      // Check for conflicts between template and directive host bindings
-      if (templateBindings.length > 0 && hostBindings.length > 0) {
-        // Conflict between template binding and directive host binding
-        // Report on ALL bindings (both template and host)
-        for (const binding of bindings) {
-          let message: string;
-          if (binding.directiveName) {
-            // This is a host binding - explain that it conflicts with template
-            message = `Attribute '${attrName}' is set both in the template and in directive '${binding.directiveName}' host bindings. The template binding will override the directive host binding.`;
-          } else {
-            // This is a template binding - explain that it overrides directive
-            const directiveNames = hostBindings
-              .map((b) => b.directiveName)
-              .filter((n): n is string => !!n)
-              .join(', ');
-            message = `Attribute '${attrName}' is set both in the template and in directive host bindings (${directiveNames}). The template binding will override the directive host binding.`;
-          }
-
-          // For directive host bindings, report on the directive selector attribute if found
-          const diagnosticSpan =
-            binding.bindingType.startsWith('directiveHost') && binding.elementSpan
-              ? binding.elementSpan
-              : binding.sourceSpan;
-
-          this.diagnostics.push({
-            category: this.severity,
-            code: AttrDiagnosticCode.CONFLICTING_ATTRIBUTE_BINDING,
-            file: this.diagnosticSourceFile,
-            start: diagnosticSpan.start,
-            length: diagnosticSpan.end - diagnosticSpan.start,
-            messageText: message,
-            source: 'angular',
-          });
+    // Detect conflicts using the shared utility
+    const conflictDiagnostics = detectConflicts(grouped, {
+      diagnosticCode: AttrDiagnosticCode.CONFLICTING_ATTRIBUTE_BINDING,
+      severity: this.severity,
+      diagnosticSourceFile: this.diagnosticSourceFile,
+      bindingPrefix: 'attribute',
+      formatValueSnippet: (binding: AttributeBinding, sourceFile: ts.SourceFile) => {
+        if (binding.isStatic && 'value' in binding.originalNode) {
+          // For static attributes, show the value
+          return binding.originalNode.value ? ` = "${binding.originalNode.value}"` : ` = ""`;
+        } else if (binding.attribute.valueSpan) {
+          // For bindings, show the expression
+          const text = sourceFile.getFullText();
+          const start = binding.attribute.valueSpan.start.offset;
+          const end = binding.attribute.valueSpan.end.offset;
+          const raw = text.slice(start, end).trim();
+          return raw ? ` — value: ${raw}` : '';
         }
-        continue;
-      }
-
-      // Check for conflicts within template bindings only
-      const hasStatic = templateBindings.some((b) => b.bindingType === 'static');
-      const hasAttrBinding = templateBindings.some((b) => b.bindingType === 'attrBinding');
-      const hasMultipleAttrBindings =
-        templateBindings.filter((b) => b.bindingType === 'attrBinding').length > 1;
-
-      if (hasStatic && hasAttrBinding) {
-        // Conflict between [attr.x] and x=""
-        for (const binding of templateBindings) {
-          this.addConflictWarning(
-            binding,
-            `Attribute '${attrName}' is set both as a static attribute and an attribute binding. The attribute binding will override the static attribute.`,
-          );
+        return '';
+      },
+      getBindingSpan: (binding: AttributeBinding, fallbackBinding?: AttributeBinding) => {
+        // For directive host bindings, prefer the element span (where directive is applied)
+        if (binding.bindingType === 'directiveHostIndividual' && binding.elementSpan) {
+          return binding.elementSpan;
         }
-      } else if (hasMultipleAttrBindings) {
-        // Multiple [attr.x] bindings
-        for (const binding of templateBindings.filter((b) => b.bindingType === 'attrBinding')) {
-          this.addDuplicateWarning(
-            binding,
-            `Attribute '${attrName}' has multiple attribute bindings. Only the last one will be applied.`,
-          );
-        }
-      }
-    }
-  }
-
-  private addConflictWarning(binding: AttributeBindingInfo, message: string) {
-    this.diagnostics.push({
-      category: this.severity,
-      code: AttrDiagnosticCode.CONFLICTING_ATTRIBUTE_BINDING,
-      file: this.diagnosticSourceFile,
-      start: binding.sourceSpan.start,
-      length: binding.sourceSpan.end - binding.sourceSpan.start,
-      messageText: message,
-      source: 'angular',
+        // Fallback to the attribute key span
+        return {
+          start: binding.attribute.keySpan.start.offset,
+          end: binding.attribute.keySpan.end.offset,
+        };
+      },
     });
-  }
 
-  private addDuplicateWarning(binding: AttributeBindingInfo, message: string) {
-    this.diagnostics.push({
-      category: this.severity,
-      code: AttrDiagnosticCode.DUPLICATE_ATTRIBUTE_BINDING,
-      file: this.diagnosticSourceFile,
-      start: binding.sourceSpan.start,
-      length: binding.sourceSpan.end - binding.sourceSpan.start,
-      messageText: message,
-      source: 'angular',
-    });
+    this.diagnostics.push(...conflictDiagnostics);
   }
 
   visitIfBlock(block: TmplAstIfBlock): void {
