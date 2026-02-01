@@ -61,6 +61,7 @@ import {getCssDiagnostics, DEFAULT_CSS_DIAGNOSTICS_CONFIG} from './css';
 import {getAriaDiagnostics, AriaDiagnosticsConfig, DEFAULT_ARIA_DIAGNOSTICS_CONFIG} from './aria';
 import {
   getEventDiagnostics,
+  getOutputDefinitionDiagnostics,
   EventDiagnosticsConfig,
   DEFAULT_EVENT_DIAGNOSTICS_CONFIG,
 } from './events';
@@ -133,12 +134,16 @@ export class LanguageService {
 
           if (cssConfig.enabled || ariaConfig.enabled || eventConfig.enabled) {
             const ttc = compiler.getTemplateTypeChecker();
-            // Find all class declarations that are components (have templates)
+            // Find all class declarations that are components/directives
             // Walk the AST once to collect CSS, ARIA, and Event diagnostics
             const visit = (node: ts.Node): void => {
               if (ts.isClassDeclaration(node)) {
                 const className = node.name?.getText() || '<anonymous>';
                 try {
+                  // Get directive metadata - works for both components and directives
+                  const meta = ttc.getDirectiveMetadata(node);
+
+                  // For template-based diagnostics, we need a template
                   const template = ttc.getTemplate(node);
                   if (template) {
                     // @ts-ignore DEBUG
@@ -162,7 +167,7 @@ export class LanguageService {
                       );
                     }
 
-                    // Collect Event diagnostics
+                    // Collect Event template binding diagnostics
                     if (eventConfig.enabled) {
                       const eventDiags = getEventDiagnostics(node, compiler, eventConfig);
                       diagnostics.push(...eventDiags);
@@ -172,8 +177,27 @@ export class LanguageService {
                       );
                     }
                   }
+
+                  // Output definition diagnostics apply to ANY directive (with or without template)
+                  // This detects @Output() that shadow DOM events at the class definition level
+                  if (eventConfig.enabled && meta) {
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Checking output definitions for directive: ${className}`,
+                    );
+                    const outputDefDiags = getOutputDefinitionDiagnostics(
+                      node,
+                      compiler,
+                      eventConfig,
+                    );
+                    diagnostics.push(...outputDefDiags);
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Event output definition diagnostics for ${className}: ${outputDefDiags.length}`,
+                    );
+                  }
                 } catch {
-                  // Not a component or error getting template, skip
+                  // Not a component/directive or error, skip
                 }
               }
               ts.forEachChild(node, visit);
@@ -211,6 +235,17 @@ export class LanguageService {
             diagnostics.push(...eventDiags);
             // @ts-ignore DEBUG
             console.log(`[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`);
+            // Definition-level Event diagnostics (e.g., @Output shadowing DOM events)
+            const outputDefDiags = getOutputDefinitionDiagnostics(
+              component,
+              compiler,
+              this.getEventDiagnosticsConfig(),
+            );
+            diagnostics.push(...outputDefDiags);
+            // @ts-ignore DEBUG
+            console.log(
+              `[LS_DIAG] Event output definition diagnostics for ${className}: ${outputDefDiags.length}`,
+            );
           }
         }
       }
