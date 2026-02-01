@@ -448,7 +448,8 @@ type StyleBindingType =
   | 'styleObject'
   | 'ngStyle'
   | 'hostIndividual'
-  | 'hostStyleObject';
+  | 'hostStyleObject'
+  | 'directiveHostIndividual';
 
 /**
  * Represents a style binding found on an element.
@@ -460,6 +461,8 @@ interface StyleBinding {
   originalPropertyName: string; // Original property name for error messages
   // Optional span for the property key inside an object binding ([style] or [ngStyle])
   propertySpan?: {start: number; end: number};
+  // Name of the directive for directive host bindings
+  directiveName?: string;
 }
 
 /**
@@ -467,8 +470,9 @@ interface StyleBinding {
  * 1. Individual [style.prop] bindings (template)
  * 2. [style]="{}" object bindings (template)
  * 3. [ngStyle]="{}" directive bindings (template)
- * 4. Individual [style.prop] host bindings
- * 5. [style]="{}" host object bindings
+ * 4. Individual [style.prop] host bindings (component's own host)
+ * 5. [style]="{}" host object bindings (component's own host)
+ * 6. Directive host bindings (from directives applied to element)
  *
  * Template always takes precedence over host bindings.
  */
@@ -478,12 +482,13 @@ const BINDING_PRECEDENCE: Record<StyleBindingType, number> = {
   ngStyle: 3,
   hostIndividual: 4,
   hostStyleObject: 5,
+  directiveHostIndividual: 6,
 };
 
 /**
  * Gets a human-readable description of a style binding type.
  */
-function getBindingDescription(type: StyleBindingType): string {
+function getBindingDescription(type: StyleBindingType, directiveName?: string): string {
   switch (type) {
     case 'individual':
       return '[style.property]';
@@ -495,6 +500,8 @@ function getBindingDescription(type: StyleBindingType): string {
       return 'host [style.property]';
     case 'hostStyleObject':
       return 'host [style]';
+    case 'directiveHostIndividual':
+      return directiveName ? `directive ${directiveName} host binding` : 'directive host binding';
   }
 }
 
@@ -1099,6 +1106,51 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       }
     }
 
+    // Collect directive host style bindings that apply to this element
+    // Only for TmplAstElement (not ng-template)
+    if ('name' in element) {
+      const directives = this.templateTypeChecker.getDirectivesOfNode(this.component, element);
+      if (directives) {
+        for (const directive of directives) {
+          // Skip the component itself - we're looking for attribute directives
+          if (directive.isComponent) continue;
+
+          // Get the class declaration from the directive reference
+          const dirNode = directive.ref.node;
+          if (!ts.isClassDeclaration(dirNode)) continue;
+
+          // Get the host element for this directive
+          const hostElement = this.templateTypeChecker.getHostElement(dirNode);
+          if (!hostElement) continue;
+
+          // Get the directive name for error messages
+          const directiveName = dirNode.name?.text ?? 'unknown';
+
+          // Collect style bindings from the directive's host element
+          for (const binding of hostElement.bindings) {
+            if (binding.type === BindingType.Style) {
+              const propertyName = binding.name.split('.')[0];
+              const normalized = normalizeCSSPropertyName(propertyName);
+              // @ts-ignore DEBUG
+              console.log(
+                `[CSS_DIAG]     -> Directive '${directiveName}' host style binding: propertyName='${propertyName}', normalized='${normalized}'`,
+              );
+              const styleBinding: StyleBinding = {
+                property: normalized,
+                bindingType: 'directiveHostIndividual',
+                attribute: binding,
+                originalPropertyName: propertyName,
+                directiveName,
+              };
+              const existing = bindingsByProperty.get(normalized) || [];
+              existing.push(styleBinding);
+              bindingsByProperty.set(normalized, existing);
+            }
+          }
+        }
+      }
+    }
+
     // Log all collected bindings
     // @ts-ignore DEBUG
     console.log(`[CSS_DIAG]   Collected ${bindingsByProperty.size} unique properties:`);
@@ -1125,7 +1177,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
       if (allSameType) {
         // PURE DUPLICATES: All bindings are same type (e.g., multiple [style.prop])
-        const bindingDescription = getBindingDescription(winner.bindingType);
+        const bindingDescription = getBindingDescription(winner.bindingType, winner.directiveName);
 
         // Helper to render display name and value snippet
         const render = (b: StyleBinding, idx: number) => {
@@ -1204,7 +1256,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             valueSnippet = raw ? ` — value: ${raw}` : '';
           }
 
-          return `${idx + 1}. ${nameDisplay} from [style.${original}]${valueSnippet} (${getBindingDescription(b.bindingType)})`;
+          return `${idx + 1}. ${nameDisplay} from [style.${original}]${valueSnippet} (${getBindingDescription(b.bindingType, b.directiveName)})`;
         };
 
         const precedenceList = sorted.map((b, idx) => render(b, idx)).join('\n');
@@ -1213,7 +1265,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
         // Also include a short consensus sentence about which binding type wins over which
         const second = sorted[1];
-        const summary = `The ${getBindingDescription(winner.bindingType)} binding takes precedence over ${getBindingDescription(second.bindingType)}.`;
+        const summary = `The ${getBindingDescription(winner.bindingType, winner.directiveName)} binding takes precedence over ${getBindingDescription(second.bindingType, second.directiveName)}.`;
 
         this.diagnostics.push({
           category: this.severity,
@@ -1233,7 +1285,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             file: this.diagnosticSourceFile,
             start: b.attribute.keySpan.start.offset,
             length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
-            messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingDescription(b.bindingType)})${idx === 0 ? ' - WINS' : ''}`,
+            messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingDescription(b.bindingType, b.directiveName)})${idx === 0 ? ' - WINS' : ''}`,
           })),
         });
       }
