@@ -63,6 +63,8 @@ interface AttributeBinding extends BaseBinding {
   isStatic: boolean;
   /** The original node (either static attribute or bound attribute) */
   originalNode: TmplAstTextAttribute | TmplAstBoundAttribute;
+  /** For directive/component host bindings, the source file containing the host definition */
+  hostSourceFile?: ts.SourceFile;
 }
 
 /**
@@ -186,23 +188,26 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
       const directives = this.templateTypeChecker.getDirectivesOfNode(this.component, element);
       if (directives) {
         for (const directive of directives) {
-          // Skip the component itself - we're looking for attribute directives
-          if (directive.isComponent) continue;
+          // Process component host bindings separately
+          const isComponentItself = directive.isComponent && directive.ref.node === this.component;
 
           // Get the class declaration from the directive reference
           const dirNode = directive.ref.node;
           if (!ts.isClassDeclaration(dirNode)) continue;
 
-          // Get the host element for this directive
+          // Get the host element for this directive/component
           const hostElement = this.templateTypeChecker.getHostElement(dirNode);
           if (!hostElement) continue;
 
-          // Get the directive name for error messages
+          // Get the directive/component name for error messages
           const directiveName = dirNode.name?.text ?? 'unknown';
+
+          // Get the source file for reading host binding values
+          const hostSourceFile = dirNode.getSourceFile();
 
           // Find the directive's selector attribute on the element for precise span
           let directiveAttrSpan: {start: number; end: number} | undefined;
-          if (directive.selector) {
+          if (!isComponentItself && directive.selector) {
             // Extract attribute name from selector (e.g., '[myAttr]' -> 'myAttr')
             const attrMatch = directive.selector.match(/\[([^\]]+)\]/);
             if (attrMatch) {
@@ -222,19 +227,20 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
           for (const binding of hostElement.bindings) {
             if (binding.type === BindingType.Attribute) {
               allBindings.push({
-                bindingType: 'directiveHostIndividual',
+                bindingType: isComponentItself ? 'hostIndividual' : 'directiveHostIndividual',
                 originalName: binding.name,
                 normalizedName: binding.name.toLowerCase(),
                 attribute: binding,
-                directiveName,
+                directiveName: isComponentItself ? undefined : directiveName,
                 elementSpan: directiveAttrSpan,
                 isStatic: false,
                 originalNode: binding,
+                hostSourceFile: hostSourceFile,
               });
 
               // @ts-ignore DEBUG
               console.log(
-                `[ATTR_DIAG]     -> Directive '${directiveName}' host attr binding '[attr.${binding.name}]'`,
+                `[ATTR_DIAG]     -> ${isComponentItself ? 'Component' : 'Directive'} '${directiveName}' host attr binding '[attr.${binding.name}]'`,
               );
             }
           }
@@ -255,14 +261,11 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
         if (binding.isStatic && 'value' in binding.originalNode) {
           // For static attributes, show the value
           return binding.originalNode.value ? ` = "${binding.originalNode.value}"` : ` = ""`;
-        } else if (binding.bindingType === 'directiveHostIndividual') {
-          // For directive host bindings, we cannot reliably read the value from the template file
-          // because the valueSpan offsets are relative to the directive's TypeScript file
-          // Skip showing the value for now
-          return '';
         } else if (binding.attribute.valueSpan) {
-          // For template bindings, show the expression
-          const text = sourceFile.getFullText();
+          // For directive/component host bindings, use their source file
+          // For template bindings, use the template source file
+          const readFrom = binding.hostSourceFile || sourceFile;
+          const text = readFrom.getFullText();
           const start = binding.attribute.valueSpan.start.offset;
           const end = binding.attribute.valueSpan.end.offset;
           const raw = text.slice(start, end).trim();
