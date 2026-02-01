@@ -560,12 +560,13 @@ describe('Event validation diagnostics', () => {
       expect(shadowDiagsFromHtml[0].messageText).toContain('ClickOverrideDirective');
       expect(shadowDiagsFromHtml[0].messageText).toContain('2 times');
 
-      // Check diagnostics from TS file perspective (should also work)
+      // When using external templates, diagnostics should NOT appear on TS file
+      // They are reported on the HTML file where the template content lives
       const tsDiags = project.getDiagnosticsForFile('app.ts');
       const shadowDiagsFromTs = tsDiags.filter(
         (d) => d.code === EventDiagnosticCode.SHADOWED_DOM_EVENT,
       );
-      expect(shadowDiagsFromTs.length).toBe(1);
+      expect(shadowDiagsFromTs.length).toBe(0);
     });
   });
 

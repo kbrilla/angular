@@ -18,6 +18,7 @@ import ts from 'typescript';
 
 import {DisplayInfoKind, unsafeCastDisplayInfoKindToScriptElementKind} from './utils/display_parts';
 import {makeElementSelector} from './utils';
+import {VALID_ARIA_ATTRIBUTES} from './aria/aria_data';
 
 /**
  * Differentiates different kinds of `AttributeCompletion`s.
@@ -405,6 +406,17 @@ export function buildAttributeCompletionTable(
         kind: AttributeCompletionKind.DomEvent,
         eventName: event,
       });
+    }
+
+    // Add ARIA attributes for attribute bindings (attr.aria-*)
+    // These are valid on all HTML elements
+    for (const ariaAttr of VALID_ARIA_ATTRIBUTES) {
+      if (!table.has(ariaAttr)) {
+        table.set(ariaAttr, {
+          kind: AttributeCompletionKind.DomProperty,
+          property: ariaAttr,
+        });
+      }
     }
   }
   return table;

@@ -59,6 +59,12 @@ import {
   getNumericUnitCompletions,
 } from './css';
 import {
+  getAriaAttributeCompletions,
+  getAriaAttributeQuickInfo,
+  getAriaValueCompletions,
+} from './aria';
+import {HTML_ATTRIBUTES} from './html_attributes';
+import {
   DisplayInfo,
   DisplayInfoKind,
   getDirectiveDisplayInfo,
@@ -300,6 +306,51 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
           isNewIdentifierLocation: true,
         };
       }
+
+      // Check if we're inside an ARIA attribute binding value (e.g., [attr.aria-atomic]="''")
+      const ariaCompletions = this.getAriaValueCompletionsForBinding();
+      if (ariaCompletions.length > 0) {
+        let replacementSpan: ts.TextSpan | undefined;
+        if (this.node.value.length > 0) {
+          replacementSpan = {
+            start: this.node.sourceSpan.start + 1, // Skip opening quote
+            length: this.node.value.length,
+          };
+        }
+        return {
+          entries: ariaCompletions.map((entry) => ({
+            ...entry,
+            replacementSpan,
+          })),
+          isGlobalCompletion: false,
+          isMemberCompletion: false,
+          isNewIdentifierLocation: true,
+        };
+      }
+    }
+
+    // Check if we're inside an ARIA text attribute value (e.g., aria-atomic="")
+    if (this.node instanceof TextAttribute && this.node.name.startsWith('aria-')) {
+      const ariaCompletions = getAriaValueCompletions(this.node.name, this.node.value);
+      if (ariaCompletions.length > 0) {
+        // Calculate replacement span for the value
+        let replacementSpan: ts.TextSpan | undefined;
+        if (this.node.valueSpan && this.node.value.length > 0) {
+          replacementSpan = {
+            start: this.node.valueSpan.start.offset,
+            length: this.node.value.length,
+          };
+        }
+        return {
+          entries: ariaCompletions.map((entry) => ({
+            ...entry,
+            replacementSpan,
+          })),
+          isGlobalCompletion: false,
+          isMemberCompletion: false,
+          isNewIdentifierLocation: true,
+        };
+      }
     }
 
     const location = this.compiler
@@ -491,6 +542,52 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
     }
 
     return completions;
+  }
+
+  /**
+   * Gets ARIA value completions when inside an ARIA attribute binding's string value.
+   * For example, for `[attr.aria-atomic]="'|'"`, suggests 'true', 'false'.
+   */
+  private getAriaValueCompletionsForBinding(): ts.CompletionEntry[] {
+    if (!(this.node instanceof LiteralPrimitive)) {
+      return [];
+    }
+
+    // Get the template source to find if we're inside an ARIA attribute binding
+    const program = this.compiler.getCurrentProgram();
+    const templateUrl = this.compiler.getTemplateTypeChecker().getTemplate(this.component)?.[0]
+      ?.sourceSpan?.start?.file?.url;
+
+    if (!templateUrl) {
+      return [];
+    }
+
+    const templateSourceFile = program.getSourceFile(templateUrl);
+    if (!templateSourceFile) {
+      return [];
+    }
+
+    const text = templateSourceFile.text;
+    const literalStart = this.node.sourceSpan.start;
+
+    // Look backwards from the literal position to find [attr.aria-*]="
+    const searchStart = Math.max(0, literalStart - 100);
+    const textBefore = text.substring(searchStart, literalStart);
+
+    // Match patterns like:
+    // [attr.aria-atomic]="'
+    // [attr.aria-hidden]="'
+    const ariaBindingMatch = textBefore.match(/\[attr\.(aria-[a-zA-Z-]+)\]=["']$/);
+
+    if (!ariaBindingMatch) {
+      return [];
+    }
+
+    const ariaAttribute = ariaBindingMatch[1];
+    const currentValue =
+      typeof this.node.value === 'string' ? this.node.value : String(this.node.value ?? '');
+
+    return getAriaValueCompletions(ariaAttribute, currentValue);
   }
 
   /**
@@ -1370,6 +1467,79 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
             insertText: entry.insertText,
           });
         }
+      }
+    }
+
+    // Add attribute name completions for attribute bindings
+    // When the user is typing after `[attr.`, provide attribute name completions including ARIA
+    if (
+      this.node instanceof TmplAstBoundAttribute &&
+      this.node.type === BindingType.Attribute &&
+      this.node.keySpan !== undefined
+    ) {
+      // Extract the typed prefix after 'attr.'
+      // For example, if the user typed '[attr.aria-', the name will be 'attr.aria-' or similar
+      const typedName = this.node.name;
+      const attrPrefix = typedName.includes('.')
+        ? typedName.substring(typedName.indexOf('.') + 1)
+        : '';
+
+      // Calculate replacement span for just the attribute name portion (after 'attr.')
+      const attrStart = this.node.keySpan.start.offset + 'attr.'.length;
+      const attrLength = attrPrefix.length;
+      const attrReplacementSpan = {
+        start: attrStart,
+        length: attrLength,
+      };
+
+      // Add all attributes from the completion table
+      for (const [name, completion] of attrTable.entries()) {
+        // Only include attributes that match the prefix
+        if (name.toLowerCase().startsWith(attrPrefix.toLowerCase())) {
+          // Include attribute/property completions, but not directive-specific ones
+          if (
+            completion.kind === AttributeCompletionKind.DomAttribute ||
+            completion.kind === AttributeCompletionKind.DomProperty
+          ) {
+            const attrName =
+              completion.kind === AttributeCompletionKind.DomAttribute
+                ? completion.attribute
+                : completion.property;
+            entries.push({
+              kind: unsafeCastDisplayInfoKindToScriptElementKind(DisplayInfoKind.ATTRIBUTE),
+              name: attrName,
+              insertText: attrName,
+              sortText: attrName,
+              replacementSpan: attrReplacementSpan,
+            });
+          }
+        }
+      }
+
+      // Add common HTML attributes
+      for (const htmlAttr of HTML_ATTRIBUTES) {
+        if (htmlAttr.toLowerCase().startsWith(attrPrefix.toLowerCase())) {
+          // Don't add if already in entries
+          const alreadyAdded = entries.some((e) => e.name === htmlAttr);
+          if (!alreadyAdded) {
+            entries.push({
+              kind: unsafeCastDisplayInfoKindToScriptElementKind(DisplayInfoKind.ATTRIBUTE),
+              name: htmlAttr,
+              insertText: htmlAttr,
+              sortText: htmlAttr,
+              replacementSpan: attrReplacementSpan,
+            });
+          }
+        }
+      }
+
+      // Get ARIA attribute completions
+      const ariaEntries = getAriaAttributeCompletions(attrPrefix);
+      for (const entry of ariaEntries) {
+        entries.push({
+          ...entry,
+          replacementSpan: attrReplacementSpan,
+        });
       }
     }
 

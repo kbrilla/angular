@@ -59,6 +59,7 @@ import {getInlayHintsForTemplate} from './inlay_hints';
 import type {AngularInlayHint, InlayHintsConfig, CssDiagnosticsConfig} from '../api';
 import {getCssDiagnostics, DEFAULT_CSS_DIAGNOSTICS_CONFIG} from './css';
 import {getAriaDiagnostics, AriaDiagnosticsConfig, DEFAULT_ARIA_DIAGNOSTICS_CONFIG} from './aria';
+import {computeAttrDiagnostics} from './attrs/attr_diagnostics';
 import {
   getEventDiagnostics,
   getOutputDefinitionDiagnostics,
@@ -149,8 +150,15 @@ export class LanguageService {
                     // @ts-ignore DEBUG
                     console.log(`[LS_DIAG] Found component: ${className} with template`);
 
+                    // Check if this component uses an external template
+                    // For external templates, skip diagnostics here - they'll be reported when processing the HTML file
+                    // This prevents diagnostics from appearing in wrong file (TS file for external template content)
+                    const resources = compiler.getDirectiveResources(node);
+                    const hasExternalTemplate =
+                      resources?.template && isExternalResource(resources.template);
+
                     // Collect CSS diagnostics
-                    if (cssConfig.enabled) {
+                    if (cssConfig.enabled && !hasExternalTemplate) {
                       const cssDiags = getCssDiagnostics(node, compiler, cssConfig);
                       diagnostics.push(...cssDiags);
                       // @ts-ignore DEBUG
@@ -158,7 +166,7 @@ export class LanguageService {
                     }
 
                     // Collect ARIA diagnostics
-                    if (ariaConfig.enabled) {
+                    if (ariaConfig.enabled && !hasExternalTemplate) {
                       const ariaDiags = getAriaDiagnostics(node, compiler, ariaConfig);
                       diagnostics.push(...ariaDiags);
                       // @ts-ignore DEBUG
@@ -168,12 +176,22 @@ export class LanguageService {
                     }
 
                     // Collect Event template binding diagnostics
-                    if (eventConfig.enabled) {
+                    if (eventConfig.enabled && !hasExternalTemplate) {
                       const eventDiags = getEventDiagnostics(node, compiler, eventConfig);
                       diagnostics.push(...eventDiags);
                       // @ts-ignore DEBUG
                       console.log(
                         `[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`,
+                      );
+                    }
+
+                    // Collect Attribute binding conflict diagnostics
+                    if (!hasExternalTemplate) {
+                      const attrDiags = this.getAttrDiagnosticsForComponent(node, compiler);
+                      diagnostics.push(...attrDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] Attr diagnostics for ${className}: ${attrDiags.length}`,
                       );
                     }
                   }
@@ -235,6 +253,14 @@ export class LanguageService {
             diagnostics.push(...eventDiags);
             // @ts-ignore DEBUG
             console.log(`[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`);
+
+            // Add Attribute binding conflict diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const attrDiags = this.getAttrDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...attrDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] Attr diagnostics for ${className}: ${attrDiags.length}`);
+
             // Definition-level Event diagnostics (e.g., @Output shadowing DOM events)
             const outputDefDiags = getOutputDefinitionDiagnostics(
               component,
@@ -453,6 +479,59 @@ export class LanguageService {
     // For now, use default configuration
     // TODO: Add configuration options to plugin config API
     return DEFAULT_EVENT_DIAGNOSTICS_CONFIG;
+  }
+
+  /**
+   * Gets Attribute binding conflict diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name for external templates.
+   * @internal
+   */
+  private getAttrDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const templateTypeChecker = compiler.getTemplateTypeChecker();
+    const templateData = templateTypeChecker.getTemplate(component);
+    if (templateData === null) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[ATTR_DIAG] Created synthetic source file for external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    // Fall back to component source file for inline templates
+    const diagnosticSourceFile = templateSourceFile || component.getSourceFile();
+    return computeAttrDiagnostics(
+      compiler,
+      diagnosticSourceFile,
+      component,
+      templateData,
+      ts.DiagnosticCategory.Warning,
+    );
   }
 
   getSuggestionDiagnostics(fileName: string): ts.DiagnosticWithLocation[] {

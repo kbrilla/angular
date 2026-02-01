@@ -23,6 +23,22 @@ export type AriaAttributeType =
   | 'tokenlist';
 
 /**
+ * Definition for an ARIA attribute.
+ */
+export interface AriaAttributeDefinition {
+  /** The type of value this attribute accepts */
+  type: AriaAttributeType;
+  /** For token/tokenlist types, the allowed values */
+  values?: readonly string[];
+  /** Whether undefined is a valid value */
+  allowundefined?: boolean;
+  /** Reference URL (WAI-ARIA spec) */
+  reference?: string;
+  /** Description (markdown) */
+  description?: string;
+}
+
+/**
  * Valid ARIA attributes from WAI-ARIA 1.2
  */
 export const VALID_ARIA_ATTRIBUTES = new Set([
@@ -348,9 +364,88 @@ function levenshteinDistance(a: string, b: string): number {
   return matrix[b.length][a.length];
 }
 
-export const ARIA_ATTRIBUTES = null; // Placeholder for compatibility
+/**
+ * Map of ARIA attribute type patterns.
+ */
+const ARIA_ATTRIBUTE_TYPES: Record<string, AriaAttributeType> = {
+  // Boolean attributes
+  'aria-atomic': 'boolean',
+  'aria-busy': 'boolean',
+  'aria-disabled': 'boolean',
+  'aria-modal': 'boolean',
+  'aria-multiline': 'boolean',
+  'aria-multiselectable': 'boolean',
+  'aria-readonly': 'boolean',
+  'aria-required': 'boolean',
+  // Tristate attributes
+  'aria-checked': 'tristate',
+  'aria-pressed': 'tristate',
+  // Boolean/undefined attributes
+  'aria-hidden': 'boolean',
+  'aria-expanded': 'boolean',
+  'aria-grabbed': 'boolean',
+  'aria-selected': 'boolean',
+  // Token attributes
+  'aria-autocomplete': 'token',
+  'aria-current': 'token',
+  'aria-haspopup': 'token',
+  'aria-invalid': 'token',
+  'aria-live': 'token',
+  'aria-orientation': 'token',
+  'aria-sort': 'token',
+  // Token list attributes
+  'aria-relevant': 'tokenlist',
+  'aria-dropeffect': 'tokenlist',
+  // Integer attributes
+  'aria-colcount': 'integer',
+  'aria-colindex': 'integer',
+  'aria-colspan': 'integer',
+  'aria-level': 'integer',
+  'aria-posinset': 'integer',
+  'aria-rowcount': 'integer',
+  'aria-rowindex': 'integer',
+  'aria-rowspan': 'integer',
+  'aria-setsize': 'integer',
+  // Number attributes
+  'aria-valuemax': 'number',
+  'aria-valuemin': 'number',
+  'aria-valuenow': 'number',
+  // ID reference attributes
+  'aria-activedescendant': 'id',
+  'aria-errormessage': 'id',
+  'aria-details': 'id',
+  // ID list attributes
+  'aria-controls': 'idlist',
+  'aria-describedby': 'idlist',
+  'aria-flowto': 'idlist',
+  'aria-labelledby': 'idlist',
+  'aria-owns': 'idlist',
+};
+
+/**
+ * Build the ARIA_ATTRIBUTES record from our data.
+ */
+function buildAriaAttributes(): Readonly<Record<string, AriaAttributeDefinition>> {
+  const result: Record<string, AriaAttributeDefinition> = {};
+
+  for (const attrName of VALID_ARIA_ATTRIBUTES) {
+    const type = ARIA_ATTRIBUTE_TYPES[attrName] ?? 'string';
+    const values = ARIA_ATTRIBUTE_VALUES[attrName];
+
+    result[attrName] = {
+      type,
+      values,
+      description: getAriaAttributeDocumentation(attrName),
+    };
+  }
+
+  return result;
+}
+
+export const ARIA_ATTRIBUTES: Readonly<Record<string, AriaAttributeDefinition>> =
+  buildAriaAttributes();
 export const ARIA_ROLES = Array.from(VALID_ARIA_ROLES); // Convert to array
+
 export function getAriaAttributeType(name: string): AriaAttributeType | undefined {
-  // Simplified - return 'string' for all
-  return VALID_ARIA_ATTRIBUTES.has(name) ? 'string' : undefined;
+  return ARIA_ATTRIBUTES[name]?.type;
 }
