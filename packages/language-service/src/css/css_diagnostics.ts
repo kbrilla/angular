@@ -458,6 +458,8 @@ interface StyleBinding {
   bindingType: StyleBindingType;
   attribute: TmplAstBoundAttribute;
   originalPropertyName: string; // Original property name for error messages
+  // Optional span for the property key inside an object binding ([style] or [ngStyle])
+  propertySpan?: {start: number; end: number};
 }
 
 /**
@@ -1087,6 +1089,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
               bindingType,
               attribute: input,
               originalPropertyName: prop.name,
+              propertySpan: {start: prop.span.start, end: prop.span.end},
             };
             const existing = bindingsByProperty.get(normalized) || [];
             existing.push(binding);
@@ -1121,20 +1124,43 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       const allSameType = bindings.every((b) => b.bindingType === winner.bindingType);
 
       if (allSameType) {
-        // PURE DUPLICATES: All bindings are the same type
-        // Build a comprehensive message showing all occurrences
+        // PURE DUPLICATES: All bindings are same type (e.g., multiple [style.prop])
         const bindingDescription = getBindingDescription(winner.bindingType);
-        const allOccurrences = sorted
-          .map((b, idx) => `${idx + 1}. [style.${b.originalPropertyName}]`)
-          .join('\n');
 
-        // Report on the LAST occurrence (which gets overridden by all previous)
+        // Helper to render display name and value snippet
+        const render = (b: StyleBinding, idx: number) => {
+          const kebab = camelToKebabCase(b.originalPropertyName);
+          const original = b.originalPropertyName;
+          const nameDisplay = kebab === original ? kebab : `${kebab} (${original})`;
+          // Try to get a value snippet for individual bindings
+          let valueSnippet = '';
+          if (b.attribute.valueSpan) {
+            const text = this.diagnosticSourceFile.getFullText();
+            const start = b.attribute.valueSpan.start.offset;
+            const end = b.attribute.valueSpan.end.offset;
+            const raw = text.slice(start, end).trim();
+            valueSnippet = raw ? ` — value: ${raw}` : '';
+          }
+          // For object bindings, show a concise mention, include the exact property key if we have a span
+          if (b.bindingType === 'styleObject' || b.bindingType === 'ngStyle') {
+            if (b.propertySpan) {
+              const text = this.diagnosticSourceFile.getFullText();
+              const keyRaw = text.slice(b.propertySpan.start, b.propertySpan.end).trim();
+              return `${idx + 1}. ${nameDisplay} from [${b.attribute.name}]={ ${keyRaw} }`;
+            }
+            return `${idx + 1}. ${nameDisplay} from [${b.attribute.name}]`;
+          }
+          return `${idx + 1}. ${nameDisplay} from [style.${original}]${valueSnippet}`;
+        };
+
+        const allOccurrences = sorted.map((b, idx) => render(b, idx)).join('\n');
         const lastBinding = sorted[sorted.length - 1];
+
         this.diagnostics.push({
           category: this.severity,
           code: CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
           messageText:
-            `CSS property '${property}' is set ${bindings.length} times via ${bindingDescription}.\n` +
+            `CSS property '${camelToKebabCase(property)}' is set ${bindings.length} times via ${bindingDescription}.\n` +
             `The first occurrence wins, subsequent bindings are ignored:\n${allOccurrences}`,
           file: this.diagnosticSourceFile,
           start: lastBinding.attribute.keySpan.start.offset,
@@ -1147,28 +1173,54 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             file: this.diagnosticSourceFile,
             start: b.attribute.keySpan.start.offset,
             length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
-            messageText: `Occurrence #${idx + 1}: [style.${b.originalPropertyName}]${idx === 0 ? ' (WINS)' : ''}`,
+            messageText: `Occurrence #${idx + 1}: ${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}]${idx === 0 ? ' (WINS)' : ''}`,
           })),
         });
       } else {
         // MIXED TYPES: Different binding types with different precedence
-        // Build a comprehensive message showing precedence order
-        const precedenceList = sorted
-          .map((b, idx) => {
-            const desc = getBindingDescription(b.bindingType);
-            const status = idx === 0 ? 'WINS' : 'overridden';
-            return `${idx + 1}. [style.${b.originalPropertyName}] (${desc}) - ${status}`;
-          })
-          .join('\n');
 
-        // Report on the LOWEST precedence binding (most likely to confuse user)
+        const render = (b: StyleBinding, idx: number) => {
+          const kebab = camelToKebabCase(b.originalPropertyName);
+          const original = b.originalPropertyName;
+          const nameDisplay = kebab === original ? kebab : `${kebab} (${original})`;
+
+          if (b.bindingType === 'styleObject' || b.bindingType === 'ngStyle') {
+            // Show property origin from object binding, include the exact key when available
+            if (b.propertySpan) {
+              const text = this.diagnosticSourceFile.getFullText();
+              const keyRaw = text.slice(b.propertySpan.start, b.propertySpan.end).trim();
+              return `${idx + 1}. ${nameDisplay} from [${b.attribute.name}]={ ${keyRaw} }`;
+            }
+            return `${idx + 1}. ${nameDisplay} from [${b.attribute.name}]`; // e.g., from [style]
+          }
+
+          // Individual binding
+          let valueSnippet = '';
+          if (b.attribute.valueSpan) {
+            const text = this.diagnosticSourceFile.getFullText();
+            const start = b.attribute.valueSpan.start.offset;
+            const end = b.attribute.valueSpan.end.offset;
+            const raw = text.slice(start, end).trim();
+            valueSnippet = raw ? ` — value: ${raw}` : '';
+          }
+
+          return `${idx + 1}. ${nameDisplay} from [style.${original}]${valueSnippet} (${getBindingDescription(b.bindingType)})`;
+        };
+
+        const precedenceList = sorted.map((b, idx) => render(b, idx)).join('\n');
+
         const lowestPrecedence = sorted[sorted.length - 1];
+
+        // Also include a short consensus sentence about which binding type wins over which
+        const second = sorted[1];
+        const summary = `The ${getBindingDescription(winner.bindingType)} binding takes precedence over ${getBindingDescription(second.bindingType)}.`;
+
         this.diagnostics.push({
           category: this.severity,
           code: CssDiagnosticCode.CONFLICTING_STYLE_BINDING,
           messageText:
-            `CSS property '${property}' is set via ${bindings.length} different bindings with conflicting precedence.\n` +
-            `Precedence order (first wins):\n${precedenceList}`,
+            `CSS property '${camelToKebabCase(property)}' is set via ${bindings.length} different bindings with conflicting precedence.\n` +
+            `Precedence order (first wins):\n${precedenceList}\n\n${summary}`,
           file: this.diagnosticSourceFile,
           start: lowestPrecedence.attribute.keySpan.start.offset,
           length:
@@ -1181,7 +1233,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             file: this.diagnosticSourceFile,
             start: b.attribute.keySpan.start.offset,
             length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
-            messageText: `[style.${b.originalPropertyName}] (${getBindingDescription(b.bindingType)})${idx === 0 ? ' - WINS' : ''}`,
+            messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingDescription(b.bindingType)})${idx === 0 ? ' - WINS' : ''}`,
           })),
         });
       }
