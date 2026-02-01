@@ -463,6 +463,9 @@ interface StyleBinding {
   propertySpan?: {start: number; end: number};
   // Name of the directive for directive host bindings
   directiveName?: string;
+  // For directive host bindings: span of the element in template where directive is applied
+  // This is used for diagnostic location since directive host spans point to directive definition
+  elementSpan?: {start: number; end: number};
 }
 
 /**
@@ -1127,6 +1130,12 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           const directiveName = dirNode.name?.text ?? 'unknown';
 
           // Collect style bindings from the directive's host element
+          // Store the element span for diagnostic location (directive host spans point to definition file)
+          const elementSpan = {
+            start: element.sourceSpan.start.offset,
+            end: element.sourceSpan.end.offset,
+          };
+
           for (const binding of hostElement.bindings) {
             if (binding.type === BindingType.Style) {
               const propertyName = binding.name.split('.')[0];
@@ -1141,6 +1150,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
                 attribute: binding,
                 originalPropertyName: propertyName,
                 directiveName,
+                elementSpan, // Use element span for diagnostic location
               };
               const existing = bindingsByProperty.get(normalized) || [];
               existing.push(styleBinding);
@@ -1208,6 +1218,20 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         const allOccurrences = sorted.map((b, idx) => render(b, idx)).join('\n');
         const lastBinding = sorted[sorted.length - 1];
 
+        // For directive host bindings, use the element span (where directive is applied in template)
+        // NOT the directive definition span. For template bindings, use the attribute keySpan.
+        const getBindingSpan = (b: StyleBinding) => {
+          if (b.elementSpan && b.bindingType === 'directiveHostIndividual') {
+            return b.elementSpan;
+          }
+          return {
+            start: b.attribute.keySpan.start.offset,
+            end: b.attribute.keySpan.end.offset,
+          };
+        };
+
+        const lastSpan = getBindingSpan(lastBinding);
+
         this.diagnostics.push({
           category: this.severity,
           code: CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
@@ -1215,18 +1239,20 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             `CSS property '${camelToKebabCase(property)}' is set ${bindings.length} times via ${bindingDescription}.\n` +
             `The first occurrence wins, subsequent bindings are ignored:\n${allOccurrences}`,
           file: this.diagnosticSourceFile,
-          start: lastBinding.attribute.keySpan.start.offset,
-          length:
-            lastBinding.attribute.keySpan.end.offset - lastBinding.attribute.keySpan.start.offset,
+          start: lastSpan.start,
+          length: lastSpan.end - lastSpan.start,
           source: 'angular',
-          relatedInformation: sorted.slice(0, -1).map((b, idx) => ({
-            category: ts.DiagnosticCategory.Message,
-            code: 0,
-            file: this.diagnosticSourceFile,
-            start: b.attribute.keySpan.start.offset,
-            length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
-            messageText: `Occurrence #${idx + 1}: ${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}]${idx === 0 ? ' (WINS)' : ''}`,
-          })),
+          relatedInformation: sorted.slice(0, -1).map((b, idx) => {
+            const span = getBindingSpan(b);
+            return {
+              category: ts.DiagnosticCategory.Message,
+              code: 0,
+              file: this.diagnosticSourceFile,
+              start: span.start,
+              length: span.end - span.start,
+              messageText: `Occurrence #${idx + 1}: ${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}]${idx === 0 ? ' (WINS)' : ''}`,
+            };
+          }),
         });
       } else {
         // MIXED TYPES: Different binding types with different precedence
@@ -1267,6 +1293,20 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         const second = sorted[1];
         const summary = `The ${getBindingDescription(winner.bindingType, winner.directiveName)} binding takes precedence over ${getBindingDescription(second.bindingType, second.directiveName)}.`;
 
+        // For directive host bindings, use the element span (where directive is applied in template)
+        // NOT the directive definition span. For template bindings, use the attribute keySpan.
+        const getBindingSpan = (b: StyleBinding) => {
+          if (b.elementSpan && b.bindingType === 'directiveHostIndividual') {
+            return b.elementSpan;
+          }
+          return {
+            start: b.attribute.keySpan.start.offset,
+            end: b.attribute.keySpan.end.offset,
+          };
+        };
+
+        const lowestSpan = getBindingSpan(lowestPrecedence);
+
         this.diagnostics.push({
           category: this.severity,
           code: CssDiagnosticCode.CONFLICTING_STYLE_BINDING,
@@ -1274,19 +1314,20 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             `CSS property '${camelToKebabCase(property)}' is set via ${bindings.length} different bindings with conflicting precedence.\n` +
             `Precedence order (first wins):\n${precedenceList}\n\n${summary}`,
           file: this.diagnosticSourceFile,
-          start: lowestPrecedence.attribute.keySpan.start.offset,
-          length:
-            lowestPrecedence.attribute.keySpan.end.offset -
-            lowestPrecedence.attribute.keySpan.start.offset,
+          start: lowestSpan.start,
+          length: lowestSpan.end - lowestSpan.start,
           source: 'angular',
-          relatedInformation: sorted.slice(0, -1).map((b, idx) => ({
-            category: ts.DiagnosticCategory.Message,
-            code: 0,
-            file: this.diagnosticSourceFile,
-            start: b.attribute.keySpan.start.offset,
-            length: b.attribute.keySpan.end.offset - b.attribute.keySpan.start.offset,
-            messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingDescription(b.bindingType, b.directiveName)})${idx === 0 ? ' - WINS' : ''}`,
-          })),
+          relatedInformation: sorted.slice(0, -1).map((b, idx) => {
+            const span = getBindingSpan(b);
+            return {
+              category: ts.DiagnosticCategory.Message,
+              code: 0,
+              file: this.diagnosticSourceFile,
+              start: span.start,
+              length: span.end - span.start,
+              messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingDescription(b.bindingType, b.directiveName)})${idx === 0 ? ' - WINS' : ''}`,
+            };
+          }),
         });
       }
     }
