@@ -146,6 +146,80 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
       } as any as TmplAstBoundAttribute;
     };
 
+    // Helper to collect host bindings from a directive/component class
+    const collectHostBindings = (
+      dirNode: ts.ClassDeclaration,
+      bindingType: 'hostIndividual' | 'hostDirectiveIndividual' | 'directiveHostIndividual',
+      directiveName: string | undefined,
+      directiveAttrSpan: {start: number; end: number} | undefined,
+    ) => {
+      const hostElement = this.templateTypeChecker.getHostElement(dirNode);
+      if (!hostElement) return;
+
+      const hostSourceFile = dirNode.getSourceFile();
+
+      // Collect attribute bindings from host
+      for (const binding of hostElement.bindings) {
+        if (binding.type === BindingType.Attribute) {
+          allBindings.push({
+            bindingType,
+            originalName: binding.name,
+            normalizedName: binding.name.toLowerCase(),
+            attribute: binding,
+            directiveName,
+            elementSpan: directiveAttrSpan,
+            isStatic: false,
+            originalNode: binding,
+            hostSourceFile: hostSourceFile,
+          });
+
+          // @ts-ignore DEBUG
+          console.log(
+            `[ATTR_DIAG]     -> ${bindingType} '${directiveName || 'component'}' host attr binding '[attr.${binding.name}]'`,
+          );
+        }
+      }
+
+      // Recursively collect host directive bindings
+      // Host directives apply to the component's host element
+      const directives = this.templateTypeChecker.getDirectivesOfNode(this.component, element);
+      if (directives) {
+        for (const directive of directives) {
+          if (directive.ref.node === dirNode && directive.isComponent) {
+            // Get host directives from this component
+            // @ts-ignore - hostDirectives is available on directive metadata
+            const hostDirectives = directive.hostDirectives;
+            if (hostDirectives && Array.isArray(hostDirectives)) {
+              for (const hostDirective of hostDirectives) {
+                // Check if directive is a Reference with a node property
+                let hostDirNode: ts.ClassDeclaration | undefined;
+                // @ts-ignore - accessing node from Reference
+                if (
+                  hostDirective.directive &&
+                  typeof hostDirective.directive === 'object' &&
+                  'node' in hostDirective.directive
+                ) {
+                  // @ts-ignore
+                  hostDirNode = hostDirective.directive.node;
+                }
+
+                if (hostDirNode && ts.isClassDeclaration(hostDirNode)) {
+                  const hostDirName = hostDirNode.name?.text ?? 'unknown';
+                  // Recursively collect from the host directive
+                  collectHostBindings(
+                    hostDirNode,
+                    'hostDirectiveIndividual',
+                    hostDirName,
+                    undefined,
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    };
+
     // Collect static attributes (disabled="", title="foo")
     for (const attr of element.attributes) {
       allBindings.push({
@@ -182,7 +256,7 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
       }
     }
 
-    // Collect directive host attribute bindings that apply to this element
+    // Collect directive/component host attribute bindings that apply to this element
     // Only for TmplAstElement (not ng-template)
     if ('name' in element) {
       const directives = this.templateTypeChecker.getDirectivesOfNode(this.component, element);
@@ -195,15 +269,8 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
           const dirNode = directive.ref.node;
           if (!ts.isClassDeclaration(dirNode)) continue;
 
-          // Get the host element for this directive/component
-          const hostElement = this.templateTypeChecker.getHostElement(dirNode);
-          if (!hostElement) continue;
-
           // Get the directive/component name for error messages
           const directiveName = dirNode.name?.text ?? 'unknown';
-
-          // Get the source file for reading host binding values
-          const hostSourceFile = dirNode.getSourceFile();
 
           // Find the directive's selector attribute on the element for precise span
           let directiveAttrSpan: {start: number; end: number} | undefined;
@@ -223,27 +290,13 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
             }
           }
 
-          // Collect attribute bindings from host
-          for (const binding of hostElement.bindings) {
-            if (binding.type === BindingType.Attribute) {
-              allBindings.push({
-                bindingType: isComponentItself ? 'hostIndividual' : 'directiveHostIndividual',
-                originalName: binding.name,
-                normalizedName: binding.name.toLowerCase(),
-                attribute: binding,
-                directiveName: isComponentItself ? undefined : directiveName,
-                elementSpan: directiveAttrSpan,
-                isStatic: false,
-                originalNode: binding,
-                hostSourceFile: hostSourceFile,
-              });
-
-              // @ts-ignore DEBUG
-              console.log(
-                `[ATTR_DIAG]     -> ${isComponentItself ? 'Component' : 'Directive'} '${directiveName}' host attr binding '[attr.${binding.name}]'`,
-              );
-            }
-          }
+          // Collect host bindings (this also recursively collects host directive bindings)
+          collectHostBindings(
+            dirNode,
+            isComponentItself ? 'hostIndividual' : 'directiveHostIndividual',
+            isComponentItself ? undefined : directiveName,
+            directiveAttrSpan,
+          );
         }
       }
     }
@@ -275,7 +328,11 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
       },
       getBindingSpan: (binding: AttributeBinding, fallbackBinding?: AttributeBinding) => {
         // For directive host bindings, prefer the element span (where directive is applied)
-        if (binding.bindingType === 'directiveHostIndividual' && binding.elementSpan) {
+        if (
+          (binding.bindingType === 'directiveHostIndividual' ||
+            binding.bindingType === 'hostDirectiveIndividual') &&
+          binding.elementSpan
+        ) {
           return binding.elementSpan;
         }
         // Fallback to the attribute key span
