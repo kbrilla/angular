@@ -1021,6 +1021,105 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
+  describe('directive host binding conflict detection', () => {
+    it('should detect conflict between directive host style binding and template style binding', () => {
+      const files = {
+        'app.ts': `
+          import {Component, Directive} from '@angular/core';
+
+          @Directive({
+            selector: '[backgroundColorApplier]',
+            host: {
+              '[style.backgroundColor]': '"red"',
+            },
+          })
+          export class BackgroundColorApplierDirective {}
+
+          @Component({
+            imports: [BackgroundColorApplierDirective],
+            template: '<div backgroundColorApplier [style.backgroundColor]="\\'blue\\'"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) =>
+          d.code === CssDiagnosticCode.CONFLICTING_STYLE_BINDING ||
+          d.code === CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
+      );
+      // Template binding should win over directive host binding
+      expect(cssDiags.length).toBeGreaterThan(0);
+      const conflictDiag = cssDiags[0];
+      expect(conflictDiag.messageText).toContain('background-color');
+    });
+
+    it('should NOT detect conflict when directive and template set different properties', () => {
+      const files = {
+        'app.ts': `
+          import {Component, Directive} from '@angular/core';
+
+          @Directive({
+            selector: '[styleApplier]',
+            host: {
+              '[style.backgroundColor]': '"red"',
+              '[style.color]': '"white"',
+            },
+          })
+          export class StyleApplierDirective {}
+
+          @Component({
+            imports: [StyleApplierDirective],
+            template: '<div styleApplier [style.width]="\\'100px\\'"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter(
+        (d) =>
+          d.code === CssDiagnosticCode.CONFLICTING_STYLE_BINDING ||
+          d.code === CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
+      );
+      expect(cssDiags.length).toBe(0);
+    });
+
+    it('should indicate template binding wins over directive host binding in message', () => {
+      const files = {
+        'app.ts': `
+          import {Component, Directive} from '@angular/core';
+
+          @Directive({
+            selector: '[widthApplier]',
+            host: {
+              '[style.width]': '"50px"',
+            },
+          })
+          export class WidthApplierDirective {}
+
+          @Component({
+            imports: [WidthApplierDirective],
+            template: '<div widthApplier [style.width]="\\'100px\\'"></div>',
+          })
+          export class AppComponent {}
+        `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const cssDiags = diags.filter((d) => d.code === CssDiagnosticCode.CONFLICTING_STYLE_BINDING);
+      expect(cssDiags.length).toBeGreaterThan(0);
+      // Message should indicate precedence: template wins
+      const message = cssDiags[0].messageText as string;
+      expect(message).toContain('[style.property]');
+      expect(message).toContain('directive');
+    });
+  });
+
   describe('false positive prevention (valid CSS patterns)', () => {
     it('should allow CSS custom properties (--my-var)', () => {
       const files = {
