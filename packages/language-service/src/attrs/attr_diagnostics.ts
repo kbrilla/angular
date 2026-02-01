@@ -255,8 +255,13 @@ class AttrDiagnosticVisitor implements TmplAstVisitor {
         if (binding.isStatic && 'value' in binding.originalNode) {
           // For static attributes, show the value
           return binding.originalNode.value ? ` = "${binding.originalNode.value}"` : ` = ""`;
+        } else if (binding.bindingType === 'directiveHostIndividual') {
+          // For directive host bindings, we cannot reliably read the value from the template file
+          // because the valueSpan offsets are relative to the directive's TypeScript file
+          // Skip showing the value for now
+          return '';
         } else if (binding.attribute.valueSpan) {
-          // For bindings, show the expression
+          // For template bindings, show the expression
           const text = sourceFile.getFullText();
           const start = binding.attribute.valueSpan.start.offset;
           const end = binding.attribute.valueSpan.end.offset;
