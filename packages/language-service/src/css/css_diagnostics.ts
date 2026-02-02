@@ -247,7 +247,7 @@ export function getCssDiagnostics(
     console.log(`[CSS_DIAG] isProcessingTsFile: ${isProcessingTsFile}`);
     if (isProcessingTsFile) {
       // Also detect conflicts within host bindings
-      detectHostStyleBindingConflicts(component, hostElement, diagnostics, severity);
+      detectHostStyleBindingConflicts(component, hostElement, diagnostics, severity, config);
     }
     // @ts-ignore DEBUG
     console.log(`[CSS_DIAG] After host validation: ${diagnostics.length} diagnostics`);
@@ -386,11 +386,85 @@ function validateHostStyleBindings(
  * - host: { '[style.width]': ... } and host: { '[style]': { width: ... } }
  * - Multiple @HostBinding decorators for the same property
  */
+
+/**
+ * Emit comprehensive diagnostic for host binding conflicts (99021).
+ */
+function emitComprehensiveHostBindingConflict(
+  component: ts.ClassDeclaration,
+  property: string,
+  bindings: Array<{
+    property: string;
+    bindingType: BaseBindingType;
+    binding: TmplAstBoundAttribute;
+    originalPropertyName: string;
+  }>,
+  diagnostics: ts.Diagnostic[],
+  severity: ts.DiagnosticCategory,
+): void {
+  const sourceFile = component.getSourceFile();
+
+  // All host bindings are from the same source (component/directive)
+  let messageLines: string[] = [];
+  const totalBindings = bindings.length;
+  messageLines.push(
+    `CSS property '${camelToKebabCase(property)}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via component/directive host bindings:`,
+  );
+  messageLines.push('');
+
+  messageLines.push(`Component/Directive host bindings:`);
+  for (let i = 0; i < bindings.length; i++) {
+    const b = bindings[i];
+    const bindingName = `[${b.binding.name}]`;
+    let valueSnippet = '';
+    if (b.binding.valueSpan) {
+      const text = sourceFile.getFullText();
+      const start = b.binding.valueSpan.start.offset;
+      const end = b.binding.valueSpan.end.offset;
+      const value = text.slice(start, end).trim();
+      valueSnippet = value ? ` = ${value}` : '';
+    }
+    const status = i === 0 ? ' [WINS]' : ' [duplicate, ignored]';
+    messageLines.push(`  ${i + 1}. ${bindingName}${valueSnippet}${status}`);
+  }
+
+  messageLines.push('');
+  messageLines.push(`Result: First binding wins, duplicates are ignored`);
+
+  const messageText = messageLines.join('\n');
+
+  // Report on the subsequent bindings (they will be ignored)
+  for (let i = 1; i < bindings.length; i++) {
+    const subsequent = bindings[i];
+    diagnostics.push({
+      category: severity,
+      code: CssDiagnosticCode.COMPREHENSIVE_BINDING_CONFLICT,
+      messageText: messageText,
+      file: sourceFile,
+      start: subsequent.binding.keySpan!.start.offset,
+      length: subsequent.binding.keySpan!.end.offset - subsequent.binding.keySpan!.start.offset,
+      source: 'angular',
+      relatedInformation: [
+        {
+          category: ts.DiagnosticCategory.Message,
+          code: 0,
+          file: sourceFile,
+          start: bindings[0].binding.keySpan!.start.offset,
+          length:
+            bindings[0].binding.keySpan!.end.offset - bindings[0].binding.keySpan!.start.offset,
+          messageText: `[${bindings[0].binding.name}] (component/directive host binding) - WINS`,
+        },
+      ],
+    });
+  }
+}
+
 function detectHostStyleBindingConflicts(
   component: ts.ClassDeclaration,
   hostElement: TmplAstHostElement,
   diagnostics: ts.Diagnostic[],
   severity: ts.DiagnosticCategory,
+  config: CssDiagnosticsConfig,
 ): void {
   // @ts-ignore DEBUG
   console.log(`[CSS_DIAG_HOST] detectHostStyleBindingConflicts for ${component.name?.getText()}`);
@@ -466,7 +540,13 @@ function detectHostStyleBindingConflicts(
       );
     }
 
-    // Build detailed message like template duplicates
+    // Use comprehensive format if enabled
+    if (config.useComprehensiveBindingConflict) {
+      emitComprehensiveHostBindingConflict(component, property, bindings, diagnostics, severity);
+      continue;
+    }
+
+    // LEGACY: Build detailed message for duplicates (99020)
     const sortedBindings = bindings.map((b, idx) => ({
       ...b,
       index: idx + 1,
