@@ -110,6 +110,8 @@ export const enum CssDiagnosticCode {
   PREFER_STYLE_OBJECT_BINDING = 99019,
   /** Duplicate CSS property across multiple individual style bindings. */
   DUPLICATE_STYLE_BINDING = 99020,
+  /** Comprehensive binding conflict diagnostic (combines duplicates + precedence conflicts). */
+  COMPREHENSIVE_BINDING_CONFLICT = 99021,
   /** [class] binding shadows @Input('class') - both will be updated. */
   CLASS_BINDING_SHADOWS_INPUT = 99411,
   /** [style] binding shadows @Input('style') - both will be updated. */
@@ -137,6 +139,13 @@ export interface CssDiagnosticsConfig {
    * Default: true
    */
   warnOnInputShadowing: boolean;
+
+  /**
+   * Use comprehensive binding conflict diagnostic (99021) instead of separate duplicates (99020) and conflicts (99005).
+   * When true, emits ONE diagnostic per property showing all bindings grouped by source with Markdown formatting.
+   * Default: true
+   */
+  useComprehensiveBindingConflict?: boolean;
 }
 
 /**
@@ -147,6 +156,7 @@ export const DEFAULT_CSS_DIAGNOSTICS_CONFIG: CssDiagnosticsConfig = {
   severity: 'warning',
   strictUnitValues: false,
   warnOnInputShadowing: true,
+  useComprehensiveBindingConflict: true,
 };
 
 /**
@@ -1075,6 +1085,181 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   }
 
   /**
+   * Emits comprehensive binding conflict diagnostic (99021) showing all bindings grouped by source.
+   */
+  private emitComprehensiveBindingConflict(
+    property: string,
+    sorted: StyleBinding[],
+    winner: StyleBinding,
+  ): void {
+    // Group bindings by source
+    const sources = new Map<
+      string,
+      {label: string; bindings: StyleBinding[]; precedence: number}
+    >();
+
+    for (const binding of sorted) {
+      let sourceKey: string;
+      let sourceLabel: string;
+      let sourcePrecedence: number;
+
+      if (
+        binding.bindingType === 'individual' ||
+        binding.bindingType === 'objectLiteral' ||
+        binding.bindingType === 'directive'
+      ) {
+        sourceKey = 'template';
+        sourceLabel = 'Template bindings';
+        sourcePrecedence = BASE_BINDING_PRECEDENCE[binding.bindingType];
+      } else if (
+        binding.bindingType === 'hostIndividual' ||
+        binding.bindingType === 'hostObjectLiteral'
+      ) {
+        sourceKey = 'component-host';
+        sourceLabel = 'Component host bindings';
+        sourcePrecedence = BASE_BINDING_PRECEDENCE[binding.bindingType];
+      } else if (
+        binding.bindingType === 'hostDirectiveIndividual' ||
+        binding.bindingType === 'directiveHostIndividual'
+      ) {
+        sourceKey = `directive-${binding.directiveName || 'unknown'}`;
+        sourceLabel = `Directive '${binding.directiveName || 'unknown'}' host bindings`;
+        sourcePrecedence = BASE_BINDING_PRECEDENCE[binding.bindingType];
+      } else {
+        sourceKey = 'other';
+        sourceLabel = 'Other bindings';
+        sourcePrecedence = 99;
+      }
+
+      if (!sources.has(sourceKey)) {
+        sources.set(sourceKey, {label: sourceLabel, bindings: [], precedence: sourcePrecedence});
+      }
+      sources.get(sourceKey)!.bindings.push(binding);
+    }
+
+    // Sort sources by precedence (winners first)
+    const sortedSources = Array.from(sources.entries()).sort(
+      (a, b) => a[1].precedence - b[1].precedence,
+    );
+
+    // Build message with Markdown formatting
+    let messageLines: string[] = [];
+    const totalBindings = sorted.length;
+    messageLines.push(
+      `**CSS property '${camelToKebabCase(property)}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via multiple sources:**`,
+    );
+    messageLines.push('');
+
+    let globalIndex = 1;
+    let winnerDeclared = false;
+
+    for (const [sourceKey, source] of sortedSources) {
+      messageLines.push(`**${source.label}:**`);
+
+      for (let i = 0; i < source.bindings.length; i++) {
+        const b = source.bindings[i];
+
+        // Get value snippet
+        let valueSnippet = '';
+        if (b.attribute.valueSpan) {
+          const text = (b.hostSourceFile || this.diagnosticSourceFile).getFullText();
+          const start = b.attribute.valueSpan.start.offset;
+          const end = b.attribute.valueSpan.end.offset;
+          const raw = text.slice(start, end).trim();
+          valueSnippet = raw ? ` = ${raw}` : '';
+        }
+
+        // Determine status
+        let status = '';
+        if (globalIndex === 1 && !winnerDeclared) {
+          status = ' **[WINS]**';
+          winnerDeclared = true;
+        } else if (i > 0) {
+          // Duplicate within same source
+          status = ' *[duplicate, ignored]*';
+        } else if (sortedSources.length > 1) {
+          // First in this source but not global winner
+          status = ` *[overridden by ${sortedSources[0][1].label.toLowerCase()}]*`;
+        }
+
+        messageLines.push(`  ${globalIndex}. \`[${b.attribute.name}]\`${valueSnippet}${status}`);
+        globalIndex++;
+      }
+
+      messageLines.push('');
+    }
+
+    // Add precedence explanation if there are conflicts
+    if (sortedSources.length > 1) {
+      const winnerSource = sortedSources[0][1];
+      const loserSource = sortedSources[1][1];
+      messageLines.push(`**Precedence:** ${winnerSource.label} > ${loserSource.label}`);
+
+      // Final result line
+      const winnerBinding = winnerSource.bindings[0];
+      if (winnerBinding.attribute.valueSpan) {
+        const text = (winnerBinding.hostSourceFile || this.diagnosticSourceFile).getFullText();
+        const start = winnerBinding.attribute.valueSpan.start.offset;
+        const end = winnerBinding.attribute.valueSpan.end.offset;
+        const value = text.slice(start, end).trim();
+        messageLines.push(
+          `**Result:** First ${winnerSource.label.toLowerCase()} binding wins (${value})`,
+        );
+      }
+    } else {
+      // Only duplicates within same source
+      messageLines.push(`**Result:** First binding wins, duplicates are ignored`);
+    }
+
+    const messageText = messageLines.join('\n');
+
+    // Helper to get binding span (for directive host bindings, use elementSpan)
+    const getBindingSpan = (b: StyleBinding, fallbackBinding?: StyleBinding) => {
+      if (b.bindingType === 'directiveHostIndividual') {
+        if (b.elementSpan) {
+          return b.elementSpan;
+        }
+        // Fallback: use winner's span to keep diagnostic in template
+        if (fallbackBinding && fallbackBinding.bindingType !== 'directiveHostIndividual') {
+          return {
+            start: fallbackBinding.attribute.keySpan.start.offset,
+            end: fallbackBinding.attribute.keySpan.end.offset,
+          };
+        }
+      }
+      return {
+        start: b.attribute.keySpan.start.offset,
+        end: b.attribute.keySpan.end.offset,
+      };
+    };
+
+    // Place diagnostic on the lowest precedence (losing) binding
+    const lowestPrecedence = sorted[sorted.length - 1];
+    const lowestSpan = getBindingSpan(lowestPrecedence, winner);
+
+    this.diagnostics.push({
+      category: this.severity,
+      code: CssDiagnosticCode.COMPREHENSIVE_BINDING_CONFLICT,
+      messageText: messageText,
+      file: this.diagnosticSourceFile,
+      start: lowestSpan.start,
+      length: lowestSpan.end - lowestSpan.start,
+      source: 'angular',
+      relatedInformation: sorted.slice(0, -1).map((b, idx) => {
+        const span = getBindingSpan(b);
+        return {
+          category: ts.DiagnosticCategory.Message,
+          code: 0,
+          file: this.diagnosticSourceFile,
+          start: span.start,
+          length: span.end - span.start,
+          messageText: `\`[${b.attribute.name}]\`${idx === 0 ? ' - WINS' : ''}`,
+        };
+      }),
+    });
+  }
+
+  /**
    * Collects all style properties being set on an element and detects conflicts.
    */
   private detectStyleBindingConflicts(element: TmplAstElement | TmplAstTemplate): void {
@@ -1239,6 +1424,13 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       // Check if ALL bindings are the same type (pure duplicates) vs mixed types (conflicts)
       const allSameType = bindings.every((b) => b.bindingType === winner.bindingType);
 
+      // NEW: Comprehensive diagnostic format (99021)
+      if (this.config.useComprehensiveBindingConflict) {
+        this.emitComprehensiveBindingConflict(property, sorted, winner);
+        continue;
+      }
+
+      // LEGACY: Separate diagnostics for duplicates (99020) and conflicts (99005)
       if (allSameType) {
         // PURE DUPLICATES: All bindings are same type (e.g., multiple [style.prop])
         const bindingDescription = getBindingTypeDescription(
