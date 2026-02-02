@@ -95,7 +95,9 @@ export function getBindingTypeDescription(
     case 'hostObjectLiteral':
       return `component host [${prefix}]`;
     case 'hostDirectiveIndividual':
-      return directiveName ? `host directive ${directiveName} binding` : 'host directive binding';
+      return directiveName
+        ? `hostDirective ${directiveName} binding (via hostDirectives: [...])`
+        : 'hostDirective binding (via hostDirectives: [...])';
     case 'directiveHostIndividual':
       return directiveName ? `directive ${directiveName} host binding` : 'directive host binding';
   }
