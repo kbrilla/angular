@@ -56,6 +56,15 @@ import {
 
 import {createShadowingDiagnostic, ShadowedInput} from '../binding_conflict_utils';
 
+import {
+  BaseBinding,
+  BaseBindingType,
+  BASE_BINDING_PRECEDENCE,
+  createConflictDiagnostic,
+  getBindingTypeDescription,
+  groupBindingsByName,
+} from '../binding_conflict_utils';
+
 /**
  * CSS diagnostic codes for the Angular Language Service.
  * These are in a separate range from Angular's core diagnostic codes.
@@ -364,7 +373,7 @@ function detectHostStyleBindingConflicts(
     string,
     Array<{
       property: string;
-      bindingType: StyleBindingType;
+      bindingType: BaseBindingType;
       binding: TmplAstBoundAttribute;
       originalPropertyName: string;
     }>
@@ -382,7 +391,7 @@ function detectHostStyleBindingConflicts(
       const normalized = normalizeCSSPropertyName(propertyName);
       const entry = {
         property: normalized,
-        bindingType: 'hostIndividual' as StyleBindingType,
+        bindingType: 'hostIndividual' as BaseBindingType,
         binding,
         originalPropertyName: propertyName,
       };
@@ -402,7 +411,7 @@ function detectHostStyleBindingConflicts(
       // We'll just track that there's a general [style] binding.
       const entry = {
         property: '__style_object__',
-        bindingType: 'hostStyleObject' as StyleBindingType,
+        bindingType: 'hostObjectLiteral' as BaseBindingType,
         binding,
         originalPropertyName: 'style',
       };
@@ -453,74 +462,18 @@ function normalizeCSSPropertyName(propertyName: string): string {
 }
 
 /**
- * Style binding types with their precedence (lower number = higher precedence).
- * Template bindings always take precedence over host bindings.
- */
-type StyleBindingType =
-  | 'individual'
-  | 'styleObject'
-  | 'ngStyle'
-  | 'hostIndividual'
-  | 'hostStyleObject'
-  | 'directiveHostIndividual';
-
-/**
  * Represents a style binding found on an element.
+ * Extends BaseBinding from binding_conflict_utils for consistent conflict detection.
  */
-interface StyleBinding {
-  property: string; // Normalized property name
-  bindingType: StyleBindingType;
-  attribute: TmplAstBoundAttribute;
-  originalPropertyName: string; // Original property name for error messages
-  // Optional span for the property key inside an object binding ([style] or [ngStyle])
+interface StyleBinding extends BaseBinding {
+  /** Normalized CSS property name (lowercase, no hyphens) */
+  property: string;
+  /** Original CSS property name for error messages (preserves case and hyphens) */
+  originalPropertyName: string;
+  /** Optional span for the property key inside an object binding ([style] or [ngStyle]) */
   propertySpan?: {start: number; end: number};
-  // Name of the directive for directive host bindings
-  directiveName?: string;
-  // For directive host bindings: span of the element in template where directive is applied
-  // This is used for diagnostic location since directive host spans point to directive definition
-  elementSpan?: {start: number; end: number};
-  // For directive/component host bindings: source file containing the host definition
+  /** For directive/component host bindings: source file containing the host definition */
   hostSourceFile?: ts.SourceFile;
-}
-
-/**
- * Style binding precedence (lower number = higher priority):
- * 1. Individual [style.prop] bindings (template)
- * 2. [style]="{}" object bindings (template)
- * 3. [ngStyle]="{}" directive bindings (template)
- * 4. Individual [style.prop] host bindings (component's own host)
- * 5. [style]="{}" host object bindings (component's own host)
- * 6. Directive host bindings (from directives applied to element)
- *
- * Template always takes precedence over host bindings.
- */
-const BINDING_PRECEDENCE: Record<StyleBindingType, number> = {
-  individual: 1,
-  styleObject: 2,
-  ngStyle: 3,
-  hostIndividual: 4,
-  hostStyleObject: 5,
-  directiveHostIndividual: 6,
-};
-
-/**
- * Gets a human-readable description of a style binding type.
- */
-function getBindingDescription(type: StyleBindingType, directiveName?: string): string {
-  switch (type) {
-    case 'individual':
-      return '[style.property]';
-    case 'styleObject':
-      return '[style]';
-    case 'ngStyle':
-      return '[ngStyle]';
-    case 'hostIndividual':
-      return 'host [style.property]';
-    case 'hostStyleObject':
-      return 'host [style]';
-    case 'directiveHostIndividual':
-      return directiveName ? `directive ${directiveName} host binding` : 'directive host binding';
-  }
 }
 
 /**
@@ -1091,6 +1044,8 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           property: normalized,
           bindingType: 'individual',
           attribute: input,
+          originalName: propertyName,
+          normalizedName: normalized,
           originalPropertyName: propertyName,
         };
         const existing = bindingsByProperty.get(normalized) || [];
@@ -1100,7 +1055,8 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       // Object style binding: [style]="{}" or [ngStyle]="{}"
       else if (input.type === BindingType.Property) {
         if (input.name === 'style' || input.name === 'ngStyle') {
-          const bindingType = input.name === 'style' ? 'styleObject' : 'ngStyle';
+          const bindingType: BaseBindingType =
+            input.name === 'style' ? 'objectLiteral' : 'directive';
           // Extract properties from the object literal
           const properties = this.extractPropertiesFromStyleBinding(input);
           // @ts-ignore DEBUG
@@ -1113,6 +1069,8 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
               property: normalized,
               bindingType,
               attribute: input,
+              originalName: prop.name,
+              normalizedName: normalized,
               originalPropertyName: prop.name,
               propertySpan: {start: prop.span.start, end: prop.span.end},
             };
@@ -1181,6 +1139,8 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
                 property: normalized,
                 bindingType: 'directiveHostIndividual',
                 attribute: binding,
+                originalName: propertyName,
+                normalizedName: normalized,
                 originalPropertyName: propertyName,
                 directiveName,
                 // Use directive attribute span if found, otherwise undefined (will use winner's span)
@@ -1212,7 +1172,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
       // Sort by precedence (lowest number = highest precedence = wins)
       const sorted = [...bindings].sort(
-        (a, b) => BINDING_PRECEDENCE[a.bindingType] - BINDING_PRECEDENCE[b.bindingType],
+        (a, b) => BASE_BINDING_PRECEDENCE[a.bindingType] - BASE_BINDING_PRECEDENCE[b.bindingType],
       );
       const winner = sorted[0];
       const losers = sorted.slice(1);
@@ -1222,7 +1182,11 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
       if (allSameType) {
         // PURE DUPLICATES: All bindings are same type (e.g., multiple [style.prop])
-        const bindingDescription = getBindingDescription(winner.bindingType, winner.directiveName);
+        const bindingDescription = getBindingTypeDescription(
+          winner.bindingType,
+          winner.directiveName,
+          'style',
+        );
 
         // Helper to render display name and value snippet
         const render = (b: StyleBinding, idx: number) => {
@@ -1241,7 +1205,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             valueSnippet = raw ? ` — value: ${raw}` : '';
           }
           // For object bindings, show a concise mention, include the exact property key if we have a span
-          if (b.bindingType === 'styleObject' || b.bindingType === 'ngStyle') {
+          if (b.bindingType === 'objectLiteral' || b.bindingType === 'directive') {
             if (b.propertySpan) {
               const text = this.diagnosticSourceFile.getFullText();
               const keyRaw = text.slice(b.propertySpan.start, b.propertySpan.end).trim();
@@ -1310,7 +1274,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           const original = b.originalPropertyName;
           const nameDisplay = kebab === original ? kebab : `${kebab} (${original})`;
 
-          if (b.bindingType === 'styleObject' || b.bindingType === 'ngStyle') {
+          if (b.bindingType === 'objectLiteral' || b.bindingType === 'directive') {
             // Show property origin from object binding, include the exact key when available
             if (b.propertySpan) {
               const text = this.diagnosticSourceFile.getFullText();
@@ -1332,7 +1296,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
             valueSnippet = raw ? ` — value: ${raw}` : '';
           }
 
-          return `${idx + 1}. ${nameDisplay} from [style.${original}]${valueSnippet} (${getBindingDescription(b.bindingType, b.directiveName)})`;
+          return `${idx + 1}. ${nameDisplay} from [style.${original}]${valueSnippet} (${getBindingTypeDescription(b.bindingType, b.directiveName, 'style')})`;
         };
 
         const precedenceList = sorted.map((b, idx) => render(b, idx)).join('\n');
@@ -1341,7 +1305,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
 
         // Also include a short consensus sentence about which binding type wins over which
         const second = sorted[1];
-        const summary = `The ${getBindingDescription(winner.bindingType, winner.directiveName)} binding takes precedence over ${getBindingDescription(second.bindingType, second.directiveName)}.`;
+        const summary = `The ${getBindingTypeDescription(winner.bindingType, winner.directiveName, 'style')} binding takes precedence over ${getBindingTypeDescription(second.bindingType, second.directiveName, 'style')}.`;
 
         // For directive host bindings, use the element span (where directive is applied in template)
         // NOT the directive definition span. For template bindings, use the attribute keySpan.
@@ -1385,7 +1349,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
               file: this.diagnosticSourceFile,
               start: span.start,
               length: span.end - span.start,
-              messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingDescription(b.bindingType, b.directiveName)})${idx === 0 ? ' - WINS' : ''}`,
+              messageText: `${camelToKebabCase(b.originalPropertyName)} from [${b.attribute.name}] (${getBindingTypeDescription(b.bindingType, b.directiveName, 'style')})${idx === 0 ? ' - WINS' : ''}`,
             };
           }),
         });
