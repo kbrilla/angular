@@ -39,6 +39,14 @@ export const BASE_BINDING_PRECEDENCE: Record<BaseBindingType, number> = {
 
 /**
  * Base binding information that can be extended for specific binding types.
+ *
+ * IMPORTANT: For bindings that can come from different source files (like host bindings
+ * that may come from TypeScript files while template bindings come from HTML files),
+ * implementations should set the `spanSourceFile` property to indicate which file
+ * the span offsets (`attribute.keySpan`) are relative to.
+ *
+ * For directive host bindings applied to template elements, use `elementSpan` instead
+ * of the directive's keySpan, since the diagnostic should point to the template location.
  */
 export interface BaseBinding {
   /** The binding type determines precedence */
@@ -51,8 +59,19 @@ export interface BaseBinding {
   attribute: TmplAstBoundAttribute;
   /** For directive host bindings, the directive name */
   directiveName?: string;
-  /** For directive host bindings, the element span where the directive is applied */
+  /**
+   * For directive host bindings, the element span where the directive is applied.
+   * This ensures diagnostics point to the template location, not the directive definition.
+   */
   elementSpan?: {start: number; end: number};
+  /**
+   * The source file that the span offsets (attribute.keySpan) are relative to.
+   * If not set, assumes the diagnostic's source file will be used.
+   *
+   * IMPORTANT: For host bindings from @HostBinding decorators or host: {} metadata,
+   * this should be set to the TypeScript source file, NOT the template file.
+   */
+  spanSourceFile?: ts.SourceFile;
 }
 
 /**
@@ -84,6 +103,17 @@ export function getBindingTypeDescription(
 
 /**
  * Configuration for creating conflict diagnostics.
+ *
+ * IMPORTANT FILE HANDLING:
+ * When bindings come from different source files (e.g., template bindings from HTML
+ * and host bindings from TypeScript), the diagnostic must use consistent file/span pairs:
+ *
+ * - `diagnosticSourceFile`: The PRIMARY file where the main diagnostic should appear
+ * - Each binding's `spanSourceFile` (if set): Override for that specific binding's span
+ * - `getBindingSpan`: Custom function to compute correct spans for each binding
+ *
+ * For directive host bindings, the `elementSpan` should be used instead of the
+ * directive's `keySpan` to keep diagnostics in the template file.
  */
 export interface ConflictDiagnosticConfig<T extends BaseBinding> {
   /** All bindings for a single property/attribute/class */
@@ -94,14 +124,24 @@ export interface ConflictDiagnosticConfig<T extends BaseBinding> {
   diagnosticCode: number;
   /** The severity level */
   severity: ts.DiagnosticCategory;
-  /** The source file for diagnostics */
+  /** The PRIMARY source file for diagnostics (main diagnostic and related info without spanSourceFile) */
   diagnosticSourceFile: ts.SourceFile;
   /** The binding type prefix for messages (e.g., "style", "attr", "class") */
   bindingPrefix: string;
   /** Optional function to format the value snippet for each binding */
   formatValueSnippet?: (binding: T, sourceFile: ts.SourceFile) => string;
-  /** Optional function to get the span for a binding (defaults to attribute.keySpan) */
+  /**
+   * Optional function to get the span for a binding (defaults to attribute.keySpan).
+   * For directive host bindings, should return elementSpan to keep diagnostic in template.
+   * The returned span MUST be consistent with the diagnostic's source file.
+   */
   getBindingSpan?: (binding: T, fallbackBinding?: T) => {start: number; end: number};
+  /**
+   * Optional function to get the source file for a binding's span.
+   * Used for `relatedInformation` when bindings come from different files.
+   * Defaults to `diagnosticSourceFile` if not provided.
+   */
+  getBindingSourceFile?: (binding: T) => ts.SourceFile;
 }
 
 /**
@@ -196,6 +236,10 @@ export function createConflictDiagnostic<T extends BaseBinding>(
   const lowestPrecedence = sorted[sorted.length - 1];
   const lowestSpan = getSpan(lowestPrecedence, winner);
 
+  // Default source file getter - uses binding's spanSourceFile if available, otherwise diagnostic source file
+  const getSourceFile =
+    config.getBindingSourceFile || ((b: T) => b.spanSourceFile || diagnosticSourceFile);
+
   // Create the main diagnostic
   const diagnostic: ts.Diagnostic = {
     category: severity,
@@ -211,10 +255,12 @@ export function createConflictDiagnostic<T extends BaseBinding>(
       const span = getSpan(b);
       const typeDesc = getBindingTypeDescription(b.bindingType, b.directiveName, bindingPrefix);
       const winsLabel = idx === 0 ? ' - WINS' : '';
+      // Use per-binding source file for related information to support cross-file diagnostics
+      const bindingFile = getSourceFile(b);
       return {
         category: ts.DiagnosticCategory.Message,
         code: 0,
-        file: diagnosticSourceFile,
+        file: bindingFile,
         start: span.start,
         length: span.end - span.start,
         messageText: `${b.originalName} from [${b.attribute.name}] (${typeDesc})${winsLabel}`,
