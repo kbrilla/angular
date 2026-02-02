@@ -1142,11 +1142,11 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       (a, b) => a[1].precedence - b[1].precedence,
     );
 
-    // Build message with Markdown formatting
+    // Build message (plain text, no Markdown - VS Code diagnostics don't support it)
     let messageLines: string[] = [];
     const totalBindings = sorted.length;
     messageLines.push(
-      `**CSS property '${camelToKebabCase(property)}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via multiple sources:**`,
+      `CSS property '${camelToKebabCase(property)}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via multiple sources:`,
     );
     messageLines.push('');
 
@@ -1154,10 +1154,16 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     let winnerDeclared = false;
 
     for (const [sourceKey, source] of sortedSources) {
-      messageLines.push(`**${source.label}:**`);
+      messageLines.push(`${source.label}:`);
 
       for (let i = 0; i < source.bindings.length; i++) {
         const b = source.bindings[i];
+
+        // Get proper binding name with prefix (e.g., [style.backgroundColor])
+        const bindingName =
+          b.attribute.type === BindingType.Style
+            ? `[style.${b.originalPropertyName}]`
+            : `[${b.attribute.name}]`;
 
         // Get value snippet
         let valueSnippet = '';
@@ -1172,17 +1178,17 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         // Determine status
         let status = '';
         if (globalIndex === 1 && !winnerDeclared) {
-          status = ' **[WINS]**';
+          status = ' [WINS]';
           winnerDeclared = true;
         } else if (i > 0) {
           // Duplicate within same source
-          status = ' *[duplicate, ignored]*';
+          status = ' [duplicate, ignored]';
         } else if (sortedSources.length > 1) {
           // First in this source but not global winner
-          status = ` *[overridden by ${sortedSources[0][1].label.toLowerCase()}]*`;
+          status = ` [overridden by ${sortedSources[0][1].label.toLowerCase()}]`;
         }
 
-        messageLines.push(`  ${globalIndex}. \`[${b.attribute.name}]\`${valueSnippet}${status}`);
+        messageLines.push(`  ${globalIndex}. ${bindingName}${valueSnippet}${status}`);
         globalIndex++;
       }
 
@@ -1193,7 +1199,7 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     if (sortedSources.length > 1) {
       const winnerSource = sortedSources[0][1];
       const loserSource = sortedSources[1][1];
-      messageLines.push(`**Precedence:** ${winnerSource.label} > ${loserSource.label}`);
+      messageLines.push(`Precedence: ${winnerSource.label} > ${loserSource.label}`);
 
       // Final result line
       const winnerBinding = winnerSource.bindings[0];
@@ -1203,12 +1209,12 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         const end = winnerBinding.attribute.valueSpan.end.offset;
         const value = text.slice(start, end).trim();
         messageLines.push(
-          `**Result:** First ${winnerSource.label.toLowerCase()} binding wins (${value})`,
+          `Result: First ${winnerSource.label.toLowerCase()} binding wins (${value})`,
         );
       }
     } else {
       // Only duplicates within same source
-      messageLines.push(`**Result:** First binding wins, duplicates are ignored`);
+      messageLines.push(`Result: First binding wins, duplicates are ignored`);
     }
 
     const messageText = messageLines.join('\n');
@@ -1247,13 +1253,18 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       source: 'angular',
       relatedInformation: sorted.slice(0, -1).map((b, idx) => {
         const span = getBindingSpan(b);
+        const bindingName =
+          b.attribute.type === BindingType.Style
+            ? `[style.${b.originalPropertyName}]`
+            : `[${b.attribute.name}]`;
+        const sourceDesc = getBindingTypeDescription(b.bindingType, b.directiveName, 'style');
         return {
           category: ts.DiagnosticCategory.Message,
           code: 0,
           file: this.diagnosticSourceFile,
           start: span.start,
           length: span.end - span.start,
-          messageText: `\`[${b.attribute.name}]\`${idx === 0 ? ' - WINS' : ''}`,
+          messageText: `${bindingName} (${sourceDesc})${idx === 0 ? ' - WINS' : ''}`,
         };
       }),
     });
