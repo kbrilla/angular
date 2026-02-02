@@ -54,6 +54,8 @@ import {
   getShorthandForLonghand,
 } from './css_properties';
 
+import {createShadowingDiagnostic, ShadowedInput} from '../binding_conflict_utils';
+
 /**
  * CSS diagnostic codes for the Angular Language Service.
  * These are in a separate range from Angular's core diagnostic codes.
@@ -1932,6 +1934,8 @@ function getDirectivesWithShadowableInputs(
  * Detects and creates diagnostics when [class] or [style] bindings shadow
  * @Input('class') or @Input('style') on directives.
  *
+ * Uses the shared `createShadowingDiagnostic` abstraction from binding_conflict_utils.
+ *
  * Returns diagnostics for both 99411 (class shadowing) and 99412 (style shadowing).
  */
 function detectInputShadowingDiagnostics(
@@ -1966,42 +1970,27 @@ function detectInputShadowingDiagnostics(
 
       const targetNode = classBinding || staticClassAttr;
       if (targetNode && targetNode.keySpan) {
-        const directiveNames = shadowedDirectives.map((d) => d.directiveName).join(', ');
-        const count = shadowedDirectives.length;
+        // Convert to ShadowedInput format for abstraction
+        const shadowedInputs: ShadowedInput[] = shadowedDirectives.map((d) => ({
+          classDecl: d.classDecl,
+          directiveName: d.directiveName,
+          classPropertyName: d.classPropertyName,
+          inputAlias: 'class',
+        }));
 
-        const messageText =
-          `The [class] binding shadows @Input('class') on ${count === 1 ? 'directive' : count + ' directives'} (${directiveNames}). ` +
-          `BOTH the directive input AND the DOM class attribute will be updated with the same value. ` +
-          `This is Angular's intentional behavior, but may be unexpected.`;
-
-        const diagnostic: ts.Diagnostic = {
-          category: severity,
-          code: CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
-          messageText,
-          file: diagnosticSourceFile,
-          start: targetNode.keySpan.start.offset,
-          length: targetNode.keySpan.end.offset - targetNode.keySpan.start.offset,
-          source: 'angular',
-          relatedInformation: [],
-        };
-
-        // Add related information pointing to each shadowed @Input declaration
-        for (const shadowedDir of shadowedDirectives) {
-          const inputDecl = findInputDeclaration(
-            shadowedDir.classDecl,
-            shadowedDir.classPropertyName,
-          );
-          if (inputDecl) {
-            diagnostic.relatedInformation!.push({
-              category: ts.DiagnosticCategory.Message,
-              code: 0,
-              messageText: `@Input('class') is declared on directive ${shadowedDir.directiveName}`,
-              file: shadowedDir.classDecl.getSourceFile(),
-              start: inputDecl.getStart(),
-              length: inputDecl.getWidth(),
-            });
-          }
-        }
+        const diagnostic = createShadowingDiagnostic({
+          templateBinding: targetNode,
+          shadowedInputs,
+          diagnosticCode: CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
+          severity,
+          diagnosticSourceFile,
+          bindingPrefix: 'class',
+          span: {
+            start: targetNode.keySpan.start.offset,
+            length: targetNode.keySpan.end.offset - targetNode.keySpan.start.offset,
+          },
+          findInputDeclaration,
+        });
 
         diagnostics.push(diagnostic);
       }
@@ -2031,42 +2020,27 @@ function detectInputShadowingDiagnostics(
 
       const targetNode = styleBinding || staticStyleAttr;
       if (targetNode && targetNode.keySpan) {
-        const directiveNames = shadowedDirectives.map((d) => d.directiveName).join(', ');
-        const count = shadowedDirectives.length;
+        // Convert to ShadowedInput format for abstraction
+        const shadowedInputs: ShadowedInput[] = shadowedDirectives.map((d) => ({
+          classDecl: d.classDecl,
+          directiveName: d.directiveName,
+          classPropertyName: d.classPropertyName,
+          inputAlias: 'style',
+        }));
 
-        const messageText =
-          `The [style] binding shadows @Input('style') on ${count === 1 ? 'directive' : count + ' directives'} (${directiveNames}). ` +
-          `BOTH the directive input AND the DOM style attribute will be updated with the same value. ` +
-          `This is Angular's intentional behavior, but may be unexpected.`;
-
-        const diagnostic: ts.Diagnostic = {
-          category: severity,
-          code: CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
-          messageText,
-          file: diagnosticSourceFile,
-          start: targetNode.keySpan.start.offset,
-          length: targetNode.keySpan.end.offset - targetNode.keySpan.start.offset,
-          source: 'angular',
-          relatedInformation: [],
-        };
-
-        // Add related information pointing to each shadowed @Input declaration
-        for (const shadowedDir of shadowedDirectives) {
-          const inputDecl = findInputDeclaration(
-            shadowedDir.classDecl,
-            shadowedDir.classPropertyName,
-          );
-          if (inputDecl) {
-            diagnostic.relatedInformation!.push({
-              category: ts.DiagnosticCategory.Message,
-              code: 0,
-              messageText: `@Input('style') is declared on directive ${shadowedDir.directiveName}`,
-              file: shadowedDir.classDecl.getSourceFile(),
-              start: inputDecl.getStart(),
-              length: inputDecl.getWidth(),
-            });
-          }
-        }
+        const diagnostic = createShadowingDiagnostic({
+          templateBinding: targetNode,
+          shadowedInputs,
+          diagnosticCode: CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
+          severity,
+          diagnosticSourceFile,
+          bindingPrefix: 'style',
+          span: {
+            start: targetNode.keySpan.start.offset,
+            length: targetNode.keySpan.end.offset - targetNode.keySpan.start.offset,
+          },
+          findInputDeclaration,
+        });
 
         diagnostics.push(diagnostic);
       }
