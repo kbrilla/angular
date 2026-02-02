@@ -99,6 +99,10 @@ export const enum CssDiagnosticCode {
   PREFER_STYLE_OBJECT_BINDING = 99019,
   /** Duplicate CSS property across multiple individual style bindings. */
   DUPLICATE_STYLE_BINDING = 99020,
+  /** [class] binding shadows @Input('class') - both will be updated. */
+  CLASS_BINDING_SHADOWS_INPUT = 99411,
+  /** [style] binding shadows @Input('style') - both will be updated. */
+  STYLE_BINDING_SHADOWS_INPUT = 99412,
 }
 
 /**
