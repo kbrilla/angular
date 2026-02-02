@@ -407,8 +407,9 @@ function emitComprehensiveHostBindingConflict(
   // Build message with file locations
   let messageLines: string[] = [];
   const totalBindings = bindings.length;
+  const cssPropertyName = camelToKebabCase(bindings[0].originalPropertyName);
   messageLines.push(
-    `CSS property '${camelToKebabCase(property)}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via component/directive host bindings:`,
+    `CSS property '${cssPropertyName}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via component/directive host bindings:`,
   );
   messageLines.push('');
 
@@ -443,28 +444,32 @@ function emitComprehensiveHostBindingConflict(
 
   const messageText = messageLines.join('\n');
 
-  // Report on the subsequent bindings (they will be ignored)
-  for (let i = 1; i < bindings.length; i++) {
-    const subsequent = bindings[i];
+  // Report on ALL bindings (not just subsequent) for better visibility
+  for (let i = 0; i < bindings.length; i++) {
+    const binding = bindings[i];
     diagnostics.push({
       category: severity,
       code: CssDiagnosticCode.COMPREHENSIVE_BINDING_CONFLICT,
       messageText: messageText,
       file: sourceFile,
-      start: subsequent.binding.keySpan!.start.offset,
-      length: subsequent.binding.keySpan!.end.offset - subsequent.binding.keySpan!.start.offset,
+      start: binding.binding.keySpan!.start.offset,
+      length: binding.binding.keySpan!.end.offset - binding.binding.keySpan!.start.offset,
       source: 'angular',
-      relatedInformation: [
-        {
-          category: ts.DiagnosticCategory.Message,
-          code: 0,
-          file: sourceFile,
-          start: bindings[0].binding.keySpan!.start.offset,
-          length:
-            bindings[0].binding.keySpan!.end.offset - bindings[0].binding.keySpan!.start.offset,
-          messageText: `[${bindings[0].binding.name}] (component/directive host binding) - WINS`,
-        },
-      ],
+      relatedInformation:
+        i === 0
+          ? []
+          : [
+              {
+                category: ts.DiagnosticCategory.Message,
+                code: 0,
+                file: sourceFile,
+                start: bindings[0].binding.keySpan!.start.offset,
+                length:
+                  bindings[0].binding.keySpan!.end.offset -
+                  bindings[0].binding.keySpan!.start.offset,
+                messageText: `[${bindings[0].binding.name}] (component/directive host binding) - WINS`,
+              },
+            ],
     });
   }
 }
@@ -1250,8 +1255,10 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     // Build message (plain text, no Markdown - VS Code diagnostics don't support it)
     let messageLines: string[] = [];
     const totalBindings = sorted.length;
+    // Use proper CSS property name (kebab-case) in the message
+    const cssPropertyName = camelToKebabCase(sorted[0].originalPropertyName);
     messageLines.push(
-      `CSS property '${camelToKebabCase(property)}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via multiple sources:`,
+      `CSS property '${cssPropertyName}' is bound ${totalBindings} time${totalBindings > 1 ? 's' : ''} via multiple sources:`,
     );
     messageLines.push('');
 
@@ -1290,7 +1297,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           const text = (b.hostSourceFile || this.diagnosticSourceFile).getFullText();
           const start = b.attribute.valueSpan.start.offset;
           const end = b.attribute.valueSpan.end.offset;
-          const raw = text.slice(start, end).trim();
+          let raw = text.slice(start, end).trim();
+          // Clean up: remove trailing > or /> that might be included in the span
+          raw = raw.replace(/[>\s]+$/, '');
           valueSnippet = raw ? ` = ${raw}` : '';
         }
 
@@ -1363,35 +1372,48 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
       };
     };
 
-    // Place diagnostic on the lowest precedence (losing) binding
+    // Place diagnostic on ALL bindings (not just losers) for better visibility
     const lowestPrecedence = sorted[sorted.length - 1];
     const lowestSpan = getBindingSpan(lowestPrecedence, winner);
 
-    this.diagnostics.push({
-      category: this.severity,
-      code: CssDiagnosticCode.COMPREHENSIVE_BINDING_CONFLICT,
-      messageText: messageText,
-      file: this.diagnosticSourceFile,
-      start: lowestSpan.start,
-      length: lowestSpan.end - lowestSpan.start,
-      source: 'angular',
-      relatedInformation: sorted.slice(0, -1).map((b, idx) => {
-        const span = getBindingSpan(b);
-        const bindingName =
-          b.attribute.type === BindingType.Style
-            ? `[style.${b.originalPropertyName}]`
-            : `[${b.attribute.name}]`;
-        const sourceDesc = getBindingTypeDescription(b.bindingType, b.directiveName, 'style');
-        return {
-          category: ts.DiagnosticCategory.Message,
-          code: 0,
-          file: this.diagnosticSourceFile,
-          start: span.start,
-          length: span.end - span.start,
-          messageText: `${bindingName} (${sourceDesc})${idx === 0 ? ' - WINS' : ''}`,
-        };
-      }),
-    });
+    // Emit diagnostic for EACH binding
+    for (let i = 0; i < sorted.length; i++) {
+      const b = sorted[i];
+      const span = getBindingSpan(b, winner);
+
+      this.diagnostics.push({
+        category: this.severity,
+        code: CssDiagnosticCode.COMPREHENSIVE_BINDING_CONFLICT,
+        messageText: messageText,
+        file: this.diagnosticSourceFile,
+        start: span.start,
+        length: span.end - span.start,
+        source: 'angular',
+        relatedInformation: sorted
+          .filter((_, idx) => idx !== i)
+          .slice(0, 3)
+          .map((relB, idx) => {
+            const relSpan = getBindingSpan(relB);
+            const bindingName =
+              relB.attribute.type === BindingType.Style
+                ? `[style.${relB.originalPropertyName}]`
+                : `[${relB.attribute.name}]`;
+            const sourceDesc = getBindingTypeDescription(
+              relB.bindingType,
+              relB.directiveName,
+              'style',
+            );
+            return {
+              category: ts.DiagnosticCategory.Message,
+              code: 0,
+              file: this.diagnosticSourceFile,
+              start: relSpan.start,
+              length: relSpan.end - relSpan.start,
+              messageText: `${bindingName} (${sourceDesc})${relB === winner ? ' - WINS' : ''}`,
+            };
+          }),
+      });
+    }
   }
 
   /**
