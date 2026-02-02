@@ -1830,3 +1830,69 @@ class PipeDetectorVisitor extends RecursiveAstVisitor {
     // Don't need to continue once we find a pipe
   }
 }
+
+/**
+ * Information about a directive that has @Input('class') or @Input('style').
+ */
+interface DirectiveWithShadowableInput {
+  /** The directive's class declaration */
+  classDecl: ts.ClassDeclaration;
+  /** The directive's name */
+  directiveName: string;
+  /** The input's class property name */
+  classPropertyName: string;
+  /** The binding property name ('class' or 'style') */
+  bindingPropertyName: string;
+}
+
+/**
+ * Checks if directives on an element have @Input('class') or @Input('style')
+ * that would be shadowed by [class] or [style] bindings.
+ */
+function getDirectivesWithShadowableInputs(
+  component: ts.ClassDeclaration,
+  element: TmplAstElement | TmplAstTemplate,
+  inputName: 'class' | 'style',
+  templateTypeChecker: TemplateTypeChecker,
+): DirectiveWithShadowableInput[] {
+  const result: DirectiveWithShadowableInput[] = [];
+
+  // Get all directives on this element
+  const directives = templateTypeChecker.getDirectivesOfNode(component, element);
+  if (!directives) {
+    return result;
+  }
+
+  for (const directive of directives) {
+    if (!ts.isClassDeclaration(directive.ref.node)) {
+      continue;
+    }
+
+    const classDecl = directive.ref.node;
+    const meta = templateTypeChecker.getDirectiveMetadata(classDecl);
+    if (!meta) {
+      continue;
+    }
+
+    // Check if this directive has @Input('class') or @Input('style')
+    // meta.inputs is a ClassPropertyMapping with .getByBindingPropertyName()
+    const inputMatches = meta.inputs.getByBindingPropertyName(inputName);
+    if (inputMatches && inputMatches.length > 0) {
+      const directiveName = classDecl.name?.text ?? 'UnknownDirective';
+
+      for (const input of inputMatches) {
+        result.push({
+          classDecl,
+          directiveName,
+          classPropertyName: input.classPropertyName,
+          bindingPropertyName: input.bindingPropertyName,
+        });
+      }
+    }
+
+    // TODO: Also check host directives (Angular 15+)
+    // They would be accessed via directive.hostDirectives
+  }
+
+  return result;
+}
