@@ -1021,11 +1021,189 @@ describe('CSS property validation diagnostics', () => {
     });
   });
 
-  describe('directive host binding conflict detection', () => {
-    it('should detect conflict between directive host style binding and template style binding', () => {
+  describe('Class/Style input shadowing diagnostics', () => {
+    let env: LanguageServiceTestEnv;
+
+    beforeEach(() => {
+      initMockFileSystem('Native');
+      env = LanguageServiceTestEnv.setup();
+    });
+
+    it('should warn when [class] binding shadows @Input("class")', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          @Input('class') className!: string;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<div myDir [class]="classes"></div>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          classes = 'foo bar';
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(1);
+      expect(shadowingDiags[0].messageText).toContain('[class] binding shadows');
+      expect(shadowingDiags[0].messageText).toContain('MyDirective');
+    });
+
+    it('should warn when [style] binding shadows @Input("style")', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          @Input('style') styles!: string;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<div myDir [style]="myStyles"></div>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          myStyles = {color: 'red'};
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(1);
+      expect(shadowingDiags[0].messageText).toContain('[style] binding shadows');
+      expect(shadowingDiags[0].messageText).toContain('MyDirective');
+    });
+
+    it('should not warn when directive does not have @Input("class")', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          @Input() someInput!: string;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<div myDir [class]="classes"></div>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          classes = 'foo bar';
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) =>
+          d.code === CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT ||
+          d.code === CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(0);
+    });
+
+    it('should warn when multiple directives have @Input("class")', () => {
+      const files = {
+        'dir1.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[dir1]',
+          standalone: true,
+        })
+        export class Dir1 {
+          @Input('class') className!: string;
+        }
+      `,
+        'dir2.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[dir2]',
+          standalone: true,
+        })
+        export class Dir2 {
+          @Input('class') cssClass!: string;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {Dir1} from './dir1';
+        import {Dir2} from './dir2';
+
+        @Component({
+          template: '<div dir1 dir2 [class]="classes"></div>',
+          imports: [Dir1, Dir2],
+          standalone: true,
+        })
+        export class AppComponent {
+          classes = 'foo bar';
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(1);
+      expect(shadowingDiags[0].messageText).toContain('2 directives');
+      expect(shadowingDiags[0].messageText).toContain('Dir1');
+      expect(shadowingDiags[0].messageText).toContain('Dir2');
+    });
+  });
+
+  describe('CONFLICTING_STYLE_BINDING diagnostics', () => {
+    it('validates background: url(...) does not conflict with background-image', () => {
       const files = {
         'app.ts': `
-          import {Component, Directive} from '@angular/core';
+        import {Component, Directive} from '@angular/core';
 
           @Directive({
             selector: '[backgroundColorApplier]',
