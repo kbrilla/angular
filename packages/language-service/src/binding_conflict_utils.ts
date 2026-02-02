@@ -25,7 +25,11 @@ export type BaseBindingType =
 /**
  * Maps binding types to their precedence order.
  * Lower numbers = higher precedence (wins in conflicts).
- * Template bindings (1-3) always win over host bindings (4-6).
+ * Template bindings (1-3) always win over host bindings (4-7).
+ *
+ * VERIFIED via runtime testing:
+ * - Template > Component host > Directive host > hostDirectives
+ * - Directive's own host binding WINS over its hostDirectives
  */
 export const BASE_BINDING_PRECEDENCE: Record<BaseBindingType, number> = {
   individual: 1,
@@ -33,8 +37,8 @@ export const BASE_BINDING_PRECEDENCE: Record<BaseBindingType, number> = {
   directive: 3,
   hostIndividual: 4,
   hostObjectLiteral: 5,
-  hostDirectiveIndividual: 6,
-  directiveHostIndividual: 7,
+  directiveHostIndividual: 6, // Directive's own host binding
+  hostDirectiveIndividual: 7, // hostDirective applied via hostDirectives: [...]
 };
 
 /**
