@@ -151,14 +151,16 @@ export class LanguageService {
                     console.log(`[LS_DIAG] Found component: ${className} with template`);
 
                     // Check if this component uses an external template
-                    // For external templates, skip diagnostics here - they'll be reported when processing the HTML file
-                    // This prevents diagnostics from appearing in wrong file (TS file for external template content)
+                    // For external templates, template diagnostics will be reported when processing the HTML file
+                    // but we still need to collect TS-file diagnostics (host binding conflicts)
                     const resources = compiler.getDirectiveResources(node);
                     const hasExternalTemplate =
                       resources?.template && isExternalResource(resources.template);
 
                     // Collect CSS diagnostics
-                    if (cssConfig.enabled && !hasExternalTemplate) {
+                    // For components with external templates, this will only collect host binding diagnostics (TS file)
+                    // For inline templates, this collects both template and host binding diagnostics
+                    if (cssConfig.enabled) {
                       const cssDiags = getCssDiagnostics(node, compiler, cssConfig);
                       diagnostics.push(...cssDiags);
                       // @ts-ignore DEBUG
