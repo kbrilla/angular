@@ -342,6 +342,7 @@ export class LanguageService {
     enabled: boolean;
     severity: 'error' | 'warning' | 'suggestion';
     strictUnitValues?: boolean;
+    warnOnInputShadowing: boolean;
   } {
     const cssValidation = this.config.cssPropertyValidation;
 
@@ -352,7 +353,7 @@ export class LanguageService {
 
     if (cssValidation === false) {
       // Explicitly disabled
-      return {enabled: false, severity: 'warning'};
+      return {enabled: false, severity: 'warning', warnOnInputShadowing: false};
     }
 
     // Custom configuration object
@@ -360,6 +361,7 @@ export class LanguageService {
       enabled: cssValidation.enabled !== false,
       severity: cssValidation.severity ?? 'warning',
       strictUnitValues: cssValidation.strictUnitValues ?? false,
+      warnOnInputShadowing: cssValidation.warnOnInputShadowing ?? true,
     };
   }
 
