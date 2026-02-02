@@ -208,6 +208,30 @@ export class LanguageService {
                     }
                   }
 
+                  // CSS host binding conflict diagnostics apply to ANY directive (with or without template)
+                  // This detects conflicts within the directive's own host bindings
+                  // (e.g., host: {[style.prop]} vs @HostBinding('style.prop'))
+                  if (cssConfig.enabled && meta && !template) {
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Checking host binding conflicts for directive without template: ${className}`,
+                    );
+                    // For directives without templates, we still need to check host binding conflicts
+                    // Use skipTemplateBindings=true since there's no template to check
+                    const cssDiags = getCssDiagnostics(
+                      node,
+                      compiler,
+                      cssConfig,
+                      undefined,
+                      true, // skipTemplateBindings - no template to check
+                    );
+                    diagnostics.push(...cssDiags);
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] CSS host binding diagnostics for ${className}: ${cssDiags.length}`,
+                    );
+                  }
+
                   // Output definition diagnostics apply to ANY directive (with or without template)
                   // This detects @Output() that shadow DOM events at the class definition level
                   if (eventConfig.enabled && meta) {
