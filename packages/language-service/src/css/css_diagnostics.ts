@@ -456,9 +456,35 @@ function detectHostStyleBindingConflicts(
       );
     }
 
-    // For host bindings with the same CSS property, report all but the first as conflicts
-    // The first binding takes precedence (order-dependent at runtime)
-    const first = bindings[0];
+    // Build detailed message like template duplicates
+    const sortedBindings = bindings.map((b, idx) => ({
+      ...b,
+      index: idx + 1,
+    }));
+
+    const bindingsList = sortedBindings
+      .map((b) => {
+        const propName = b.originalPropertyName;
+        const source = `[${b.binding.name}]`;
+        // Try to get value snippet
+        let valueSnippet = '';
+        if (b.binding.valueSpan) {
+          const sourceFile = component.getSourceFile();
+          const text = sourceFile.getFullText();
+          const start = b.binding.valueSpan.start.offset;
+          const end = b.binding.valueSpan.end.offset;
+          const value = text.slice(start, end).trim();
+          if (value) {
+            valueSnippet = ` — value: ${value}`;
+          }
+        }
+        return `${b.index}. ${propName} from ${source}${valueSnippet}`;
+      })
+      .join('\n');
+
+    const messageText =
+      `CSS property '${property}' is set ${bindings.length} times via component/directive host bindings.\n` +
+      `The first occurrence wins, subsequent bindings are ignored:\n${bindingsList}`;
 
     // Report diagnostics on subsequent bindings (they will be overridden)
     for (let i = 1; i < bindings.length; i++) {
@@ -470,8 +496,8 @@ function detectHostStyleBindingConflicts(
 
       diagnostics.push({
         category: severity,
-        code: CssDiagnosticCode.CONFLICTING_STYLE_BINDING,
-        messageText: `CSS property '${subsequent.originalPropertyName}' is set via multiple host bindings. Only one value will be applied at runtime.`,
+        code: CssDiagnosticCode.DUPLICATE_STYLE_BINDING,
+        messageText: messageText,
         file: component.getSourceFile(),
         start: subsequent.binding.keySpan!.start.offset,
         length: subsequent.binding.keySpan!.end.offset - subsequent.binding.keySpan!.start.offset,
