@@ -160,6 +160,8 @@ export const DEFAULT_CSS_DIAGNOSTICS_CONFIG: CssDiagnosticsConfig = {
  * @param config Optional configuration for diagnostics.
  * @param templateSourceFile Optional source file for external templates. If provided, diagnostics
  *                           will point to this file instead of the component's TypeScript file.
+ * @param skipTemplateBindings If true, skip template binding diagnostics and only check host bindings.
+ *                             Use this when processing TS files for components with external templates.
  * @returns Array of CSS diagnostics.
  */
 export function getCssDiagnostics(
@@ -167,6 +169,7 @@ export function getCssDiagnostics(
   compiler: NgCompiler,
   config: CssDiagnosticsConfig = DEFAULT_CSS_DIAGNOSTICS_CONFIG,
   templateSourceFile?: ts.SourceFile,
+  skipTemplateBindings: boolean = false,
 ): ts.Diagnostic[] {
   const componentName = component.name?.getText() || '<anonymous>';
   // @ts-ignore DEBUG
@@ -197,10 +200,12 @@ export function getCssDiagnostics(
   // @ts-ignore DEBUG
   console.log(`[CSS_DIAG] Using source file for diagnostics: ${diagnosticSourceFile.fileName}`);
 
-  // Validate template style bindings
-  const template = templateTypeChecker.getTemplate(component);
+  // Validate template style bindings (skip if skipTemplateBindings is true)
+  const template = !skipTemplateBindings ? templateTypeChecker.getTemplate(component) : null;
   // @ts-ignore DEBUG
-  console.log(`[CSS_DIAG] Template retrieved: ${template !== null ? 'YES' : 'NO'}`);
+  console.log(
+    `[CSS_DIAG] Template retrieved: ${template !== null ? 'YES' : 'NO'} (skipTemplateBindings=${skipTemplateBindings})`,
+  );
   if (template !== null) {
     // @ts-ignore DEBUG
     console.log(`[CSS_DIAG] Template has ${template.length} root nodes`);

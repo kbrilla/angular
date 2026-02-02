@@ -158,13 +158,23 @@ export class LanguageService {
                       resources?.template && isExternalResource(resources.template);
 
                     // Collect CSS diagnostics
-                    // For components with external templates, this will only collect host binding diagnostics (TS file)
-                    // For inline templates, this collects both template and host binding diagnostics
+                    // For components with external templates, skip template binding diagnostics
+                    // (they'll be collected when processing the HTML file), but still check host bindings
+                    // For inline templates, collect both template and host binding diagnostics
                     if (cssConfig.enabled) {
-                      const cssDiags = getCssDiagnostics(node, compiler, cssConfig);
+                      const skipTemplateBindings = !!hasExternalTemplate;
+                      const cssDiags = getCssDiagnostics(
+                        node,
+                        compiler,
+                        cssConfig,
+                        undefined,
+                        skipTemplateBindings,
+                      );
                       diagnostics.push(...cssDiags);
                       // @ts-ignore DEBUG
-                      console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
+                      console.log(
+                        `[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length} (skipTemplate=${skipTemplateBindings})`,
+                      );
                     }
 
                     // Collect ARIA diagnostics
