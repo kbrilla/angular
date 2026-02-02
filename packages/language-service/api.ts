@@ -102,6 +102,13 @@ export interface CssDiagnosticsConfig {
    * Default: false
    */
   strictUnitValues?: boolean;
+
+  /**
+   * Whether to warn when [class]/[style] bindings shadow directive @Input('class')/@Input('style').
+   * This is informational - both the directive input AND DOM attribute will be updated.
+   * Default: true
+   */
+  warnOnInputShadowing?: boolean;
 }
 
 export type GetTcbResponse = {

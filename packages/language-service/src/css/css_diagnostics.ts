@@ -120,6 +120,12 @@ export interface CssDiagnosticsConfig {
    * - Using numbers without units in non-unit bindings
    */
   strictUnitValues?: boolean;
+
+  /**
+   * Whether to warn when [class]/[style] bindings shadow directive @Input('class')/@Input('style').
+   * Default: true
+   */
+  warnOnInputShadowing: boolean;
 }
 
 /**
@@ -129,6 +135,7 @@ export const DEFAULT_CSS_DIAGNOSTICS_CONFIG: CssDiagnosticsConfig = {
   enabled: true,
   severity: 'warning',
   strictUnitValues: false,
+  warnOnInputShadowing: true,
 };
 
 /**
@@ -1692,6 +1699,18 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     // @ts-ignore DEBUG
     console.log(`[CSS_DIAG] visitElement: <${element.name}> with ${element.inputs.length} inputs`);
 
+    // Check for input shadowing (99411, 99412)
+    if (this.config.warnOnInputShadowing) {
+      const shadowingDiags = detectInputShadowingDiagnostics(
+        this.component,
+        element,
+        this.diagnosticSourceFile,
+        this.templateTypeChecker,
+        this.severity,
+      );
+      this.diagnostics.push(...shadowingDiags);
+    }
+
     // First, detect style binding conflicts on this element
     this.detectStyleBindingConflicts(element);
 
@@ -1715,6 +1734,18 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   visitTemplate(template: TmplAstTemplate): void {
     // @ts-ignore DEBUG
     console.log(`[CSS_DIAG] visitTemplate with ${template.inputs.length} inputs`);
+
+    // Check for input shadowing on <ng-template> elements too
+    if (this.config.warnOnInputShadowing) {
+      const shadowingDiags = detectInputShadowingDiagnostics(
+        this.component,
+        template,
+        this.diagnosticSourceFile,
+        this.templateTypeChecker,
+        this.severity,
+      );
+      this.diagnostics.push(...shadowingDiags);
+    }
 
     // Detect style binding conflicts on ng-template
     this.detectStyleBindingConflicts(template);
@@ -1895,4 +1926,214 @@ function getDirectivesWithShadowableInputs(
   }
 
   return result;
+}
+
+/**
+ * Detects and creates diagnostics when [class] or [style] bindings shadow
+ * @Input('class') or @Input('style') on directives.
+ *
+ * Returns diagnostics for both 99411 (class shadowing) and 99412 (style shadowing).
+ */
+function detectInputShadowingDiagnostics(
+  component: ts.ClassDeclaration,
+  element: TmplAstElement | TmplAstTemplate,
+  diagnosticSourceFile: ts.SourceFile,
+  templateTypeChecker: TemplateTypeChecker,
+  severity: ts.DiagnosticCategory,
+): ts.Diagnostic[] {
+  const diagnostics: ts.Diagnostic[] = [];
+
+  // Check for [class] or static class attribute
+  const hasClassBinding = element.inputs.some(
+    (input) => input.type === BindingType.Class && input.name === 'class',
+  );
+  const hasStaticClass = element.attributes.some((attr) => attr.name === 'class');
+
+  if (hasClassBinding || hasStaticClass) {
+    const shadowedDirectives = getDirectivesWithShadowableInputs(
+      component,
+      element,
+      'class',
+      templateTypeChecker,
+    );
+
+    if (shadowedDirectives.length > 0) {
+      // Find the binding to attach the diagnostic to
+      const classBinding = element.inputs.find(
+        (input) => input.type === BindingType.Class && input.name === 'class',
+      );
+      const staticClassAttr = element.attributes.find((attr) => attr.name === 'class');
+
+      const targetNode = classBinding || staticClassAttr;
+      if (targetNode && targetNode.keySpan) {
+        const directiveNames = shadowedDirectives.map((d) => d.directiveName).join(', ');
+        const count = shadowedDirectives.length;
+
+        const messageText =
+          `The [class] binding shadows @Input('class') on ${count === 1 ? 'directive' : count + ' directives'} (${directiveNames}). ` +
+          `BOTH the directive input AND the DOM class attribute will be updated with the same value. ` +
+          `This is Angular's intentional behavior, but may be unexpected.`;
+
+        const diagnostic: ts.Diagnostic = {
+          category: severity,
+          code: CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
+          messageText,
+          file: diagnosticSourceFile,
+          start: targetNode.keySpan.start.offset,
+          length: targetNode.keySpan.end.offset - targetNode.keySpan.start.offset,
+          source: 'angular',
+          relatedInformation: [],
+        };
+
+        // Add related information pointing to each shadowed @Input declaration
+        for (const shadowedDir of shadowedDirectives) {
+          const inputDecl = findInputDeclaration(
+            shadowedDir.classDecl,
+            shadowedDir.classPropertyName,
+          );
+          if (inputDecl) {
+            diagnostic.relatedInformation!.push({
+              category: ts.DiagnosticCategory.Message,
+              code: 0,
+              messageText: `@Input('class') is declared on directive ${shadowedDir.directiveName}`,
+              file: shadowedDir.classDecl.getSourceFile(),
+              start: inputDecl.getStart(),
+              length: inputDecl.getWidth(),
+            });
+          }
+        }
+
+        diagnostics.push(diagnostic);
+      }
+    }
+  }
+
+  // Check for [style] or static style attribute
+  const hasStyleBinding = element.inputs.some(
+    (input) => input.type === BindingType.Style && input.name === 'style',
+  );
+  const hasStaticStyle = element.attributes.some((attr) => attr.name === 'style');
+
+  if (hasStyleBinding || hasStaticStyle) {
+    const shadowedDirectives = getDirectivesWithShadowableInputs(
+      component,
+      element,
+      'style',
+      templateTypeChecker,
+    );
+
+    if (shadowedDirectives.length > 0) {
+      // Find the binding to attach the diagnostic to
+      const styleBinding = element.inputs.find(
+        (input) => input.type === BindingType.Style && input.name === 'style',
+      );
+      const staticStyleAttr = element.attributes.find((attr) => attr.name === 'style');
+
+      const targetNode = styleBinding || staticStyleAttr;
+      if (targetNode && targetNode.keySpan) {
+        const directiveNames = shadowedDirectives.map((d) => d.directiveName).join(', ');
+        const count = shadowedDirectives.length;
+
+        const messageText =
+          `The [style] binding shadows @Input('style') on ${count === 1 ? 'directive' : count + ' directives'} (${directiveNames}). ` +
+          `BOTH the directive input AND the DOM style attribute will be updated with the same value. ` +
+          `This is Angular's intentional behavior, but may be unexpected.`;
+
+        const diagnostic: ts.Diagnostic = {
+          category: severity,
+          code: CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
+          messageText,
+          file: diagnosticSourceFile,
+          start: targetNode.keySpan.start.offset,
+          length: targetNode.keySpan.end.offset - targetNode.keySpan.start.offset,
+          source: 'angular',
+          relatedInformation: [],
+        };
+
+        // Add related information pointing to each shadowed @Input declaration
+        for (const shadowedDir of shadowedDirectives) {
+          const inputDecl = findInputDeclaration(
+            shadowedDir.classDecl,
+            shadowedDir.classPropertyName,
+          );
+          if (inputDecl) {
+            diagnostic.relatedInformation!.push({
+              category: ts.DiagnosticCategory.Message,
+              code: 0,
+              messageText: `@Input('style') is declared on directive ${shadowedDir.directiveName}`,
+              file: shadowedDir.classDecl.getSourceFile(),
+              start: inputDecl.getStart(),
+              length: inputDecl.getWidth(),
+            });
+          }
+        }
+
+        diagnostics.push(diagnostic);
+      }
+    }
+  }
+
+  return diagnostics;
+}
+
+/**
+ * Finds the @Input() decorator or input signal declaration for a given class property.
+ * Returns the decorator node or property declaration.
+ */
+function findInputDeclaration(
+  classDecl: ts.ClassDeclaration,
+  propertyName: string,
+): ts.Node | null {
+  for (const member of classDecl.members) {
+    if (
+      ts.isPropertyDeclaration(member) &&
+      member.name &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === propertyName
+    ) {
+      // Check for @Input() decorator
+      if (member.modifiers) {
+        for (const modifier of member.modifiers) {
+          if (ts.isDecorator(modifier)) {
+            const expr = modifier.expression;
+            if (
+              ts.isCallExpression(expr) &&
+              ts.isIdentifier(expr.expression) &&
+              expr.expression.text === 'Input'
+            ) {
+              return modifier;
+            }
+          }
+        }
+      }
+
+      // For signal inputs (input(), model()), return the property itself
+      return member;
+    }
+
+    // Check for setter with @Input decorator
+    if (
+      ts.isSetAccessor(member) &&
+      member.name &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === propertyName
+    ) {
+      if (member.modifiers) {
+        for (const modifier of member.modifiers) {
+          if (ts.isDecorator(modifier)) {
+            const expr = modifier.expression;
+            if (
+              ts.isCallExpression(expr) &&
+              ts.isIdentifier(expr.expression) &&
+              expr.expression.text === 'Input'
+            ) {
+              return modifier;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return null;
 }
