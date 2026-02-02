@@ -223,8 +223,17 @@ export function getCssDiagnostics(
   console.log(`[CSS_DIAG] Host element retrieved: ${hostElement !== null ? 'YES' : 'NO'}`);
   if (hostElement !== null) {
     validateHostStyleBindings(component, hostElement, diagnostics, severity);
-    // Also detect conflicts within host bindings
-    detectHostStyleBindingConflicts(component, hostElement, diagnostics, severity);
+
+    // Host binding conflict diagnostics should only be added when processing the TS file,
+    // not when processing an external HTML template, since host binding diagnostics
+    // always point to the component's TypeScript file.
+    const isProcessingTsFile = diagnosticSourceFile === component.getSourceFile();
+    // @ts-ignore DEBUG
+    console.log(`[CSS_DIAG] isProcessingTsFile: ${isProcessingTsFile}`);
+    if (isProcessingTsFile) {
+      // Also detect conflicts within host bindings
+      detectHostStyleBindingConflicts(component, hostElement, diagnostics, severity);
+    }
     // @ts-ignore DEBUG
     console.log(`[CSS_DIAG] After host validation: ${diagnostics.length} diagnostics`);
   }
