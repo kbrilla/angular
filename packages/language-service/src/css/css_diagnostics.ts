@@ -404,7 +404,7 @@ function emitComprehensiveHostBindingConflict(
 ): void {
   const sourceFile = component.getSourceFile();
 
-  // All host bindings are from the same source (component/directive)
+  // Build message with file locations
   let messageLines: string[] = [];
   const totalBindings = bindings.length;
   messageLines.push(
@@ -412,7 +412,17 @@ function emitComprehensiveHostBindingConflict(
   );
   messageLines.push('');
 
-  messageLines.push(`Component/Directive host bindings:`);
+  // Get file location for first binding
+  const fileName = sourceFile.fileName.split('/').pop() || sourceFile.fileName;
+  const getLocation = (binding: TmplAstBoundAttribute): string => {
+    if (binding.keySpan) {
+      const pos = sourceFile.getLineAndCharacterOfPosition(binding.keySpan.start.offset);
+      return `${fileName}(${pos.line + 1}, ${pos.character + 1})`;
+    }
+    return fileName;
+  };
+
+  messageLines.push(`Component/Directive host bindings ${getLocation(bindings[0].binding)}:`);
   for (let i = 0; i < bindings.length; i++) {
     const b = bindings[i];
     const bindingName = `[${b.binding.name}]`;
@@ -1165,6 +1175,21 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
   }
 
   /**
+   * Get file location string for a binding (e.g., "app.html(8, 33)").
+   */
+  private getBindingLocation(binding: StyleBinding): string {
+    const file = binding.hostSourceFile || this.diagnosticSourceFile;
+    const fileName = file.fileName.split('/').pop() || file.fileName;
+
+    if (binding.attribute.keySpan) {
+      const pos = file.getLineAndCharacterOfPosition(binding.attribute.keySpan.start.offset);
+      return `${fileName}(${pos.line + 1}, ${pos.character + 1})`;
+    }
+
+    return fileName;
+  }
+
+  /**
    * Emits comprehensive binding conflict diagnostic (99021) showing all bindings grouped by source.
    */
   private emitComprehensiveBindingConflict(
@@ -1234,7 +1259,21 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
     let winnerDeclared = false;
 
     for (const [sourceKey, source] of sortedSources) {
-      messageLines.push(`${source.label}:`);
+      // Get file position for this source's first binding (used in header if all bindings are from same location)
+      const firstBinding = source.bindings[0];
+      const firstLocation = this.getBindingLocation(firstBinding);
+
+      // If all bindings in this source are from same location, show it in the header
+      const allSameLocation = source.bindings.every((b) => {
+        const loc = this.getBindingLocation(b);
+        return loc === firstLocation;
+      });
+
+      if (allSameLocation && firstLocation) {
+        messageLines.push(`${source.label} ${firstLocation}:`);
+      } else {
+        messageLines.push(`${source.label}:`);
+      }
 
       for (let i = 0; i < source.bindings.length; i++) {
         const b = source.bindings[i];
@@ -1255,6 +1294,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           valueSnippet = raw ? ` = ${raw}` : '';
         }
 
+        // Get location for this binding (only if not shown in header)
+        const locationSuffix = !allSameLocation ? ` ${this.getBindingLocation(b)}` : '';
+
         // Determine status
         let status = '';
         if (globalIndex === 1 && !winnerDeclared) {
@@ -1268,7 +1310,9 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
           status = ` [overridden by ${sortedSources[0][1].label.toLowerCase()}]`;
         }
 
-        messageLines.push(`  ${globalIndex}. ${bindingName}${valueSnippet}${status}`);
+        messageLines.push(
+          `  ${globalIndex}. ${bindingName}${valueSnippet}${locationSuffix}${status}`,
+        );
         globalIndex++;
       }
 
