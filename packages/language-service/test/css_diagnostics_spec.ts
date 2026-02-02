@@ -1197,6 +1197,168 @@ describe('CSS property validation diagnostics', () => {
       expect(shadowingDiags[0].messageText).toContain('Dir1');
       expect(shadowingDiags[0].messageText).toContain('Dir2');
     });
+
+    it('should provide related information pointing to @Input declaration', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          @Input('class') className!: string;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<div myDir [class]="classes"></div>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          classes = 'foo bar';
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(1);
+      expect(shadowingDiags[0].relatedInformation).toBeDefined();
+      expect(shadowingDiags[0].relatedInformation!.length).toBeGreaterThan(0);
+      expect(shadowingDiags[0].relatedInformation![0].messageText).toContain('MyDirective');
+    });
+
+    it('should work with signal-based inputs', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          className = input.required<string>({alias: 'class'});
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<div myDir [class]="classes"></div>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          classes = 'foo bar';
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(1);
+      expect(shadowingDiags[0].messageText).toContain('MyDirective');
+    });
+
+    it('should work when directive is on <ng-template>', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          @Input('style') styles!: Record<string, any>;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<ng-template myDir [style]="myStyles"></ng-template>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          myStyles = {color: 'red'};
+        }
+      `,
+      };
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) => d.code === CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(1);
+    });
+
+    it('should be suppressible via config', () => {
+      const files = {
+        'dir.ts': `
+        import {Directive, Input} from '@angular/core';
+
+        @Directive({
+          selector: '[myDir]',
+          standalone: true,
+        })
+        export class MyDirective {
+          @Input('class') className!: string;
+        }
+      `,
+        'app.ts': `
+        import {Component} from '@angular/core';
+        import {MyDirective} from './dir';
+
+        @Component({
+          template: '<div myDir [class]="classes"></div>',
+          imports: [MyDirective],
+          standalone: true,
+        })
+        export class AppComponent {
+          classes = 'foo bar';
+        }
+      `,
+      };
+
+      // Create project with cssPropertyValidation disabled
+      const project = env.addProject('test', files, {
+        cssPropertyValidation: {
+          enabled: true,
+          warnOnInputShadowing: false,
+        },
+      });
+
+      const diags = project.getDiagnosticsForFile('app.ts');
+
+      const shadowingDiags = diags.filter(
+        (d) =>
+          d.code === CssDiagnosticCode.CLASS_BINDING_SHADOWS_INPUT ||
+          d.code === CssDiagnosticCode.STYLE_BINDING_SHADOWS_INPUT,
+      );
+
+      expect(shadowingDiags.length).toBe(0);
+    });
   });
 
   describe('CONFLICTING_STYLE_BINDING diagnostics', () => {
