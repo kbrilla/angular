@@ -368,6 +368,10 @@ function detectHostStyleBindingConflicts(
   diagnostics: ts.Diagnostic[],
   severity: ts.DiagnosticCategory,
 ): void {
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG_HOST] detectHostStyleBindingConflicts for ${component.name?.getText()}`);
+  // @ts-ignore DEBUG
+  console.log(`[CSS_DIAG_HOST]   hostElement.bindings.length = ${hostElement.bindings.length}`);
   // Collect all host style bindings by normalized property name
   const bindingsByProperty = new Map<
     string,
@@ -427,6 +431,17 @@ function detectHostStyleBindingConflicts(
   for (const [property, bindings] of bindingsByProperty) {
     if (bindings.length <= 1 || property === '__style_object__') continue;
 
+    // @ts-ignore DEBUG
+    console.log(
+      `[CSS_DIAG_HOST] Found conflict for '${property}' with ${bindings.length} bindings`,
+    );
+    for (const b of bindings) {
+      // @ts-ignore DEBUG
+      console.log(
+        `[CSS_DIAG_HOST]   binding: keySpan=${JSON.stringify({start: b.binding.keySpan?.start?.offset, end: b.binding.keySpan?.end?.offset})}`,
+      );
+    }
+
     // For host bindings with the same CSS property, report all but the first as conflicts
     // The first binding takes precedence (order-dependent at runtime)
     const first = bindings[0];
@@ -434,6 +449,10 @@ function detectHostStyleBindingConflicts(
     // Report diagnostics on subsequent bindings (they will be overridden)
     for (let i = 1; i < bindings.length; i++) {
       const subsequent = bindings[i];
+      // @ts-ignore DEBUG
+      console.log(
+        `[CSS_DIAG_HOST]   Creating diagnostic at start=${subsequent.binding.keySpan!.start.offset}, length=${subsequent.binding.keySpan!.end.offset - subsequent.binding.keySpan!.start.offset}`,
+      );
 
       diagnostics.push({
         category: severity,
@@ -1311,17 +1330,31 @@ class CssBindingVisitor implements TmplAstVisitor<void> {
         // NOT the directive definition span. For template bindings, use the attribute keySpan.
         // If elementSpan is undefined for directive, use the winner's span (keep diagnostic in template file)
         const getBindingSpan = (b: StyleBinding, fallbackBinding?: StyleBinding) => {
+          // @ts-ignore DEBUG
+          console.log(
+            `[CSS_DIAG] getBindingSpan: type=${b.bindingType}, elementSpan=${JSON.stringify(b.elementSpan)}, keySpan=${JSON.stringify({start: b.attribute.keySpan?.start?.offset, end: b.attribute.keySpan?.end?.offset})}, fallback=${fallbackBinding?.bindingType}`,
+          );
           if (b.bindingType === 'directiveHostIndividual') {
             if (b.elementSpan) {
+              // @ts-ignore DEBUG
+              console.log(`[CSS_DIAG]   -> Using elementSpan`);
               return b.elementSpan;
             }
             // Fallback: use winner's span to keep diagnostic in template
             if (fallbackBinding && fallbackBinding.bindingType !== 'directiveHostIndividual') {
+              // @ts-ignore DEBUG
+              console.log(
+                `[CSS_DIAG]   -> Using fallback span from ${fallbackBinding.bindingType}`,
+              );
               return {
                 start: fallbackBinding.attribute.keySpan.start.offset,
                 end: fallbackBinding.attribute.keySpan.end.offset,
               };
             }
+            // @ts-ignore DEBUG
+            console.log(
+              `[CSS_DIAG]   -> FALLTHROUGH: no elementSpan, no valid fallback! Using directive's keySpan (WRONG FILE!)`,
+            );
           }
           return {
             start: b.attribute.keySpan.start.offset,
