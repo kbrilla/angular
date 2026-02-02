@@ -272,3 +272,186 @@ export function detectConflicts<T extends BaseBinding>(
 
   return diagnostics;
 }
+
+/**
+ * Represents information about an @Input that is being shadowed by a binding.
+ */
+export interface ShadowedInput {
+  /** The directive/component class declaration */
+  classDecl: ts.ClassDeclaration;
+  /** The directive/component name */
+  directiveName: string;
+  /** The input's property name in the class (e.g., 'className' for @Input('class')) */
+  classPropertyName: string;
+  /** The input's public alias (e.g., 'class' for @Input('class')) */
+  inputAlias: string;
+}
+
+/**
+ * Configuration for creating shadowing diagnostics.
+ * Shadowing occurs when a binding (like [class] or [style]) updates BOTH:
+ * 1. A directive's @Input (e.g., @Input('class'))
+ * 2. The DOM attribute/property
+ *
+ * Unlike conflict diagnostics where one binding "wins", in shadowing scenarios
+ * BOTH targets are updated with the same value.
+ */
+export interface ShadowingDiagnosticConfig<T> {
+  /** The template binding that shadows the directive input(s) */
+  templateBinding: T;
+  /** Information about the shadowed directive input(s) */
+  shadowedInputs: ShadowedInput[];
+  /** The diagnostic code to use */
+  diagnosticCode: number;
+  /** The severity level */
+  severity: ts.DiagnosticCategory;
+  /** The source file for diagnostics */
+  diagnosticSourceFile: ts.SourceFile;
+  /** The binding prefix for messages (e.g., "class", "style") */
+  bindingPrefix: string;
+  /** Span for the diagnostic (start offset, length) */
+  span: {start: number; length: number};
+  /** Optional function to find the @Input declaration node for related information */
+  findInputDeclaration?: (classDecl: ts.ClassDeclaration, propertyName: string) => ts.Node | null;
+}
+
+/**
+ * Creates a shadowing diagnostic when a template binding updates both a directive's @Input
+ * and the DOM attribute/property.
+ *
+ * Unlike conflict diagnostics, shadowing diagnostics are INFORMATIONAL - they explain that
+ * BOTH targets receive the same value, which is Angular's intentional behavior but may be unexpected.
+ *
+ * Example diagnostic:
+ * ```
+ * The [class] binding shadows @Input('class') on directive MyDirective.
+ * BOTH the directive input AND the DOM class attribute will be updated with the same value.
+ * This is Angular's intentional behavior, but may be unexpected.
+ * ```
+ */
+export function createShadowingDiagnostic<T>(config: ShadowingDiagnosticConfig<T>): ts.Diagnostic {
+  const {
+    shadowedInputs,
+    diagnosticCode,
+    severity,
+    diagnosticSourceFile,
+    bindingPrefix,
+    span,
+    findInputDeclaration,
+  } = config;
+
+  const count = shadowedInputs.length;
+  const directiveNames = shadowedInputs.map((s) => s.directiveName).join(', ');
+
+  const messageText =
+    `The [${bindingPrefix}] binding shadows @Input('${bindingPrefix}') on ${count === 1 ? 'directive' : count + ' directives'} (${directiveNames}). ` +
+    `BOTH the directive input AND the DOM ${bindingPrefix} attribute will be updated with the same value. ` +
+    `This is Angular's intentional behavior, but may be unexpected.`;
+
+  const relatedInformation: ts.DiagnosticRelatedInformation[] = [];
+
+  // Add related information pointing to each shadowed @Input declaration
+  if (findInputDeclaration) {
+    for (const shadowedInput of shadowedInputs) {
+      const inputDecl = findInputDeclaration(
+        shadowedInput.classDecl,
+        shadowedInput.classPropertyName,
+      );
+      if (inputDecl) {
+        relatedInformation.push({
+          category: ts.DiagnosticCategory.Message,
+          code: 0,
+          messageText: `@Input('${shadowedInput.inputAlias}') is declared on directive ${shadowedInput.directiveName}`,
+          file: shadowedInput.classDecl.getSourceFile(),
+          start: inputDecl.getStart(),
+          length: inputDecl.getWidth(),
+        });
+      }
+    }
+  }
+
+  const diagnostic: ts.Diagnostic = {
+    category: severity,
+    code: diagnosticCode,
+    messageText,
+    file: diagnosticSourceFile,
+    start: span.start,
+    length: span.length,
+    source: 'angular',
+    relatedInformation: relatedInformation.length > 0 ? relatedInformation : undefined,
+  };
+
+  return diagnostic;
+}
+
+/**
+ * Configuration for inter-directive shadowing diagnostics.
+ * This is when multiple directives on the same element set the same binding.
+ */
+export interface InterDirectiveShadowingConfig {
+  /** The binding name (e.g., 'class', 'style.color') */
+  bindingName: string;
+  /** List of directives that all set this binding */
+  directives: Array<{
+    directiveName: string;
+    bindingValue?: string;
+    sourceFile?: ts.SourceFile;
+    span?: {start: number; length: number};
+  }>;
+  /** The diagnostic code to use */
+  diagnosticCode: number;
+  /** The severity level */
+  severity: ts.DiagnosticCategory;
+  /** The source file for diagnostics */
+  diagnosticSourceFile: ts.SourceFile;
+  /** Span for the diagnostic */
+  span: {start: number; length: number};
+  /** The binding prefix for messages */
+  bindingPrefix: string;
+}
+
+/**
+ * Creates a diagnostic when multiple directives set the same class/style binding.
+ *
+ * Example:
+ * ```
+ * Multiple directives set '${bindingPrefix}.${bindingName}' on this element:
+ * - Directive1
+ * - Directive2
+ * The last directive application order determines the final value.
+ * ```
+ */
+export function createInterDirectiveShadowingDiagnostic(
+  config: InterDirectiveShadowingConfig,
+): ts.Diagnostic {
+  const {bindingName, directives, diagnosticCode, severity, diagnosticSourceFile, span} = config;
+
+  const directiveList = directives.map((d) => `  - ${d.directiveName}`).join('\n');
+
+  const messageText =
+    `Multiple directives set '${bindingName}' on this element:\n` +
+    `${directiveList}\n` +
+    `The last directive in application order determines the final value.`;
+
+  const relatedInformation: ts.DiagnosticRelatedInformation[] = directives
+    .filter((d) => d.sourceFile && d.span)
+    .map((d) => ({
+      category: ts.DiagnosticCategory.Message,
+      code: 0,
+      messageText: `${d.directiveName} sets ${bindingName}${d.bindingValue ? ` = ${d.bindingValue}` : ''}`,
+      file: d.sourceFile!,
+      start: d.span!.start,
+      length: d.span!.length,
+    }));
+
+  return {
+    category: severity,
+    code: diagnosticCode,
+    messageText,
+    file: diagnosticSourceFile,
+    start: span.start,
+    length: span.length,
+    source: 'angular',
+    relatedInformation: relatedInformation.length > 0 ? relatedInformation : undefined,
+  };
+}
