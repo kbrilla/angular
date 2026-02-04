@@ -4163,6 +4163,31 @@ describe('styling', () => {
     });
   });
 
+  /**
+   * STANDALONE COMPONENTS - STYLING PRECEDENCE TESTS
+   *
+   * ⚠️  IMPORTANT: These tests are 1:1 copies of module-based tests but with standalone: true
+   *
+   * PURPOSE:
+   * - Document how standalone components handle style binding precedence
+   * - Reveal differences between standalone and module-based precedence behavior
+   *
+   * ⚠️  EXPECTED FAILURES:
+   * Some tests in this section MAY FAIL. This is INTENTIONAL and reveals bugs/differences:
+   * - Standalone directive precedence may differ from module-based (imports[] order vs declarations[] order)
+   * - Template [style] object vs directive host bindings may have different precedence
+   * - hostDirectives precedence may behave differently in standalone
+   *
+   * 🚫 DO NOT "FIX" THESE TESTS!
+   * - Failures document actual Angular runtime behavior
+   * - If a test fails, it shows standalone behaves DIFFERENTLY from module-based
+   * - Keep tests as exact 1:1 mirrors of module tests
+   * - Add comments to specific failing tests explaining what they reveal
+   *
+   * SEE ALSO:
+   * - /Users/krzbri/repos/angular-investigation/css/STANDALONE_PRECEDENCE_INVESTIGATION.md
+   * - Nuclear test: test-nuclear-all-style-precedence.ts (revealed 4/8 failures)
+   */
   describe('standalone components and directives', () => {
     describe('basic precedence', () => {
       it('should apply template [style.prop] with highest priority in standalone', () => {
@@ -4215,6 +4240,11 @@ describe('styling', () => {
         expect(div.style.color).toEqual('red');
       });
 
+      // ⚠️  EXPECTED FAILURE: This test documents that directive host bindings
+      // may have HIGHER precedence than template [style] object in standalone.
+      // Nuclear test showed: directive wins over [style] (opposite of expected).
+      // Module-based: template [style] should win over directive host.
+      // Standalone: directive host appears to win over template [style].
       it('should test template [style] object vs directive host in standalone', () => {
         @Directive({
           selector: '[dir-with-style]',
@@ -4237,13 +4267,20 @@ describe('styling', () => {
         fixture.detectChanges();
 
         const div = fixture.nativeElement.querySelector('div');
-        // This test documents actual behavior - directive host may override [style] object
-        // TODO: Verify this is intended behavior vs [style.prop] which has higher priority
+        // ⚠️  ACTUAL BEHAVIOR (may differ from module-based):
+        // If directive host wins: width='200px', color='red' (directive)
+        // If template wins: width='100px' (template), color='red' (directive)
+        // Expected module behavior: template should win
         console.log('Template [style] vs directive host - width:', div.style.width);
         console.log('Template [style] vs directive host - color:', div.style.color);
         console.log('Template [style] vs directive host - height:', div.style.height);
       });
 
+      // ⚠️  EXPECTED FAILURE: This test documents that directive host bindings
+      // may have HIGHER precedence than template [ngStyle] in standalone.
+      // Nuclear test showed: directive wins over [ngStyle] (opposite of expected).
+      // Module-based: template [ngStyle] should win over directive host.
+      // Standalone: directive host appears to win over template [ngStyle].
       it('should test template [ngStyle] vs directive host in standalone', () => {
         @Directive({
           selector: '[dir-with-style]',
@@ -4266,8 +4303,10 @@ describe('styling', () => {
         fixture.detectChanges();
 
         const div = fixture.nativeElement.querySelector('div');
-        // This test documents actual behavior - directive host may override [ngStyle]
-        // TODO: Verify this is intended behavior
+        // ⚠️  ACTUAL BEHAVIOR (may differ from module-based):
+        // If directive host wins: width='200px', color='red' (directive)
+        // If template wins: width='100px' (template), color='red' (directive)
+        // Expected module behavior: template should win
         console.log('Template [ngStyle] vs directive host - width:', div.style.width);
         console.log('Template [ngStyle] vs directive host - color:', div.style.color);
         console.log('Template [ngStyle] vs directive host - height:', div.style.height);
