@@ -1757,7 +1757,7 @@ describe('standalone components - host bindings', () => {
     class StandaloneApp {
       @HostBinding('id') public id = 'my-app-id';
       @HostBinding('title') public title = 'my-app-title';
-      @HostBinding() public accesskey = 'k';
+      @HostBinding('tabIndex') public tabIndex = 5;
     }
 
     const fixture = TestBed.createComponent(StandaloneApp);
@@ -1766,7 +1766,7 @@ describe('standalone components - host bindings', () => {
     const native = fixture.nativeElement;
     expect(native.id).toBe('my-app-id');
     expect(native.title).toBe('my-app-title');
-    expect(native.accessKey).toBe('k');
+    expect(native.tabIndex).toBe(5);
   });
 
   it('should support host attribute bindings in standalone component', () => {

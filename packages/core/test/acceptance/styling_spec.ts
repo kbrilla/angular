@@ -4570,7 +4570,7 @@ describe('styling', () => {
         expect(div.style.width).toEqual('200px');
       });
 
-      it('should handle module-based directive on standalone component', () => {
+      it('should throw error when importing module-based directive to standalone component', () => {
         @Directive({
           selector: '[module-dir]',
           standalone: false,
@@ -4591,11 +4591,10 @@ describe('styling', () => {
           declarations: [ModuleDir],
         });
 
-        const fixture = TestBed.createComponent(StandaloneCmp);
-        fixture.detectChanges();
-
-        const div = fixture.nativeElement.querySelector('div');
-        expect(div.style.width).toEqual('200px');
+        // Should throw because you can't import non-standalone directive to standalone component
+        expect(() => {
+          TestBed.createComponent(StandaloneCmp);
+        }).toThrowError(/is not standalone/);
       });
     });
 
