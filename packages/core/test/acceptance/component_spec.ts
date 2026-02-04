@@ -1177,18 +1177,18 @@ describe('standalone components - component features', () => {
       imports: [NgIf],
     })
     class StandaloneComp {
-      show = true;
+      show = false;
     }
 
     const fixture = TestBed.createComponent(StandaloneComp);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Visible');
+    expect(fixture.nativeElement.textContent).not.toContain('Visible');
 
-    fixture.componentInstance.show = false;
+    fixture.componentInstance.show = true;
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).not.toContain('Visible');
+    expect(fixture.nativeElement.textContent).toContain('Visible');
   });
 
   it('should support encapsulation in standalone component', () => {
