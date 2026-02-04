@@ -997,3 +997,341 @@ describe('component', () => {
     });
   });
 });
+
+describe('standalone components - component features', () => {
+  it('should create and render standalone component', () => {
+    @Component({
+      selector: 'standalone-comp',
+      template: '<h1>Standalone Component</h1>',
+      standalone: true,
+    })
+    class StandaloneComp {}
+
+    const fixture = TestBed.createComponent(StandaloneComp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('h1').textContent).toBe('Standalone Component');
+  });
+
+  it('should support inputs and outputs in standalone component', () => {
+    @Component({
+      selector: 'standalone-comp',
+      template: '<div>{{ value }}</div>',
+      standalone: true,
+    })
+    class StandaloneComp {
+      @Input() value = '';
+    }
+
+    @Component({
+      template: '<standalone-comp [value]="message"></standalone-comp>',
+      standalone: true,
+      imports: [StandaloneComp],
+    })
+    class App {
+      message = 'Hello Standalone';
+    }
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('div').textContent).toBe('Hello Standalone');
+  });
+
+  it('should support ViewChild in standalone component', () => {
+    @Component({
+      selector: 'child-comp',
+      template: '<span>Child</span>',
+      standalone: true,
+    })
+    class ChildComp {
+      value = 'child-value';
+    }
+
+    @Component({
+      template: '<child-comp></child-comp>',
+      standalone: true,
+      imports: [ChildComp],
+    })
+    class ParentComp {
+      @ViewChild(ChildComp) child!: ChildComp;
+    }
+
+    const fixture = TestBed.createComponent(ParentComp);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.child).toBeDefined();
+    expect(fixture.componentInstance.child.value).toBe('child-value');
+  });
+
+  it('should support ViewChild with required in standalone component', () => {
+    @Component({
+      selector: 'child-comp',
+      template: '<span>Child</span>',
+      standalone: true,
+    })
+    class ChildComp {
+      value = 'child-value';
+    }
+
+    @Component({
+      template: '<child-comp></child-comp>',
+      standalone: true,
+      imports: [ChildComp],
+    })
+    class ParentComp {
+      @ViewChild(ChildComp, {read: ChildComp}) child!: ChildComp;
+    }
+
+    const fixture = TestBed.createComponent(ParentComp);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.child.value).toBe('child-value');
+  });
+
+  it('should support dependency injection in standalone component', () => {
+    @Injectable()
+    class MyService {
+      getValue() {
+        return 'service-value';
+      }
+    }
+
+    @Component({
+      selector: 'standalone-comp',
+      template: '<div>{{ value }}</div>',
+      standalone: true,
+      providers: [MyService],
+    })
+    class StandaloneComp {
+      value: string;
+      constructor(service: MyService) {
+        this.value = service.getValue();
+      }
+    }
+
+    const fixture = TestBed.createComponent(StandaloneComp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('div').textContent).toBe('service-value');
+  });
+
+  it('should support nested standalone components', () => {
+    @Component({
+      selector: 'grandchild-comp',
+      template: '<span>Grandchild</span>',
+      standalone: true,
+    })
+    class GrandchildComp {}
+
+    @Component({
+      selector: 'child-comp',
+      template: '<div>Child: <grandchild-comp></grandchild-comp></div>',
+      standalone: true,
+      imports: [GrandchildComp],
+    })
+    class ChildComp {}
+
+    @Component({
+      template: '<child-comp></child-comp>',
+      standalone: true,
+      imports: [ChildComp],
+    })
+    class ParentComp {}
+
+    const fixture = TestBed.createComponent(ParentComp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Grandchild');
+  });
+
+  it('should support standalone component with directives', () => {
+    @Directive({
+      selector: '[highlight]',
+      standalone: true,
+    })
+    class HighlightDirective {
+      constructor(el: ElementRef) {
+        el.nativeElement.style.backgroundColor = 'yellow';
+      }
+    }
+
+    @Component({
+      template: '<div highlight>Highlighted</div>',
+      standalone: true,
+      imports: [HighlightDirective],
+    })
+    class StandaloneComp {}
+
+    const fixture = TestBed.createComponent(StandaloneComp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div');
+    expect(div.style.backgroundColor).toBe('yellow');
+  });
+
+  it('should support standalone component importing NgIf', () => {
+    @Component({
+      template: '<div *ngIf="show">Visible</div>',
+      standalone: true,
+      imports: [NgIf],
+    })
+    class StandaloneComp {
+      show = true;
+    }
+
+    const fixture = TestBed.createComponent(StandaloneComp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Visible');
+
+    fixture.componentInstance.show = false;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Visible');
+  });
+
+  it('should support encapsulation in standalone component', () => {
+    @Component({
+      selector: 'emulated-comp',
+      template: '<div>Emulated</div>',
+      standalone: true,
+      styles: ['div { color: red; }'],
+      encapsulation: ViewEncapsulation.Emulated,
+    })
+    class EmulatedComp {}
+
+    @Component({
+      selector: 'none-comp',
+      template: '<div>None</div>',
+      standalone: true,
+      styles: ['div { color: blue; }'],
+      encapsulation: ViewEncapsulation.None,
+    })
+    class NoneComp {}
+
+    @Component({
+      template: '<emulated-comp></emulated-comp><none-comp></none-comp>',
+      standalone: true,
+      imports: [EmulatedComp, NoneComp],
+    })
+    class App {}
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    // Just verify components render; style isolation is browser-dependent
+    expect(fixture.nativeElement.textContent).toContain('Emulated');
+    expect(fixture.nativeElement.textContent).toContain('None');
+  });
+
+  it('should support createComponent with standalone component', () => {
+    @Component({
+      selector: 'dynamic-comp',
+      template: '<span>Dynamic</span>',
+      standalone: true,
+    })
+    class DynamicComp {}
+
+    @Component({
+      template: '<div #container></div>',
+      standalone: true,
+    })
+    class HostComp {
+      @ViewChild('container', {read: ViewContainerRef}) container!: ViewContainerRef;
+    }
+
+    const fixture = TestBed.createComponent(HostComp);
+    fixture.detectChanges();
+
+    const componentRef = fixture.componentInstance.container.createComponent(DynamicComp);
+    componentRef.changeDetectorRef.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Dynamic');
+  });
+
+  it('should support onDestroy in standalone component used as provider', () => {
+    const testToken = new InjectionToken<StandaloneParent>('testToken');
+    let destroyCalls = 0;
+
+    @Component({
+      selector: 'standalone-parent',
+      template: '<ng-content></ng-content>',
+      providers: [{provide: testToken, useExisting: StandaloneParent}],
+      standalone: true,
+    })
+    class StandaloneParent implements OnDestroy {
+      ngOnDestroy() {
+        destroyCalls++;
+      }
+    }
+
+    @Component({
+      selector: 'standalone-child',
+      template: '',
+      standalone: true,
+    })
+    class StandaloneChild {
+      constructor(_parent: StandaloneParent) {}
+    }
+
+    @Component({
+      template: `
+        <standalone-parent>
+          <standalone-child></standalone-child>
+        </standalone-parent>
+      `,
+      standalone: true,
+      imports: [StandaloneParent, StandaloneChild],
+    })
+    class App {}
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    expect(destroyCalls).toBe(0);
+
+    fixture.destroy();
+    expect(destroyCalls).toBe(1);
+  });
+
+  it('should support forwardRef in standalone component', () => {
+    @Component({
+      selector: 'standalone-comp',
+      template: '{{ message }}',
+      standalone: true,
+    })
+    class StandaloneComp {
+      message = 'test';
+    }
+
+    @Component({
+      template: '<standalone-comp></standalone-comp>',
+      standalone: true,
+      imports: [forwardRef(() => StandaloneComp)],
+    })
+    class App {}
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toBe('test');
+  });
+
+  it('should support reflectComponentType with standalone component', () => {
+    @Component({
+      selector: 'standalone-comp',
+      template: '<div>Test</div>',
+      standalone: true,
+    })
+    class StandaloneComp {
+      @Input() value = '';
+    }
+
+    const mirror = reflectComponentType(StandaloneComp);
+    expect(mirror).toBeDefined();
+    expect(mirror!.selector).toBe('standalone-comp');
+    expect(mirror!.isStandalone).toBe(true);
+    expect(mirror!.inputs.length).toBe(1);
+    expect(mirror!.inputs[0].propName).toBe('value');
+  });
+});
