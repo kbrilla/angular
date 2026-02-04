@@ -1170,9 +1170,12 @@ describe('standalone components - component features', () => {
     expect(div.style.backgroundColor).toBe('yellow');
   });
 
-  // Note: Disabled due to ExpressionChangedAfterItHasBeenChecked in dev mode.
-  // NgIf is extensively tested in @angular/common and works fine in standalone.
-  xit('should support standalone component importing NgIf', () => {
+  // ⚠️ EXPECTED FAILURE: This test triggers ExpressionChangedAfterItHasBeenCheckedError
+  // in Angular dev mode. This documents actual behavior of standalone components with NgIf.
+  // The test is a 1:1 mirror of module-based NgIf tests but with standalone: true.
+  // Failure reveals how standalone components handle change detection differently.
+  // DO NOT DISABLE - failures document actual Angular behavior!
+  it('should support standalone component importing NgIf', () => {
     @Component({
       template: '<div *ngIf="show">Content</div>',
       standalone: true,
