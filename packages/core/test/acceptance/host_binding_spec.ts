@@ -1741,3 +1741,323 @@ describe('host bindings', () => {
     });
   });
 });
+
+describe('standalone components - host bindings', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideZoneChangeDetection()],
+    });
+  });
+
+  it('should render host bindings on standalone root component', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+    })
+    class StandaloneApp {
+      @HostBinding('id') public id = 'my-app-id';
+      @HostBinding('title') public title = 'my-app-title';
+      @HostBinding() public accesskey = 'k';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    const native = fixture.nativeElement;
+    expect(native.id).toBe('my-app-id');
+    expect(native.title).toBe('my-app-title');
+    expect(native.accessKey).toBe('k');
+  });
+
+  it('should support host attribute bindings in standalone component', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+    })
+    class StandaloneApp {
+      @HostBinding('attr.role') public role = 'button';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.getAttribute('role')).toBe('button');
+  });
+
+  it('should support updating host attribute bindings in standalone component', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+    })
+    class StandaloneApp {
+      @HostBinding('attr.role') public role = 'button';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.getAttribute('role')).toBe('button');
+
+    fixture.componentInstance.role = 'listbox';
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.getAttribute('role')).toBe('listbox');
+  });
+
+  it('should support host class bindings in standalone component', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+    })
+    class StandaloneApp {
+      @HostBinding('class.foo') public foo = true;
+      @HostBinding('class.bar') public bar = false;
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.classList.contains('foo')).toBe(true);
+    expect(fixture.nativeElement.classList.contains('bar')).toBe(false);
+  });
+
+  it('should support host style bindings in standalone component', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+    })
+    class StandaloneApp {
+      @HostBinding('style.color') public color = 'red';
+      @HostBinding('style.width') public width = '100px';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.style.color).toBe('red');
+    expect(fixture.nativeElement.style.width).toBe('100px');
+  });
+
+  it('should apply host bindings from standalone directive to template element', () => {
+    @Directive({
+      selector: '[dir]',
+      standalone: true,
+    })
+    class StandaloneDir {
+      @HostBinding('id') public id = 'directive-id';
+      @HostBinding('title') public title = 'directive-title';
+    }
+
+    @Component({
+      template: '<div dir></div>',
+      standalone: true,
+      imports: [StandaloneDir],
+    })
+    class StandaloneApp {}
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div');
+    expect(div.id).toBe('directive-id');
+    expect(div.title).toBe('directive-title');
+  });
+
+  it('should support multiple standalone directives with host bindings', () => {
+    @Directive({
+      selector: '[dir1]',
+      standalone: true,
+    })
+    class StandaloneDir1 {
+      @HostBinding('class.dir1') public hasClass = true;
+    }
+
+    @Directive({
+      selector: '[dir2]',
+      standalone: true,
+    })
+    class StandaloneDir2 {
+      @HostBinding('class.dir2') public hasClass = true;
+    }
+
+    @Component({
+      template: '<div dir1 dir2></div>',
+      standalone: true,
+      imports: [StandaloneDir1, StandaloneDir2],
+    })
+    class StandaloneApp {}
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div');
+    expect(div.classList.contains('dir1')).toBe(true);
+    expect(div.classList.contains('dir2')).toBe(true);
+  });
+
+  it('should support hostDirectives with host bindings', () => {
+    @Directive({
+      selector: '[hostDir]',
+      standalone: true,
+    })
+    class HostDir {
+      @HostBinding('class.host-directive') public hasClass = true;
+      @HostBinding('attr.data-host') public dataAttr = 'from-host-directive';
+    }
+
+    @Directive({
+      selector: '[mainDir]',
+      standalone: true,
+      hostDirectives: [HostDir],
+    })
+    class MainDir {
+      @HostBinding('class.main-directive') public hasClass = true;
+      @HostBinding('attr.data-main') public dataAttr = 'from-main-directive';
+    }
+
+    @Component({
+      template: '<div mainDir></div>',
+      standalone: true,
+      imports: [MainDir],
+    })
+    class StandaloneApp {}
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div');
+    expect(div.classList.contains('main-directive')).toBe(true);
+    expect(div.classList.contains('host-directive')).toBe(true);
+    expect(div.getAttribute('data-main')).toBe('from-main-directive');
+    expect(div.getAttribute('data-host')).toBe('from-host-directive');
+  });
+
+  it('should support template bindings overriding host bindings in standalone', () => {
+    @Directive({
+      selector: '[dir]',
+      standalone: true,
+    })
+    class StandaloneDir {
+      @HostBinding('style.color') public color = 'red';
+    }
+
+    @Component({
+      template: '<div dir [style.color]="componentColor"></div>',
+      standalone: true,
+      imports: [StandaloneDir],
+    })
+    class StandaloneApp {
+      componentColor = 'blue';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div');
+    // Template binding should win over directive host binding
+    expect(div.style.color).toBe('blue');
+  });
+
+  it('should handle dynamic host bindings in standalone component', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+    })
+    class StandaloneApp {
+      @HostBinding('title') public title = 'initial';
+      @HostBinding('attr.role') public role = 'button';
+      @HostBinding('class.active') public isActive = false;
+      @HostBinding('style.color') public color = 'black';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.title).toBe('initial');
+    expect(fixture.nativeElement.getAttribute('role')).toBe('button');
+    expect(fixture.nativeElement.classList.contains('active')).toBe(false);
+    expect(fixture.nativeElement.style.color).toBe('black');
+
+    // Update all bindings
+    fixture.componentInstance.title = 'updated';
+    fixture.componentInstance.role = 'listbox';
+    fixture.componentInstance.isActive = true;
+    fixture.componentInstance.color = 'red';
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.title).toBe('updated');
+    expect(fixture.nativeElement.getAttribute('role')).toBe('listbox');
+    expect(fixture.nativeElement.classList.contains('active')).toBe(true);
+    expect(fixture.nativeElement.style.color).toBe('red');
+  });
+
+  it('should handle nested hostDirectives with host bindings', () => {
+    @Directive({
+      selector: '[level3]',
+      standalone: true,
+    })
+    class Level3Dir {
+      @HostBinding('class.level3') public hasClass = true;
+    }
+
+    @Directive({
+      selector: '[level2]',
+      standalone: true,
+      hostDirectives: [Level3Dir],
+    })
+    class Level2Dir {
+      @HostBinding('class.level2') public hasClass = true;
+    }
+
+    @Directive({
+      selector: '[level1]',
+      standalone: true,
+      hostDirectives: [Level2Dir],
+    })
+    class Level1Dir {
+      @HostBinding('class.level1') public hasClass = true;
+    }
+
+    @Component({
+      template: '<div level1></div>',
+      standalone: true,
+      imports: [Level1Dir],
+    })
+    class StandaloneApp {}
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div');
+    expect(div.classList.contains('level1')).toBe(true);
+    expect(div.classList.contains('level2')).toBe(true);
+    expect(div.classList.contains('level3')).toBe(true);
+  });
+
+  it('should support host bindings in standalone component with host object', () => {
+    @Component({
+      template: '...',
+      standalone: true,
+      host: {
+        '[id]': 'id',
+        '[attr.role]': 'role',
+        '[class.active]': 'isActive',
+        '[style.color]': 'color',
+      },
+    })
+    class StandaloneApp {
+      id = 'my-id';
+      role = 'button';
+      isActive = true;
+      color = 'green';
+    }
+
+    const fixture = TestBed.createComponent(StandaloneApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.id).toBe('my-id');
+    expect(fixture.nativeElement.getAttribute('role')).toBe('button');
+    expect(fixture.nativeElement.classList.contains('active')).toBe(true);
+    expect(fixture.nativeElement.style.color).toBe('green');
+  });
+});
