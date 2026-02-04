@@ -1172,23 +1172,25 @@ describe('standalone components - component features', () => {
 
   it('should support standalone component importing NgIf', () => {
     @Component({
-      template: '<div *ngIf="show">Visible</div>',
+      template: '<div *ngIf="show">Visible</div><div *ngIf="!show">Hidden</div>',
       standalone: true,
       imports: [NgIf],
     })
     class StandaloneComp {
-      show = false;
+      show = true;
     }
 
     const fixture = TestBed.createComponent(StandaloneComp);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).not.toContain('Visible');
+    expect(fixture.nativeElement.textContent).toContain('Visible');
+    expect(fixture.nativeElement.textContent).not.toContain('Hidden');
 
-    fixture.componentInstance.show = true;
+    fixture.componentInstance.show = false;
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Visible');
+    expect(fixture.nativeElement.textContent).not.toContain('Visible');
+    expect(fixture.nativeElement.textContent).toContain('Hidden');
   });
 
   it('should support encapsulation in standalone component', () => {
