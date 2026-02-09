@@ -1090,6 +1090,18 @@ describe('parser', () => {
       it('should parse hex in expressions', () => {
         checkBinding('0xFF + 1', '255 + 1');
       });
+
+      it('should treat legacy octal-style numbers as decimal', () => {
+        // `0777` is not a valid ES6+ octal (that would be `0o777`).
+        // The lexer scans `0` then continues with decimal digits, treating it as `777`.
+        checkBinding('0777', '777');
+      });
+
+      it('should parse numbers with leading zeros as decimal (not legacy octal)', () => {
+        // In strict mode JS, `09` is decimal 9, not an octal error.
+        // Angular templates follow strict mode semantics.
+        checkBinding('09', '9');
+      });
     });
 
     describe('BigInt literals', () => {

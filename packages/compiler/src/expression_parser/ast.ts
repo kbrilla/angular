@@ -775,6 +775,11 @@ export class RecursiveAstVisitor implements AstVisitor {
     this.visitAll(ast.expressions, context);
   }
   visitLiteralMap(ast: LiteralMap, context: any): any {
+    for (const key of ast.keys) {
+      if (key.kind === 'property' && key.isComputed && key.computedKey) {
+        this.visit(key.computedKey, context);
+      }
+    }
     this.visitAll(ast.values, context);
   }
   visitLiteralPrimitive(ast: LiteralPrimitive, context: any): any {}

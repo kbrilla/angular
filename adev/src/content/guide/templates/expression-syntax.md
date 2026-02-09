@@ -25,6 +25,8 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 
 There are no unsupported value literal types.
 
+NOTE: RegExp literals are parsed and type-checked but cannot be used for runtime matching within template expressions. They are primarily useful when passed to component inputs that accept `RegExp` values.
+
 ## Globals
 
 Angular expressions support the following [globals](https://developer.mozilla.org/en-US/docs/Glossary/Global_object):
