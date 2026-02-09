@@ -543,6 +543,23 @@ export class ComponentDecoratorHandler
       changeDetection = new o.WrappedNodeExpr(component.get('changeDetection')!);
     }
 
+    // Read per-component optionalChainingSemantics override from @Component metadata.
+    // Allows individual components to override the project-wide strictOptionalChainingSemantics.
+    let componentOptionalChainingSemantics: OptionalChainingSemantics | null = null;
+    if (component.has('optionalChainingSemantics')) {
+      const expr = component.get('optionalChainingSemantics')!;
+      const value = this.evaluator.evaluate(expr);
+      if (value !== 'legacy' && value !== 'native') {
+        throw createValueHasWrongTypeError(
+          expr,
+          value,
+          `optionalChainingSemantics must be 'legacy' or 'native'`,
+        );
+      }
+      componentOptionalChainingSemantics =
+        value === 'native' ? OptionalChainingSemantics.Native : OptionalChainingSemantics.Legacy;
+    }
+
     let animations: o.Expression | null = null;
     let legacyAnimationTriggerNames: LegacyAnimationTriggerNames | null = null;
     if (component.has('animations')) {
