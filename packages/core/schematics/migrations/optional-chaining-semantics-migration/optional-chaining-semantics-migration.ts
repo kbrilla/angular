@@ -12,135 +12,236 @@ import {
   ProgramInfo,
   projectFile,
   ProjectFile,
+  Replacement,
   Serializable,
+  TextUpdate,
   TsurgeFunnelMigration,
 } from '../../utils/tsurge';
 import {NgComponentTemplateVisitor} from '../../utils/ng_component_template';
-import {findSafeNavigationExpressions} from './add-null-coalescing';
+import {AbsoluteFsPath} from '../../../../compiler-cli';
+import {migrateTemplate, migrateTemplateBestEffort} from './add-null-coalescing';
 
 export interface MigrationConfig {
   /**
-   * Whether to analyze this component template.
+   * Whether to migrate this component template.
    */
   shouldMigrate?: (containingFile: ProjectFile) => boolean;
+
+  /**
+   * When enabled, uses `?? null` for expressions that can't be safely converted
+   * to ternaries (method calls, keyed access, pipes, etc).
+   *
+   * **⚠️ DANGEROUS**: `?? null` can incorrectly convert genuinely `undefined`
+   * runtime values to `null`. Only use this if you've verified that affected
+   * expressions never legitimately produce `undefined`. Similar to signal
+   * migration's `--best-effort-mode`.
+   */
+  bestEffortMode?: boolean;
+
+  /**
+   * When enabled, prompts the user for each template before applying changes.
+   * Only applicable when running via CLI (not programmatic API).
+   *
+   * The prompt shows the before/after diff for each template and lets the
+   * user accept, skip, or abort the migration.
+   */
+  interactiveMode?: boolean;
+
+  /**
+   * Callback for interactive mode. Called for each template with `?.` usage.
+   * Return `true` to apply changes, `false` to skip.
+   * If not provided and `interactiveMode` is true, defaults to accepting all.
+   */
+  promptForTemplate?: (info: TemplatePromptInfo) => Promise<boolean>;
 }
 
-export interface OptionalChainingSemanticsData {
-  file: ProjectFile;
+export interface TemplatePromptInfo {
   componentName: string;
-  expressionCount: number;
+  filePath: string;
+  originalContent: string;
+  migratedContent: string;
+  fullyMigrated: boolean;
+  migratedCount: number;
+  skippedCount: number;
 }
 
-export interface OptionalChainingCompilationUnitData {
-  componentsWithSafeNavigation: Array<OptionalChainingSemanticsData>;
+export interface TemplateResult {
+  file: ProjectFile;
+  templateFile: ProjectFile;
+  componentName: string;
+  fullyMigrated: boolean;
+  migratedCount: number;
+  skippedCount: number;
+  /** Original template content for interactive mode diff display. */
+  originalContent: string;
+  /** Migrated template content (only valid when fullyMigrated or bestEffortMode). */
+  migratedContent: string;
+  replacements: Replacement[];
+  /** Whether this template was approved in interactive mode. Null = not interactive. */
+  approved: boolean | null;
+}
+
+export interface CompilationUnitData {
+  templates: TemplateResult[];
 }
 
 /**
- * Analysis migration that reports components using safe navigation (`?.`) in their templates.
+ * Migration for switching from legacy to native optional chaining semantics.
  *
- * When switching from legacy to native optional chaining semantics
- * (`strictOptionalChainingSemantics: true`), the runtime behavior of `?.` changes from
- * returning `null` to returning `undefined` on short-circuit. This migration scans templates
- * and reports which components use `?.` so developers can verify their templates before
- * opting into native semantics.
+ * Modes:
  *
- * NOTE: Auto-transformation with `?? null` is intentionally NOT used because it would
- * incorrectly change genuinely `undefined` property values to `null`. For example:
- *   `a?.b?.c` where `c` is `undefined` on the resolved object:
- *     - Legacy and native both correctly return `undefined` (no short-circuit)
- *     - Adding `?? null` would incorrectly return `null`
+ * **Default (safe):** Converts `a?.b?.c` → `a != null ? (a.b != null ? a.b.c : null) : null`
+ * Only modifies a template if ALL its `?.` expressions were successfully converted.
+ * Templates with method calls, pipes, keyed access, etc. are left untouched.
  *
- * The recommended migration strategy is:
- * 1. Run this analysis to identify components with `?.` usage
- * 2. Verify each component's template does not depend on the `null` return value
- * 3. Enable `strictOptionalChainingSemantics: true` in the project's tsconfig
+ * **Best-effort (dangerous):** Also applies `?? null` to expressions that can't be
+ * converted to ternaries. This covers more cases but may incorrectly convert
+ * genuinely `undefined` values to `null`. Use `--best-effort-mode` CLI flag.
+ *
+ * **Interactive:** Prompts for each template before applying. Use `--interactive` CLI flag.
+ *
+ * The project-wide `strictOptionalChainingSemantics: true` should only be enabled when
+ * ALL templates were either fully migrated or have no `?.` usage.
  */
 export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
-  OptionalChainingCompilationUnitData,
-  OptionalChainingCompilationUnitData
+  CompilationUnitData,
+  CompilationUnitData
 > {
   constructor(private readonly config: MigrationConfig = {}) {
     super();
   }
 
-  override async analyze(
-    info: ProgramInfo,
-  ): Promise<Serializable<OptionalChainingCompilationUnitData>> {
+  override async analyze(info: ProgramInfo): Promise<Serializable<CompilationUnitData>> {
     const {sourceFiles, program} = info;
     const typeChecker = program.getTypeChecker();
-    const componentsWithSafeNavigation: Array<OptionalChainingSemanticsData> = [];
+    const templates: TemplateResult[] = [];
+    const bestEffort = this.config.bestEffortMode ?? false;
 
     for (const sf of sourceFiles) {
       ts.forEachChild(sf, (node: ts.Node) => {
-        if (!ts.isClassDeclaration(node)) {
-          return;
-        }
+        if (!ts.isClassDeclaration(node)) return;
 
         const file = projectFile(node.getSourceFile(), info);
-
-        if (this.config.shouldMigrate && this.config.shouldMigrate(file) === false) {
-          return;
-        }
+        if (this.config.shouldMigrate && !this.config.shouldMigrate(file)) return;
 
         const templateVisitor = new NgComponentTemplateVisitor(typeChecker);
         templateVisitor.visitNode(node);
 
-        templateVisitor.resolvedTemplates.forEach((template) => {
-          const {hasSafeNavigation, expressionCount} = findSafeNavigationExpressions(
-            template.content,
-          );
+        templateVisitor.resolvedTemplates.forEach((tpl) => {
+          const result = bestEffort
+            ? migrateTemplateBestEffort(tpl.content)
+            : migrateTemplate(tpl.content);
 
-          if (hasSafeNavigation) {
-            componentsWithSafeNavigation.push({
-              file,
-              componentName: node.name?.text ?? '<anonymous>',
-              expressionCount,
-            });
+          // Skip templates with no safe navigation — already native-safe
+          if (!result.hasSafeNavigation) return;
+
+          const canApply = result.fullyMigrated;
+          const replacements: Replacement[] = [];
+
+          if (canApply) {
+            const fileToMigrate = tpl.inline
+              ? file
+              : projectFile(tpl.filePath as AbsoluteFsPath, info);
+            replacements.push(
+              new Replacement(
+                fileToMigrate,
+                new TextUpdate({
+                  position: tpl.start,
+                  end: tpl.start + tpl.content.length,
+                  toInsert: result.migrated,
+                }),
+              ),
+            );
           }
+
+          templates.push({
+            file,
+            templateFile: tpl.inline
+              ? file
+              : projectFile(tpl.filePath as AbsoluteFsPath, info),
+            componentName: node.name?.text ?? '<anonymous>',
+            fullyMigrated: canApply,
+            migratedCount: result.migratedCount,
+            skippedCount: result.skippedCount,
+            originalContent: tpl.content,
+            migratedContent: result.migrated,
+            replacements,
+            approved: null,
+          });
         });
       });
     }
 
-    return confirmAsSerializable({componentsWithSafeNavigation});
+    // Interactive mode: prompt for each template
+    if (this.config.interactiveMode && this.config.promptForTemplate) {
+      for (const tpl of templates) {
+        if (!tpl.fullyMigrated) {
+          tpl.approved = false;
+          continue;
+        }
+        tpl.approved = await this.config.promptForTemplate({
+          componentName: tpl.componentName,
+          filePath: tpl.templateFile.rootRelativePath,
+          originalContent: tpl.originalContent,
+          migratedContent: tpl.migratedContent,
+          fullyMigrated: tpl.fullyMigrated,
+          migratedCount: tpl.migratedCount,
+          skippedCount: tpl.skippedCount,
+        });
+      }
+    }
+
+    return confirmAsSerializable({templates});
   }
 
   override async combine(
-    unitA: OptionalChainingCompilationUnitData,
-    unitB: OptionalChainingCompilationUnitData,
-  ): Promise<Serializable<OptionalChainingCompilationUnitData>> {
+    unitA: CompilationUnitData,
+    unitB: CompilationUnitData,
+  ): Promise<Serializable<CompilationUnitData>> {
     return confirmAsSerializable({
-      componentsWithSafeNavigation: [
-        ...unitA.componentsWithSafeNavigation,
-        ...unitB.componentsWithSafeNavigation,
-      ],
+      templates: [...unitA.templates, ...unitB.templates],
     });
   }
 
   override async globalMeta(
-    combinedData: OptionalChainingCompilationUnitData,
-  ): Promise<Serializable<OptionalChainingCompilationUnitData>> {
+    combinedData: CompilationUnitData,
+  ): Promise<Serializable<CompilationUnitData>> {
+    return confirmAsSerializable({templates: combinedData.templates});
+  }
+
+  override async stats(globalData: CompilationUnitData) {
+    const total = globalData.templates.length;
+    const fullyMigrated = globalData.templates.filter((t) => t.fullyMigrated).length;
+    const needsManualReview = globalData.templates.filter((t) => !t.fullyMigrated).length;
+    const totalExprMigrated = globalData.templates.reduce((a, t) => a + t.migratedCount, 0);
+    const totalExprSkipped = globalData.templates.reduce((a, t) => a + t.skippedCount, 0);
+    const canEnableProjectWideFlag = needsManualReview === 0;
+
     return confirmAsSerializable({
-      componentsWithSafeNavigation: combinedData.componentsWithSafeNavigation,
+      componentsWithSafeNavigation: total,
+      fullyMigrated,
+      needsManualReview,
+      totalExpressionsMigrated: totalExprMigrated,
+      totalExpressionsSkipped: totalExprSkipped,
+      canEnableProjectWideFlag,
+      manualReviewComponents: globalData.templates
+        .filter((t) => !t.fullyMigrated)
+        .map((t) => `${t.componentName} in ${t.file.rootRelativePath} (${t.skippedCount} expr)`),
     });
   }
 
-  override async stats(globalMetadata: OptionalChainingCompilationUnitData) {
-    const totalComponents = globalMetadata.componentsWithSafeNavigation.length;
-    const totalExpressions = globalMetadata.componentsWithSafeNavigation.reduce(
-      (acc, cur) => acc + cur.expressionCount,
-      0,
-    );
+  override async migrate(globalData: CompilationUnitData) {
+    const interactive = this.config.interactiveMode ?? false;
 
-    return confirmAsSerializable({
-      componentsWithSafeNavigation: totalComponents,
-      safeNavigationExpressions: totalExpressions,
-    });
-  }
+    const replacements = globalData.templates
+      .filter((t) => {
+        if (!t.fullyMigrated) return false;
+        // In interactive mode, only apply approved templates
+        if (interactive && t.approved !== true) return false;
+        return true;
+      })
+      .flatMap((t) => t.replacements);
 
-  override async migrate(_globalData: OptionalChainingCompilationUnitData) {
-    // This migration is analysis-only — it does not auto-transform templates.
-    // See class-level JSDoc for the recommended manual migration strategy.
-    return {replacements: []};
+    return {replacements};
   }
 }
-
