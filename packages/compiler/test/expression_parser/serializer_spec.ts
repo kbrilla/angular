@@ -156,5 +156,17 @@ describe('serializer', () => {
     it('serializes BigInt in expression', () => {
       expect(serialize(parse('1n + 2n'))).toBe('1n + 2n');
     });
+
+    it('serializes hex number literal as decimal', () => {
+      expect(serialize(parse('0xFF'))).toBe('255');
+    });
+
+    it('serializes octal number literal as decimal', () => {
+      expect(serialize(parse('0o77'))).toBe('63');
+    });
+
+    it('serializes binary number literal as decimal', () => {
+      expect(serialize(parse('0b1010'))).toBe('10');
+    });
   });
 });

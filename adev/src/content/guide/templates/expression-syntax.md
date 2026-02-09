@@ -12,8 +12,8 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 | ---------------------- | ------------------------------- |
 | String                 | `'Hello'`, `"World"`            |
 | Boolean                | `true`, `false`                 |
-| Number                 | `123`, `3.14`                   |
-| BigInt                 | `1n`, `100n`                    |
+| Number                 | `123`, `3.14`, `1_000`, `0xFF`, `0o77`, `0b1010` |
+| BigInt                 | `1n`, `100n`, `0xFFn`           |
 | Object                 | `{name: 'Alice'}`               |
 | Array                  | `['Onion', 'Cheese', 'Garlic']` |
 | null                   | `null`                          |

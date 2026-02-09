@@ -478,6 +478,21 @@ class _Scanner {
     let simple = this.index === start;
     let hasSeparators = false;
     this.advance(); // Skip initial digit.
+
+    // Check for hex (0x/0X), octal (0o/0O), or binary (0b/0B) prefixes.
+    if (
+      this.index === start + 1 &&
+      this.input.charCodeAt(start) === chars.$0
+    ) {
+      if (this.peek === chars.$x || this.peek === chars.$X) {
+        return this.scanRadixNumber(start, chars.isAsciiHexDigit, 16);
+      } else if (this.peek === chars.$o || this.peek === chars.$O) {
+        return this.scanRadixNumber(start, chars.isOctalDigit, 8);
+      } else if (this.peek === chars.$b || this.peek === chars.$B) {
+        return this.scanRadixNumber(start, chars.isBinaryDigit, 2);
+      }
+    }
+
     while (true) {
       if (chars.isDigit(this.peek)) {
         // Do nothing.
@@ -519,6 +534,59 @@ class _Scanner {
     }
 
     const value = simple ? parseIntAutoRadix(str) : parseFloat(str);
+    return newNumberToken(start, this.index, value);
+  }
+
+  /**
+   * Scans a number literal with a specific radix prefix (0x, 0o, 0b).
+   * @param start The start index of the number literal.
+   * @param isValidDigit A function that checks if a character is a valid digit for the radix.
+   * @param radix The radix (16, 8, or 2).
+   */
+  private scanRadixNumber(
+    start: number,
+    isValidDigit: (code: number) => boolean,
+    radix: number,
+  ): Token {
+    this.advance(); // Skip the radix prefix letter (x, o, b).
+
+    if (!isValidDigit(this.peek)) {
+      return this.error('Expected a digit', 0);
+    }
+
+    let hasSeparators = false;
+    while (true) {
+      if (isValidDigit(this.peek)) {
+        // Do nothing.
+      } else if (this.peek === chars.$_) {
+        if (
+          !isValidDigit(this.input.charCodeAt(this.index - 1)) ||
+          !isValidDigit(this.input.charCodeAt(this.index + 1))
+        ) {
+          return this.error('Invalid numeric separator', 0);
+        }
+        hasSeparators = true;
+      } else {
+        break;
+      }
+      this.advance();
+    }
+
+    let str = this.input.substring(start, this.index);
+    if (hasSeparators) {
+      str = str.replace(/_/g, '');
+    }
+
+    // BigInt with radix prefix: 0xFFn, 0o77n, 0b1010n
+    if (this.peek === chars.$n) {
+      this.advance();
+      return newBigIntToken(start, this.index, str);
+    }
+
+    const value = Number(str);
+    if (isNaN(value)) {
+      return this.error('Invalid integer literal', 0);
+    }
     return newNumberToken(start, this.index, value);
   }
 

@@ -1016,6 +1016,32 @@ describe('parser', () => {
       expect((map.keys[0] as LiteralMapPropertyKey).isShorthandInitialized).toBe(true);
     });
 
+    describe('hex, octal, and binary number literals', () => {
+      it('should parse hex number literals', () => {
+        checkBinding('0xFF', '255');
+      });
+
+      it('should parse hex number literals with uppercase prefix', () => {
+        checkBinding('0XFF', '255');
+      });
+
+      it('should parse octal number literals', () => {
+        checkBinding('0o77', '63');
+      });
+
+      it('should parse binary number literals', () => {
+        checkBinding('0b1010', '10');
+      });
+
+      it('should parse hex with numeric separators', () => {
+        checkBinding('0xFF_FF', '65535');
+      });
+
+      it('should parse hex in expressions', () => {
+        checkBinding('0xFF + 1', '255 + 1');
+      });
+    });
+
     describe('BigInt literals', () => {
       it('should parse a simple BigInt literal', () => {
         checkBinding('1n');
