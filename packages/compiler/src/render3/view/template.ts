@@ -297,6 +297,13 @@ export interface ParsedTemplate {
   preserveWhitespaces?: boolean;
 
   /**
+   * The semantics used for safe navigation (`?.`) expressions in this template.
+   * When `'js'`, safe navigation returns `undefined` on short-circuit.
+   * When `'legacy'` or not set, safe navigation returns `null`.
+   */
+  optionalChainingSemantics?: 'legacy' | 'js';
+
+  /**
    * Any errors from parsing the template the first time.
    *
    * `null` if there are no errors. Otherwise, the array of errors is guaranteed to be non-empty.

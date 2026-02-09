@@ -124,6 +124,20 @@ export interface R3DirectiveMetadata {
 }
 
 /**
+ * Specifies the semantics used for safe navigation (`?.`) expressions in a template.
+ *
+ * - `Legacy`: Safe navigation returns `null` on short-circuit (Angular's historical behavior).
+ * - `Js`: Safe navigation returns `undefined` on short-circuit, matching JavaScript/TypeScript
+ *   optional chaining semantics (TC39 spec).
+ */
+export enum OptionalChainingSemantics {
+  /** Legacy Angular semantics: `a?.b` evaluates to `null` when `a` is nullish. */
+  Legacy = 'legacy',
+  /** JavaScript semantics: `a?.b` evaluates to `undefined` when `a` is nullish. */
+  Js = 'js',
+}
+
+/**
  * Defines how dynamic imports for deferred dependencies should be emitted in the
  * generated output:
  *  - either in a function on per-component basis (in case of local compilation)
@@ -219,6 +233,13 @@ export interface R3ComponentMetadata<
      * Whether the template preserves whitespaces from the user's code.
      */
     preserveWhitespaces?: boolean;
+
+    /**
+     * The semantics used for safe navigation (`?.`) expressions in this template.
+     * When set to `OptionalChainingSemantics.Js`, safe navigation returns `undefined`
+     * on short-circuit (matching JS optional chaining). Defaults to `Legacy` (`null`).
+     */
+    optionalChainingSemantics?: OptionalChainingSemantics;
   };
 
   declarations: DeclarationT[];

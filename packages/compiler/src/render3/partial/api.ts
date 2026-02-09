@@ -236,6 +236,14 @@ export interface R3DeclareComponentMetadata extends R3DeclareDirectiveMetadata {
    * Whether whitespace in the template should be preserved. Defaults to false.
    */
   preserveWhitespaces?: boolean;
+
+  /**
+   * The semantics used for safe navigation (`?.`) expressions in this template.
+   * `'legacy'` means safe navigation returns `null` on short-circuit (default).
+   * `'js'` means safe navigation returns `undefined`, matching JS optional chaining.
+   * If not present, defaults to `'legacy'`.
+   */
+  optionalChainingSemantics?: 'legacy' | 'js';
 }
 
 export type R3DeclareTemplateDependencyMetadata =

@@ -25,6 +25,7 @@ import {
   ExternalExpr,
   FactoryTarget,
   makeBindingParser,
+  OptionalChainingSemantics,
   outputAst as o,
   R3ComponentDeferMetadata,
   R3ComponentMetadata,
@@ -282,6 +283,7 @@ export class ComponentDecoratorHandler
     private readonly typeCheckHostBindings: boolean,
     private readonly enableSelectorless: boolean,
     private readonly emitDeclarationOnly: boolean,
+    private readonly strictOptionalChainingSemantics: boolean = false,
   ) {
     this.extractTemplateOptions = {
       enableI18nLegacyMessageIdFormat: this.enableI18nLegacyMessageIdFormat,
@@ -978,7 +980,12 @@ export class ComponentDecoratorHandler
         localReferencedSymbols,
         meta: {
           ...metadata,
-          template,
+          template: {
+            ...template,
+            optionalChainingSemantics: this.strictOptionalChainingSemantics
+              ? OptionalChainingSemantics.Js
+              : OptionalChainingSemantics.Legacy,
+          },
           encapsulation,
           changeDetection,
           styles,
