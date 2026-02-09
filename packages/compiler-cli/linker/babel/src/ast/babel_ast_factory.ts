@@ -119,7 +119,11 @@ export class BabelAstFactory implements AstFactory<t.Statement, t.Expression | t
       assert(body, t.isBlockStatement, 'a block');
     }
     return t.arrowFunctionExpression(
-      parameters.map((param) => t.identifier(param)),
+      parameters.map((param) => {
+        const isRest = param.startsWith('...');
+        const name = isRest ? param.slice(3) : param;
+        return isRest ? t.restElement(t.identifier(name)) : t.identifier(name);
+      }),
       body,
     );
   }

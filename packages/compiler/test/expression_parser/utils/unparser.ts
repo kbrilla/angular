@@ -8,6 +8,8 @@
 
 import {
   ArrowFunction,
+  ArrowFunctionParameter,
+  ArrowFunctionRestParameter,
   AST,
   AstVisitor,
   ASTWithSource,
@@ -256,10 +258,16 @@ class Unparser implements AstVisitor {
   }
 
   visitArrowFunction(ast: ArrowFunction, context: any) {
-    if (ast.parameters.length === 1) {
+    const formatParam = (p: ArrowFunctionParameter) =>
+      p instanceof ArrowFunctionRestParameter ? `...${p.name}` : p.name;
+
+    if (
+      ast.parameters.length === 1 &&
+      !(ast.parameters[0] instanceof ArrowFunctionRestParameter)
+    ) {
       this._expression += ast.parameters[0].name;
     } else {
-      this._expression += `(${ast.parameters.map((e) => e.name).join(', ')})`;
+      this._expression += `(${ast.parameters.map(formatParam).join(', ')})`;
     }
     this._expression += ' => ';
     this._visit(ast.body);

@@ -144,10 +144,16 @@ class SerializeExpressionVisitor implements expr.AstVisitor {
   visitArrowFunction(ast: expr.ArrowFunction, context: any) {
     let params: string;
 
-    if (ast.parameters.length === 1) {
+    const formatParam = (p: expr.ArrowFunctionParameter) =>
+      p instanceof expr.ArrowFunctionRestParameter ? `...${p.name}` : p.name;
+
+    if (
+      ast.parameters.length === 1 &&
+      !(ast.parameters[0] instanceof expr.ArrowFunctionRestParameter)
+    ) {
       params = ast.parameters[0].name;
     } else {
-      params = `(${ast.parameters.map((e) => e.name).join(', ')})`;
+      params = `(${ast.parameters.map(formatParam).join(', ')})`;
     }
 
     return `${params} => ${ast.body.visit(this, context)}`;

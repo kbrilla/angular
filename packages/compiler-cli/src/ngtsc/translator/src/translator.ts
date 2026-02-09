@@ -343,7 +343,7 @@ export class ExpressionTranslatorVisitor<TFile, TStatement, TExpression>
 
   visitArrowFunctionExpr(ast: o.ArrowFunctionExpr, context: any) {
     return this.factory.createArrowFunctionExpression(
-      ast.params.map((param) => param.name),
+      ast.params.map((param) => (param.isRest ? `...${param.name}` : param.name)),
       Array.isArray(ast.body)
         ? this.factory.createBlock(this.visitStatements(ast.body, context))
         : ast.body.visitExpression(this, context),

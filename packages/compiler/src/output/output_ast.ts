@@ -985,14 +985,15 @@ export class FnParam {
   constructor(
     public name: string,
     public type: Type | null = null,
+    public isRest: boolean = false,
   ) {}
 
   isEquivalent(param: FnParam): boolean {
-    return this.name === param.name;
+    return this.name === param.name && this.isRest === param.isRest;
   }
 
   clone(): FnParam {
-    return new FnParam(this.name, this.type);
+    return new FnParam(this.name, this.type, this.isRest);
   }
 }
 

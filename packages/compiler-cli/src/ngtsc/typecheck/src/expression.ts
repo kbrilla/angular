@@ -8,6 +8,7 @@
 
 import {
   ArrowFunction,
+  ArrowFunctionRestParameter,
   AST,
   AstVisitor,
   ASTWithSource,
@@ -498,7 +499,12 @@ class AstTranslator implements AstVisitor {
 
   visitArrowFunction(ast: ArrowFunction): ts.ArrowFunction {
     const params = ast.parameters.map((param) => {
-      const paramNode = ts.factory.createParameterDeclaration(undefined, undefined, param.name);
+      const isRest = param instanceof ArrowFunctionRestParameter;
+      const paramNode = ts.factory.createParameterDeclaration(
+        undefined,
+        isRest ? ts.factory.createToken(ts.SyntaxKind.DotDotDotToken) : undefined,
+        param.name,
+      );
       // Ignore diagnostics on the node to skip diagnostics from `noImplicitAny` since
       // users aren't able to set types on the parameters. Note that this is preferable
       // to setting their types to `any`, because it allows us to infer the types when

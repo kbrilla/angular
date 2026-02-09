@@ -19,6 +19,7 @@ import {
   ArrowFunction,
   ArrowFunctionParameter,
   ArrowFunctionIdentifierParameter,
+  ArrowFunctionRestParameter,
   AST,
   ASTWithSource,
   Binary,
@@ -1744,7 +1745,29 @@ class _ParseAST {
 
     if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
       while (this.next !== EOF) {
-        if (this.next.isIdentifier()) {
+        if (this.next.isOperator('...')) {
+          const restStart = this.inputIndex;
+          this.advance();
+          if (this.next.isIdentifier()) {
+            const token = this.next;
+            this.advance();
+            params.push(
+              new ArrowFunctionRestParameter(
+                token.strValue,
+                this.span(restStart),
+                this.sourceSpan(restStart),
+              ),
+            );
+
+            if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
+              this.error('A rest parameter must be the last parameter in an arrow function');
+            }
+            break;
+          } else {
+            this.error(`Unexpected token ${this.next}`);
+            break;
+          }
+        } else if (this.next.isIdentifier()) {
           const token = this.next;
           this.advance();
           params.push(this.getArrowFunctionIdentifierArg(token));
@@ -1791,7 +1814,11 @@ class _ParseAST {
       let i = start + 1;
 
       for (i; i < tokens.length; i++) {
-        if (!tokens[i].isIdentifier() && !tokens[i].isCharacter(chars.$COMMA)) {
+        if (
+          !tokens[i].isIdentifier() &&
+          !tokens[i].isCharacter(chars.$COMMA) &&
+          !tokens[i].isOperator('...')
+        ) {
           break;
         }
       }

@@ -207,7 +207,15 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     return ts.factory.createArrowFunction(
       undefined,
       undefined,
-      parameters.map((param) => ts.factory.createParameterDeclaration(undefined, undefined, param)),
+      parameters.map((param) => {
+        const isRest = param.startsWith('...');
+        const name = isRest ? param.slice(3) : param;
+        return ts.factory.createParameterDeclaration(
+          undefined,
+          isRest ? ts.factory.createToken(ts.SyntaxKind.DotDotDotToken) : undefined,
+          name,
+        );
+      }),
       undefined,
       undefined,
       body,

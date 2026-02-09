@@ -551,7 +551,17 @@ export class ArrowFunctionIdentifierParameter {
   ) {}
 }
 
-export type ArrowFunctionParameter = ArrowFunctionIdentifierParameter; // TODO(crisbeto): also rest parameters?
+export class ArrowFunctionRestParameter {
+  constructor(
+    public name: string,
+    public span: ParseSpan,
+    public sourceSpan: AbsoluteSourceSpan,
+  ) {}
+}
+
+export type ArrowFunctionParameter =
+  | ArrowFunctionIdentifierParameter
+  | ArrowFunctionRestParameter;
 
 export class ArrowFunction extends AST {
   constructor(
