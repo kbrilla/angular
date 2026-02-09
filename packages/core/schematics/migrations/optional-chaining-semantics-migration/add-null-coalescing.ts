@@ -159,7 +159,6 @@ export function migrateTemplate(template: string): TemplateMigrationResult {
     }
 
     // Try to build ternary replacement for the outermost safe nav chain
-    const originalText = template.substring(occ.start, occ.end);
     const ternary = tryBuildTernary(occ.node, template);
     if (ternary !== null) {
       migratedCount++;
@@ -322,10 +321,21 @@ class SafeNavCollector extends TmplAstRecursiveVisitor {
 
 /**
  * Expression-level AST visitor that finds safe navigation nodes and determines their context.
+ *
+ * For chains like `a?.b?.c`, the AST is:
+ *   SafePropertyRead('c', receiver: SafePropertyRead('b', receiver: ImplicitReceiver))
+ * We only want to record the OUTERMOST safe read (the `c` node) because it represents
+ * the entire chain. Inner safe reads are part of the same chain and should not be recorded
+ * separately.
  */
 class SafeNavExpressionFinder extends RecursiveAstVisitor {
   occurrences: SafeNavOccurrence[] = [];
   private contextStack: SafeNavContext[] = [];
+  /**
+   * Set of AST nodes that are receivers of a safe navigation node.
+   * These should NOT be recorded as separate occurrences.
+   */
+  private receiverNodes = new Set<AST>();
 
   constructor(private rootContext: SafeNavContext) {
     super();
@@ -336,43 +346,63 @@ class SafeNavExpressionFinder extends RecursiveAstVisitor {
     return this.contextStack[this.contextStack.length - 1];
   }
 
-  override visitSafePropertyRead(ast: SafePropertyRead, context?: any): any {
-    // Don't recurse into inner safe reads (they're part of a chain)
-    // Only record the outermost one
-    if (!this.isInsideSafeChain(ast)) {
-      this.occurrences.push({
-        node: ast,
-        context: this.currentContext,
-        start: ast.sourceSpan.start,
-        end: ast.sourceSpan.end,
-      });
+  /**
+   * Mark all receiver nodes in a safe navigation chain so they won't be recorded.
+   */
+  private markReceiverChain(node: AST): void {
+    if (node instanceof SafePropertyRead || node instanceof SafeKeyedRead || node instanceof SafeCall) {
+      this.receiverNodes.add(node);
+      this.markReceiverChain(node.receiver);
+    } else if (node instanceof PropertyRead) {
+      this.markReceiverChain(node.receiver);
+    } else if (node instanceof NonNullAssert) {
+      this.markReceiverChain(node.expression);
     }
-    // Still visit the receiver in case it has safe nav too
+  }
+
+  override visitSafePropertyRead(ast: SafePropertyRead, context?: any): any {
+    // If this node is a receiver of a larger safe chain, skip it
+    if (this.receiverNodes.has(ast)) {
+      return;
+    }
+    // Mark all inner receivers so they won't be recorded separately
+    this.markReceiverChain(ast.receiver);
+    this.occurrences.push({
+      node: ast,
+      context: this.currentContext,
+      start: ast.sourceSpan.start,
+      end: ast.sourceSpan.end,
+    });
+    // Visit the receiver to find any independent safe nav in sub-expressions
     this.visit(ast.receiver, context);
   }
 
   override visitSafeKeyedRead(ast: SafeKeyedRead, context?: any): any {
-    if (!this.isInsideSafeChain(ast)) {
-      this.occurrences.push({
-        node: ast,
-        context: this.currentContext,
-        start: ast.sourceSpan.start,
-        end: ast.sourceSpan.end,
-      });
+    if (this.receiverNodes.has(ast)) {
+      return;
     }
+    this.markReceiverChain(ast.receiver);
+    this.occurrences.push({
+      node: ast,
+      context: this.currentContext,
+      start: ast.sourceSpan.start,
+      end: ast.sourceSpan.end,
+    });
     this.visit(ast.receiver, context);
     this.visit(ast.key, context);
   }
 
   override visitSafeCall(ast: SafeCall, context?: any): any {
-    if (!this.isInsideSafeChain(ast)) {
-      this.occurrences.push({
-        node: ast,
-        context: this.currentContext,
-        start: ast.sourceSpan.start,
-        end: ast.sourceSpan.end,
-      });
+    if (this.receiverNodes.has(ast)) {
+      return;
     }
+    this.markReceiverChain(ast.receiver);
+    this.occurrences.push({
+      node: ast,
+      context: this.currentContext,
+      start: ast.sourceSpan.start,
+      end: ast.sourceSpan.end,
+    });
     this.visit(ast.receiver, context);
     this.visitAll(ast.args, context);
   }
@@ -413,16 +443,6 @@ class SafeNavExpressionFinder extends RecursiveAstVisitor {
   override visitNonNullAssert(ast: NonNullAssert, context?: any): any {
     // a?.b! — non-null assertion doesn't change null/undefined equivalence
     this.visit(ast.expression, context);
-  }
-
-  /**
-   * Check if an AST node is a receiver inside a larger safe chain.
-   * If so, we don't want to record it separately.
-   */
-  private isInsideSafeChain(node: AST): boolean {
-    // The parent tracking would require more complex machinery.
-    // For now, we record all safe nav nodes and deduplicate by position.
-    return false;
   }
 }
 
