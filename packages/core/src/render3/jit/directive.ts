@@ -120,9 +120,9 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
           }
         }
         // Resolve optional chaining semantics: component metadata → JIT options → default 'legacy'
-        let optionalChainingSemantics: 'legacy' | 'js' | undefined = undefined;
+        let optionalChainingSemantics: 'legacy' | 'native' | undefined = undefined;
         if (options !== null && options.strictOptionalChainingSemantics) {
-          optionalChainingSemantics = 'js';
+          optionalChainingSemantics = 'native';
         }
         let encapsulation = metadata.encapsulation;
         if (encapsulation === undefined) {

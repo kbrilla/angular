@@ -298,10 +298,10 @@ export interface ParsedTemplate {
 
   /**
    * The semantics used for safe navigation (`?.`) expressions in this template.
-   * When `'js'`, safe navigation returns `undefined` on short-circuit.
+   * When `'native'`, safe navigation returns `undefined` on short-circuit.
    * When `'legacy'` or not set, safe navigation returns `null`.
    */
-  optionalChainingSemantics?: 'legacy' | 'js';
+  optionalChainingSemantics?: 'legacy' | 'native';
 
   /**
    * Any errors from parsing the template the first time.

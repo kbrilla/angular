@@ -18,7 +18,7 @@ interface SafeTransformContext {
 /**
  * Safe read expressions such as `a?.b` have different semantics in Angular templates as
  * compared to JavaScript. By default (legacy semantics), they evaluate to `null` instead of
- * `undefined`. When `optionalChainingSemantics` is set to `'js'` on the compilation job,
+ * `undefined`. When `optionalChainingSemantics` is set to `'native'` on the compilation job,
  * safe reads evaluate to `undefined`, matching JavaScript/TypeScript optional chaining behavior.
  *
  * This phase finds all unresolved safe read expressions, and converts them into the appropriate
@@ -248,7 +248,7 @@ function ternaryTransform(e: o.Expression, job: CompilationJob): o.Expression {
   // otherwise use `null` for legacy Angular behavior.
   const useJsSemantics =
     job instanceof ComponentCompilationJob &&
-    job.optionalChainingSemantics === OptionalChainingSemantics.Js;
+    job.optionalChainingSemantics === OptionalChainingSemantics.Native;
   const shortCircuitValue = useJsSemantics ? o.UNDEFINED_EXPR : o.NULL_EXPR;
   return new o.ParenthesizedExpr(
     new o.ConditionalExpr(

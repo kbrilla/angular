@@ -240,10 +240,10 @@ export interface R3DeclareComponentMetadata extends R3DeclareDirectiveMetadata {
   /**
    * The semantics used for safe navigation (`?.`) expressions in this template.
    * `'legacy'` means safe navigation returns `null` on short-circuit (default).
-   * `'js'` means safe navigation returns `undefined`, matching JS optional chaining.
+   * `'native'` means safe navigation returns `undefined`, matching native ECMAScript optional chaining.
    * If not present, defaults to `'legacy'`.
    */
-  optionalChainingSemantics?: 'legacy' | 'js';
+  optionalChainingSemantics?: 'legacy' | 'native';
 }
 
 export type R3DeclareTemplateDependencyMetadata =

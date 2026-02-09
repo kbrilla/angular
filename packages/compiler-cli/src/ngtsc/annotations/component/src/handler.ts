@@ -983,7 +983,7 @@ export class ComponentDecoratorHandler
           template: {
             ...template,
             optionalChainingSemantics: this.strictOptionalChainingSemantics
-              ? OptionalChainingSemantics.Js
+              ? OptionalChainingSemantics.Native
               : OptionalChainingSemantics.Legacy,
           },
           encapsulation,

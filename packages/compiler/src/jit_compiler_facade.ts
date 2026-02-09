@@ -302,8 +302,8 @@ export class CompilerFacadeImpl implements CompilerFacade {
 
     // Compile the component metadata, including template, into an expression.
     const optionalChainingSemantics =
-      facade.optionalChainingSemantics === 'js'
-        ? OptionalChainingSemantics.Js
+      facade.optionalChainingSemantics === 'native'
+        ? OptionalChainingSemantics.Native
         : OptionalChainingSemantics.Legacy;
     const meta: R3ComponentMetadata<R3TemplateDependency> = {
       ...facade,
@@ -666,8 +666,8 @@ function convertDeclareComponentFacadeToMetadata(
   );
 
   const declOptionalChainingSemantics =
-    decl.optionalChainingSemantics === 'js'
-      ? OptionalChainingSemantics.Js
+    decl.optionalChainingSemantics === 'native'
+      ? OptionalChainingSemantics.Native
       : OptionalChainingSemantics.Legacy;
 
   return {

@@ -127,14 +127,14 @@ export interface R3DirectiveMetadata {
  * Specifies the semantics used for safe navigation (`?.`) expressions in a template.
  *
  * - `Legacy`: Safe navigation returns `null` on short-circuit (Angular's historical behavior).
- * - `Js`: Safe navigation returns `undefined` on short-circuit, matching JavaScript/TypeScript
+ * - `Native`: Safe navigation returns `undefined` on short-circuit, matching native ECMAScript
  *   optional chaining semantics (TC39 spec).
  */
 export enum OptionalChainingSemantics {
   /** Legacy Angular semantics: `a?.b` evaluates to `null` when `a` is nullish. */
   Legacy = 'legacy',
-  /** JavaScript semantics: `a?.b` evaluates to `undefined` when `a` is nullish. */
-  Js = 'js',
+  /** Native ECMAScript semantics: `a?.b` evaluates to `undefined` when `a` is nullish. */
+  Native = 'native',
 }
 
 /**

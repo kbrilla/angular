@@ -231,8 +231,8 @@ export class PartialComponentLinkerVersion1<TStatement, TExpression>
     // regardless of the consuming app's strictOptionalChainingSemantics setting.
     const optionalChainingSemantics: OptionalChainingSemantics =
       metaObj.has('optionalChainingSemantics') &&
-      metaObj.getString('optionalChainingSemantics') === 'js'
-        ? OptionalChainingSemantics.Js
+      metaObj.getString('optionalChainingSemantics') === 'native'
+        ? OptionalChainingSemantics.Native
         : OptionalChainingSemantics.Legacy;
 
     return {
