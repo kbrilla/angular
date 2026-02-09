@@ -822,10 +822,6 @@ class _ParseAST {
     const start = this.inputIndex;
     let result = this.parseExpression();
     if (this.consumeOptionalOperator('|')) {
-      if (this.parseFlags & ParseFlags.Action) {
-        this.error(`Cannot have a pipe in an action expression`);
-      }
-
       do {
         const nameStart = this.inputIndex;
         let nameId = this.expectIdentifierOrKeyword();
@@ -1163,6 +1159,10 @@ class _ParseAST {
       );
     } else if (this.next.isNumber()) {
       const value = this.next.toNumber();
+      this.advance();
+      return new LiteralPrimitive(this.span(start), this.sourceSpan(start), value);
+    } else if (this.next.isBigInt()) {
+      const value = BigInt(this.next.strValue);
       this.advance();
       return new LiteralPrimitive(this.span(start), this.sourceSpan(start), value);
     } else if (this.next.isTemplateLiteralEnd()) {

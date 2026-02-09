@@ -237,6 +237,8 @@ export class GenericKeyFn implements ExpressionKeyFn {
   keyOf(expr: o.Expression): string {
     if (expr instanceof o.LiteralExpr && typeof expr.value === 'string') {
       return `"${expr.value}"`;
+    } else if (expr instanceof o.LiteralExpr && typeof expr.value === 'bigint') {
+      return `${expr.value}n`;
     } else if (expr instanceof o.LiteralExpr) {
       return String(expr.value);
     } else if (expr instanceof o.RegularExpressionLiteralExpr) {

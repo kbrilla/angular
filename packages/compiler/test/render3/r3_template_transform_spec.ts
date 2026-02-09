@@ -652,7 +652,7 @@ describe('R3 template transform', () => {
 
     it('should report pipes in two-way bindings', () => {
       expect(() => parse(`<div [(prop)]="v | pipe"></div>`)).toThrowError(
-        /Cannot have a pipe in an action expression/,
+        /Unsupported expression in a two-way binding/,
       );
     });
 

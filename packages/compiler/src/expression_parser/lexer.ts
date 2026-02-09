@@ -16,6 +16,7 @@ export enum TokenType {
   String,
   Operator,
   Number,
+  BigInt,
   RegExpBody,
   RegExpFlags,
   Error,
@@ -143,6 +144,10 @@ export class Token {
     return this.type === TokenType.RegExpFlags;
   }
 
+  isBigInt(): boolean {
+    return this.type === TokenType.BigInt;
+  }
+
   toNumber(): number {
     return this.type === TokenType.Number ? this.numValue : -1;
   }
@@ -175,6 +180,8 @@ export class Token {
         return this.strValue;
       case TokenType.Number:
         return this.numValue.toString();
+      case TokenType.BigInt:
+        return `${this.strValue}n`;
       default:
         return null;
     }
@@ -214,6 +221,10 @@ function newOperatorToken(index: number, end: number, text: string): Token {
 
 function newNumberToken(index: number, end: number, n: number): Token {
   return new Token(index, end, TokenType.Number, n, '');
+}
+
+function newBigIntToken(index: number, end: number, text: string): Token {
+  return new Token(index, end, TokenType.BigInt, 0, text);
 }
 
 function newErrorToken(index: number, end: number, message: string): Token {
@@ -500,6 +511,13 @@ class _Scanner {
     if (hasSeparators) {
       str = str.replace(/_/g, '');
     }
+
+    // BigInt literals: integer followed by `n` suffix.
+    if (simple && this.peek === chars.$n) {
+      this.advance();
+      return newBigIntToken(start, this.index, str);
+    }
+
     const value = simple ? parseIntAutoRadix(str) : parseFloat(str);
     return newNumberToken(start, this.index, value);
   }

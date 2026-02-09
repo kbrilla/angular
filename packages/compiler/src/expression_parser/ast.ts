@@ -188,7 +188,7 @@ export class LiteralPrimitive extends AST {
   constructor(
     span: ParseSpan,
     sourceSpan: AbsoluteSourceSpan,
-    public value: string | number | boolean | null | undefined,
+    public value: string | number | bigint | boolean | null | undefined,
   ) {
     super(span, sourceSpan);
   }

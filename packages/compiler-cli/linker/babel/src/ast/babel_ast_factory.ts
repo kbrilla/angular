@@ -154,11 +154,13 @@ export class BabelAstFactory implements AstFactory<t.Statement, t.Expression | t
     );
   }
 
-  createLiteral(value: string | number | boolean | null | undefined): t.Expression {
+  createLiteral(value: string | number | bigint | boolean | null | undefined): t.Expression {
     if (typeof value === 'string') {
       return t.stringLiteral(value);
     } else if (typeof value === 'number') {
       return t.numericLiteral(value);
+    } else if (typeof value === 'bigint') {
+      return t.bigIntLiteral(`${value}`);
     } else if (typeof value === 'boolean') {
       return t.booleanLiteral(value);
     } else if (value === undefined) {

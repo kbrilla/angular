@@ -569,7 +569,7 @@ export class RegularExpressionLiteralExpr extends Expression {
 
 export class LiteralExpr extends Expression {
   constructor(
-    public value: number | string | boolean | null | undefined,
+    public value: number | bigint | string | boolean | null | undefined,
     type?: Type | null,
     sourceSpan?: ParseSourceSpan | null,
   ) {

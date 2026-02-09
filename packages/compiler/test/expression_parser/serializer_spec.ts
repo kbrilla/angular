@@ -144,5 +144,17 @@ describe('serializer', () => {
     it('serializes arrow function with regular and rest parameters', () => {
       expect(serialize(parse('(a, b, ...rest) => a + b'))).toBe('(a, b, ...rest) => a + b');
     });
+
+    it('serializes BigInt literal', () => {
+      expect(serialize(parse('1n'))).toBe('1n');
+    });
+
+    it('serializes large BigInt literal', () => {
+      expect(serialize(parse('9007199254740991n'))).toBe('9007199254740991n');
+    });
+
+    it('serializes BigInt in expression', () => {
+      expect(serialize(parse('1n + 2n'))).toBe('1n + 2n');
+    });
   });
 });

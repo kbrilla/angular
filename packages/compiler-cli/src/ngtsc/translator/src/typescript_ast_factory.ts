@@ -232,7 +232,7 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     return ts.factory.createIfStatement(condition, thenStatement, elseStatement ?? undefined);
   }
 
-  createLiteral(value: string | number | boolean | null | undefined): ts.Expression {
+  createLiteral(value: string | number | bigint | boolean | null | undefined): ts.Expression {
     if (value === undefined) {
       return ts.factory.createIdentifier('undefined');
     } else if (value === null) {
@@ -241,6 +241,8 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
       return value ? ts.factory.createTrue() : ts.factory.createFalse();
     } else if (typeof value === 'number') {
       return tsNumericExpression(value);
+    } else if (typeof value === 'bigint') {
+      return ts.factory.createBigIntLiteral(`${value}`);
     } else {
       return ts.factory.createStringLiteral(value);
     }

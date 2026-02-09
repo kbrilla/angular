@@ -1016,6 +1016,35 @@ describe('parser', () => {
       expect((map.keys[0] as LiteralMapPropertyKey).isShorthandInitialized).toBe(true);
     });
 
+    describe('BigInt literals', () => {
+      it('should parse a simple BigInt literal', () => {
+        checkBinding('1n');
+      });
+
+      it('should parse a zero BigInt literal', () => {
+        checkBinding('0n');
+      });
+
+      it('should parse a large BigInt literal', () => {
+        checkBinding('9007199254740991n');
+      });
+
+      it('should parse BigInt in expressions', () => {
+        checkBinding('1n + 2n');
+      });
+
+      it('should parse BigInt with numeric separators', () => {
+        checkBinding('1_000_000n', '1000000n');
+      });
+
+      it('should parse BigInt as LiteralPrimitive with bigint value', () => {
+        const ast = parseBinding('42n');
+        const lit = ast.ast as any;
+        expect(typeof lit.value).toBe('bigint');
+        expect(lit.value).toBe(BigInt(42));
+      });
+    });
+
     describe('arrow functions', () => {
       it('should parse a single-parameter arrow function', () => {
         checkBinding('a => a');
@@ -1133,11 +1162,8 @@ describe('parser', () => {
       });
 
       describe('arrow function validations', () => {
-        it('should not allow pipe to be used inside an arrow function', () => {
-          expectBindingError(
-            '(a, b) => (a + b | pipe)',
-            'Cannot have a pipe in an action expression',
-          );
+        it('should allow pipe to be used inside an arrow function', () => {
+          checkBinding('(a, b) => (a + b | pipe)', '(a, b) => ((a + b | pipe))');
         });
 
         it('should report an error for an arrow function with a body', () => {

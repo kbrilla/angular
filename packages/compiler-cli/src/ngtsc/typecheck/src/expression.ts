@@ -265,6 +265,8 @@ class AstTranslator implements AstVisitor {
       node = ts.factory.createStringLiteral(ast.value);
     } else if (typeof ast.value === 'number') {
       node = tsNumericExpression(ast.value);
+    } else if (typeof ast.value === 'bigint') {
+      node = ts.factory.createBigIntLiteral(`${ast.value}`);
     } else if (typeof ast.value === 'boolean') {
       node = ast.value ? ts.factory.createTrue() : ts.factory.createFalse();
     } else {
