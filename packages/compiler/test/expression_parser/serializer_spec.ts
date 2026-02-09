@@ -136,5 +136,13 @@ describe('serializer', () => {
     it('serializes instanceof expressions', () => {
       expect(serialize(parse(' foo   instanceof   Bar '))).toBe('foo instanceof Bar');
     });
+
+    it('serializes arrow function with rest parameter', () => {
+      expect(serialize(parse('(...args) => args'))).toBe('(...args) => args');
+    });
+
+    it('serializes arrow function with regular and rest parameters', () => {
+      expect(serialize(parse('(a, b, ...rest) => a + b'))).toBe('(a, b, ...rest) => a + b');
+    });
   });
 });

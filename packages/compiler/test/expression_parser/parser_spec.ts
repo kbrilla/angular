@@ -10,6 +10,8 @@ import {expect} from '@angular/private/testing/matchers';
 import {
   AbsoluteSourceSpan,
   ArrowFunction,
+  ArrowFunctionIdentifierParameter,
+  ArrowFunctionRestParameter,
   ASTWithSource,
   BindingPipe,
   BindingPipeType,
@@ -1053,6 +1055,46 @@ describe('parser', () => {
 
       it('should parse an arrow function that returns an array', () => {
         checkBinding('(a, b) => [a, b, foo]');
+      });
+
+      describe('rest parameters', () => {
+        it('should parse an arrow function with only a rest parameter', () => {
+          checkBinding('(...args) => args');
+        });
+
+        it('should parse an arrow function with regular and rest parameters', () => {
+          checkBinding('(a, b, ...rest) => a + b');
+        });
+
+        it('should parse an arrow function with one regular and a rest parameter', () => {
+          checkBinding('(a, ...rest) => a');
+        });
+
+        it('should parse a rest parameter as ArrowFunctionRestParameter', () => {
+          const ast = parseBinding('(a, ...rest) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(2);
+          expect(arrowFn.parameters[0] instanceof ArrowFunctionIdentifierParameter).toBe(true);
+          expect(arrowFn.parameters[1] instanceof ArrowFunctionRestParameter).toBe(true);
+          expect(arrowFn.parameters[0].name).toBe('a');
+          expect(arrowFn.parameters[1].name).toBe('rest');
+        });
+
+        it('should produce spans for rest parameters', () => {
+          const ast = parseBinding('(a, ...rest) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          const getSource = (span: ParseSpan) => ast.source?.substring(span.start, span.end);
+
+          expect(getSource(arrowFn.parameters[0].span)).toBe('a');
+          expect(getSource(arrowFn.parameters[1].span)).toBe('...rest');
+        });
+
+        it('should report an error when rest parameter is not last', () => {
+          expectBindingError(
+            '(...rest, a) => a',
+            'A rest parameter must be the last parameter in an arrow function',
+          );
+        });
       });
 
       describe('arrow function spans', () => {

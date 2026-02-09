@@ -559,9 +559,7 @@ export class ArrowFunctionRestParameter {
   ) {}
 }
 
-export type ArrowFunctionParameter =
-  | ArrowFunctionIdentifierParameter
-  | ArrowFunctionRestParameter;
+export type ArrowFunctionParameter = ArrowFunctionIdentifierParameter | ArrowFunctionRestParameter;
 
 export class ArrowFunction extends AST {
   constructor(

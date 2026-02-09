@@ -261,10 +261,7 @@ class Unparser implements AstVisitor {
     const formatParam = (p: ArrowFunctionParameter) =>
       p instanceof ArrowFunctionRestParameter ? `...${p.name}` : p.name;
 
-    if (
-      ast.parameters.length === 1 &&
-      !(ast.parameters[0] instanceof ArrowFunctionRestParameter)
-    ) {
+    if (ast.parameters.length === 1 && !(ast.parameters[0] instanceof ArrowFunctionRestParameter)) {
       this._expression += ast.parameters[0].name;
     } else {
       this._expression += `(${ast.parameters.map(formatParam).join(', ')})`;
