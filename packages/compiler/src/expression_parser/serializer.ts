@@ -62,11 +62,14 @@ class SerializeExpressionVisitor implements expr.AstVisitor {
         if (literal.kind === 'spread') {
           return '...';
         }
+        if (literal.isComputed && literal.computedKey) {
+          return `[${literal.computedKey.visit(this, context)}]`;
+        }
         return literal.quoted ? `'${literal.key}'` : literal.key;
       }),
       ast.values.map((value) => value.visit(this, context)),
     )
-      .map(([key, value]) => `${key}: ${value}`)
+      .map(([key, value]) => (key === '...' ? `...${value}` : `${key}: ${value}`))
       .join(', ')}}`;
   }
 

@@ -380,6 +380,14 @@ export interface ObjectLiteralAssignment<TExpression> {
    * Whether the `propertyName` should be enclosed in quotes.
    */
   quoted: boolean;
+  /**
+   * Whether this is a computed property name (e.g. `{[key]: value}`).
+   */
+  isComputed?: boolean;
+  /**
+   * The expression for the computed property name.
+   */
+  computedKey?: TExpression;
 }
 
 /**

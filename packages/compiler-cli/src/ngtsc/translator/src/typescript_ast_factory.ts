@@ -259,12 +259,16 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
           return ts.factory.createSpreadAssignment(prop.expression);
         }
 
-        return ts.factory.createPropertyAssignment(
-          prop.quoted
-            ? ts.factory.createStringLiteral(prop.propertyName)
-            : ts.factory.createIdentifier(prop.propertyName),
-          prop.value,
-        );
+        let keyExpr: ts.PropertyName;
+        if (prop.isComputed && prop.computedKey) {
+          keyExpr = ts.factory.createComputedPropertyName(prop.computedKey);
+        } else if (prop.quoted) {
+          keyExpr = ts.factory.createStringLiteral(prop.propertyName);
+        } else {
+          keyExpr = ts.factory.createIdentifier(prop.propertyName);
+        }
+
+        return ts.factory.createPropertyAssignment(keyExpr, prop.value);
       }),
     );
   }

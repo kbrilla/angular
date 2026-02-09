@@ -10,11 +10,11 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 
 | Literal type           | Example values                  |
 | ---------------------- | ------------------------------- |
-| String                 | `'Hello'`, `"World"`            |
-| Boolean                | `true`, `false`                 |
-| Number                 | `123`, `3.14`, `1_000`, `0xFF`, `0o77`, `0b1010` |
-| BigInt                 | `1n`, `100n`, `0xFFn`           |
-| Object                 | `{name: 'Alice'}`               |
+| String                 | `'Hello'`, `"World"`, `'\u{1F600}'`               |
+| Boolean                | `true`, `false`                                   |
+| Number                 | `123`, `3.14`, `1_000`, `0xFF`, `0o77`, `0b1010`  |
+| BigInt                 | `1n`, `100n`, `0xFFn`                             |
+| Object                 | `{name: 'Alice'}`, `{[dynamicKey]: value}`        |
 | Array                  | `['Onion', 'Cheese', 'Garlic']` |
 | null                   | `null`                          |
 | RegExp                 | `/\d+/`                         |
@@ -33,6 +33,18 @@ Angular expressions support the following [globals](https://developer.mozilla.or
 - [$any](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#any)
 
 No other JavaScript globals are supported. Common JavaScript globals include `Number`, `Boolean`, `NaN`, `Infinity`, `parseInt`, and more.
+
+## Comments in expressions
+
+Angular expressions support both line comments and block comments:
+
+```angular-html
+<!-- Line comments strip everything after // -->
+{{ value // this is ignored }}
+
+<!-- Block comments can appear inline -->
+{{ someFunction(/* param description */ value) }}
+```
 
 ## Local variables
 
@@ -64,6 +76,7 @@ Angular supports the following operators from standard JavaScript.
 | Unary Negation                | `-x`                                           |
 | Unary Plus                    | `+y`                                           |
 | Property Accessor             | `person['name']`                               |
+| Computed Property Names       | `{[dynamicKey]: value}`                        |
 | typeof                        | `typeof 42`                                    |
 | void                          | `void 1`                                       |
 | in                            | `'model' in car`                               |
@@ -102,6 +115,20 @@ NOTE: Optional chaining behaves differently from the standard JavaScript version
 | new                   | `new Car()`                       |
 
 NOTE: Object and array destructuring are supported in `@let` declarations. See the [variables guide](/guide/templates/variables) for details.
+
+## String escape sequences
+
+Angular supports the following escape sequences in string literals:
+
+| Escape sequence | Description                                |
+| --------------- | ------------------------------------------ |
+| `\n`            | Newline                                    |
+| `\t`            | Tab                                        |
+| `\\`            | Backslash                                  |
+| `\'`            | Single quote                               |
+| `\"`            | Double quote                               |
+| `\uXXXX`       | 4-digit Unicode escape (`\u4f60` → `你`)   |
+| `\u{XXXXX}`    | Braced Unicode escape (`\u{1F600}` → `😀`) |
 
 ## Lexical context for expressions
 

@@ -230,6 +230,8 @@ export interface LiteralMapPropertyKey {
   span: ParseSpan;
   sourceSpan: AbsoluteSourceSpan;
   isShorthandInitialized?: boolean;
+  isComputed?: boolean;
+  computedKey?: AST;
 }
 
 export interface LiteralMapSpreadKey {

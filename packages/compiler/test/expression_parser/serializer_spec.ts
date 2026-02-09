@@ -168,5 +168,13 @@ describe('serializer', () => {
     it('serializes binary number literal as decimal', () => {
       expect(serialize(parse('0b1010'))).toBe('10');
     });
+
+    it('serializes computed property name in object literal', () => {
+      expect(serialize(parse('{[key]: value}'))).toBe('{[key]: value}');
+    });
+
+    it('serializes mixed regular and computed properties', () => {
+      expect(serialize(parse('{a: 1, [key]: 2}'))).toBe('{a: 1, [key]: 2}');
+    });
   });
 });

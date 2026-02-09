@@ -168,6 +168,10 @@ class Unparser implements AstVisitor {
 
       if (key.kind === 'spread') {
         this._expression += '...';
+      } else if (key.isComputed && key.computedKey) {
+        this._expression += '[';
+        this._visit(key.computedKey);
+        this._expression += ']: ';
       } else {
         this._expression += key.quoted ? JSON.stringify(key.key) : key.key;
         this._expression += ': ';

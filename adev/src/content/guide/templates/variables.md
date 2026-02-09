@@ -26,27 +26,71 @@ Each `@let` block can declare exactly one variable. You cannot declare multiple 
 
 ### Destructuring with `@let`
 
-`@let` supports object and array destructuring patterns, similar to JavaScript destructuring:
+`@let` supports comprehensive object and array destructuring patterns, following the [JavaScript destructuring syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring):
+
+#### Object destructuring
 
 ```angular-html
-<!-- Object destructuring -->
+<!-- Basic object destructuring -->
 @let { name, age } = user;
 <p>{{ name }} is {{ age }} years old</p>
 
-<!-- Object destructuring with renaming -->
+<!-- Renaming properties -->
 @let { name: userName, email: userEmail } = user;
 <p>{{ userName }} ({{ userEmail }})</p>
 
-<!-- Array destructuring -->
-@let [first, second] = items;
-<p>First: {{ first }}, Second: {{ second }}</p>
+<!-- Default values -->
+@let { name, role = 'user' } = person;
+<p>{{ name }} has role {{ role }}</p>
+
+<!-- Rename with default -->
+@let { name: displayName = 'Anonymous' } = person;
+
+<!-- Rest properties -->
+@let { id, ...details } = user;
+<p>User #{{ id }}, details: {{ details | json }}</p>
 ```
 
-Destructuring is desugared into individual property accesses. For example, `@let { name, age } = person;` is equivalent to:
+#### Array destructuring
 
 ```angular-html
+<!-- Basic array destructuring -->
+@let [first, second] = items;
+<p>First: {{ first }}, Second: {{ second }}</p>
+
+<!-- Skipping elements (holes) -->
+@let [first, , third] = items;
+
+<!-- Default values -->
+@let [first = 'default', second] = items;
+
+<!-- Rest elements -->
+@let [head, ...tail] = items;
+<p>First: {{ head }}, Rest: {{ tail | json }}</p>
+```
+
+#### How destructuring works
+
+Destructuring is desugared into individual property/index accesses. For example:
+
+```angular-html
+<!-- This: -->
+@let { name, age } = person;
+<!-- Becomes: -->
 @let name = person.name;
 @let age = person.age;
+
+<!-- This: -->
+@let [first, , third, ...rest] = items;
+<!-- Becomes: -->
+@let first = items[0];
+@let third = items[2];
+@let rest = items.slice(3);
+
+<!-- This: -->
+@let { name = 'default' } = person;
+<!-- Becomes: -->
+@let name = person.name ?? 'default';
 ```
 
 ### Referencing the value of `@let`

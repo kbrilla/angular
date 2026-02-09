@@ -1338,6 +1338,8 @@ export class LiteralMapPropertyAssignment {
     public key: string,
     public value: Expression,
     public quoted: boolean,
+    public isComputed?: boolean,
+    public computedKey?: Expression,
   ) {}
 
   isEquivalent(e: LiteralMapPropertyAssignment): boolean {
@@ -1345,7 +1347,13 @@ export class LiteralMapPropertyAssignment {
   }
 
   clone(): LiteralMapPropertyAssignment {
-    return new LiteralMapPropertyAssignment(this.key, this.value.clone(), this.quoted);
+    return new LiteralMapPropertyAssignment(
+      this.key,
+      this.value.clone(),
+      this.quoted,
+      this.isComputed,
+      this.computedKey?.clone(),
+    );
   }
 
   isConstant() {

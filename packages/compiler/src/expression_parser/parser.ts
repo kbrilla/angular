@@ -455,10 +455,84 @@ export class Parser {
   }
 
   private _stripComments(input: string): {stripped: string; hasComments: boolean} {
-    const i = this._commentStart(input);
-    return i != null
-      ? {stripped: input.substring(0, i), hasComments: true}
-      : {stripped: input, hasComments: false};
+    let hasComments = false;
+    let result = input;
+
+    // Strip block comments /* ... */ first (can appear in the middle of expressions).
+    result = this._stripBlockComments(result);
+    if (result !== input) {
+      hasComments = true;
+    }
+
+    // Strip line comments // ... (must be at the end).
+    const i = this._commentStart(result);
+    if (i != null) {
+      result = result.substring(0, i);
+      hasComments = true;
+    }
+
+    return {stripped: result, hasComments};
+  }
+
+  /**
+   * Strips block comments (/* ... *​/) from an expression string,
+   * respecting quoted strings.
+   */
+  private _stripBlockComments(input: string): string {
+    let outerQuote: number | null = null;
+    let result = '';
+    let i = 0;
+
+    while (i < input.length) {
+      const char = input.charCodeAt(i);
+
+      if (outerQuote !== null) {
+        result += input[i];
+        if (char === outerQuote) {
+          outerQuote = null;
+        } else if (char === chars.$BACKSLASH && i + 1 < input.length) {
+          // Skip escaped character in string.
+          i++;
+          result += input[i];
+        }
+        i++;
+        continue;
+      }
+
+      if (chars.isQuote(char)) {
+        outerQuote = char;
+        result += input[i];
+        i++;
+        continue;
+      }
+
+      if (
+        char === chars.$SLASH &&
+        i + 1 < input.length &&
+        input.charCodeAt(i + 1) === chars.$STAR
+      ) {
+        // Found `/*`, skip until `*/`.
+        i += 2;
+        while (i < input.length - 1) {
+          if (
+            input.charCodeAt(i) === chars.$STAR &&
+            input.charCodeAt(i + 1) === chars.$SLASH
+          ) {
+            i += 2;
+            break;
+          }
+          i++;
+        }
+        // Replace comment with a single space to preserve token boundaries.
+        result += ' ';
+        continue;
+      }
+
+      result += input[i];
+      i++;
+    }
+
+    return result;
   }
 
   private _commentStart(input: string): number | null {
@@ -1223,6 +1297,27 @@ class _ParseAST {
             span: this.span(keyStart),
             sourceSpan: this.sourceSpan(keyStart),
           } satisfies LiteralMapSpreadKey);
+          values.push(this.parsePipe());
+          continue;
+        }
+
+        // Computed property name: `{[expr]: value}`
+        if (this.next.isCharacter(chars.$LBRACKET)) {
+          this.advance(); // consume '['
+          const computedKey = this.parsePipe();
+          this.expectCharacter(chars.$RBRACKET);
+          const keySpan = this.span(keyStart);
+          const keySourceSpan = this.sourceSpan(keyStart);
+          keys.push({
+            kind: 'property',
+            key: '',
+            quoted: false,
+            isComputed: true,
+            computedKey,
+            span: keySpan,
+            sourceSpan: keySourceSpan,
+          } satisfies LiteralMapPropertyKey);
+          this.expectCharacter(chars.$COLON);
           values.push(this.parsePipe());
           continue;
         }

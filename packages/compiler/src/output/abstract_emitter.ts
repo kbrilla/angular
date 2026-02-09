@@ -462,6 +462,11 @@ export abstract class AbstractEmitterVisitor implements o.StatementVisitor, o.Ex
         if (entry instanceof o.LiteralMapSpreadAssignment) {
           ctx.print(ast, '...');
           entry.expression.visitExpression(this, ctx);
+        } else if (entry.isComputed && entry.computedKey) {
+          ctx.print(ast, '[');
+          entry.computedKey.visitExpression(this, ctx);
+          ctx.print(ast, ']:');
+          entry.value.visitExpression(this, ctx);
         } else {
           ctx.print(
             ast,

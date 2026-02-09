@@ -1016,6 +1016,56 @@ describe('parser', () => {
       expect((map.keys[0] as LiteralMapPropertyKey).isShorthandInitialized).toBe(true);
     });
 
+    describe('computed property names', () => {
+      it('should parse an object literal with a computed property name', () => {
+        checkBinding('{[key]: value}');
+      });
+
+      it('should parse computed property name with string key', () => {
+        checkBinding("{['name']: value}");
+      });
+
+      it('should parse mixed regular and computed properties', () => {
+        checkBinding('{a: 1, [key]: 2}');
+      });
+    });
+
+    describe('block comments', () => {
+      it('should strip block comments from expressions', () => {
+        checkBinding('a /* comment */ + b', 'a + b');
+      });
+
+      it('should strip block comments in function calls', () => {
+        checkBinding('foo(/* arg */ x)', 'foo(x)');
+      });
+
+      it('should strip block comments at start of expression', () => {
+        checkBinding('/* comment */ x', 'x');
+      });
+
+      it('should strip multiple block comments', () => {
+        checkBinding('a /* c1 */ + /* c2 */ b', 'a + b');
+      });
+
+      it('should not strip block comment markers inside strings', () => {
+        checkBinding("'a /* b */ c'");
+      });
+    });
+
+    describe('unicode braced escapes', () => {
+      it('should parse braced unicode escape in strings', () => {
+        checkBinding("'\\u{4f60}'", "'你'");
+      });
+
+      it('should parse braced unicode escape for emoji', () => {
+        checkBinding("'\\u{1F600}'", "'😀'");
+      });
+
+      it('should still parse 4-digit unicode escapes', () => {
+        checkBinding("'\\u4f60'", "'你'");
+      });
+    });
+
     describe('hex, octal, and binary number literals', () => {
       it('should parse hex number literals', () => {
         checkBinding('0xFF', '255');

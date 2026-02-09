@@ -183,10 +183,17 @@ export class BabelAstFactory implements AstFactory<t.Statement, t.Expression | t
           return t.spreadElement(prop.expression);
         }
 
-        const key = prop.quoted
-          ? t.stringLiteral(prop.propertyName)
-          : t.identifier(prop.propertyName);
-        return t.objectProperty(key, prop.value);
+        let key: t.Expression;
+        let computed = false;
+        if (prop.isComputed && prop.computedKey) {
+          key = prop.computedKey;
+          computed = true;
+        } else if (prop.quoted) {
+          key = t.stringLiteral(prop.propertyName);
+        } else {
+          key = t.identifier(prop.propertyName);
+        }
+        return t.objectProperty(key, prop.value, computed);
       }),
     );
   }
