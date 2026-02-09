@@ -12,44 +12,48 @@ import {
   ProgramInfo,
   projectFile,
   ProjectFile,
-  Replacement,
   Serializable,
-  TextUpdate,
   TsurgeFunnelMigration,
 } from '../../utils/tsurge';
 import {NgComponentTemplateVisitor} from '../../utils/ng_component_template';
-import {AbsoluteFsPath} from '../../../../compiler-cli';
-import {addNullCoalescingToSafeNavigations} from './add-null-coalescing';
+import {findSafeNavigationExpressions} from './add-null-coalescing';
 
 export interface MigrationConfig {
   /**
-   * Whether to migrate this component template.
+   * Whether to analyze this component template.
    */
   shouldMigrate?: (containingFile: ProjectFile) => boolean;
 }
 
 export interface OptionalChainingSemanticsData {
   file: ProjectFile;
-  replacementCount: number;
-  replacements: Replacement[];
+  componentName: string;
+  expressionCount: number;
 }
 
 export interface OptionalChainingCompilationUnitData {
-  expressionReplacements: Array<OptionalChainingSemanticsData>;
+  componentsWithSafeNavigation: Array<OptionalChainingSemanticsData>;
 }
 
 /**
- * Migration that appends `?? null` to safe navigation expressions (`?.`) in Angular templates.
+ * Analysis migration that reports components using safe navigation (`?.`) in their templates.
  *
  * When switching from legacy to native optional chaining semantics
  * (`strictOptionalChainingSemantics: true`), the runtime behavior of `?.` changes from
- * returning `null` to returning `undefined` on short-circuit. This migration preserves the
- * legacy `null` behavior for existing expressions by adding `?? null`, so that the switch
- * to native semantics does not break existing code that depends on the `null` return value.
+ * returning `null` to returning `undefined` on short-circuit. This migration scans templates
+ * and reports which components use `?.` so developers can verify their templates before
+ * opting into native semantics.
  *
- * Example:
- *   Before: `{{ user?.name }}`
- *   After:  `{{ user?.name ?? null }}`
+ * NOTE: Auto-transformation with `?? null` is intentionally NOT used because it would
+ * incorrectly change genuinely `undefined` property values to `null`. For example:
+ *   `a?.b?.c` where `c` is `undefined` on the resolved object:
+ *     - Legacy and native both correctly return `undefined` (no short-circuit)
+ *     - Adding `?? null` would incorrectly return `null`
+ *
+ * The recommended migration strategy is:
+ * 1. Run this analysis to identify components with `?.` usage
+ * 2. Verify each component's template does not depend on the `null` return value
+ * 3. Enable `strictOptionalChainingSemantics: true` in the project's tsconfig
  */
 export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
   OptionalChainingCompilationUnitData,
@@ -64,7 +68,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
   ): Promise<Serializable<OptionalChainingCompilationUnitData>> {
     const {sourceFiles, program} = info;
     const typeChecker = program.getTypeChecker();
-    const expressionReplacements: Array<OptionalChainingSemanticsData> = [];
+    const componentsWithSafeNavigation: Array<OptionalChainingSemanticsData> = [];
 
     for (const sf of sourceFiles) {
       ts.forEachChild(sf, (node: ts.Node) => {
@@ -82,43 +86,22 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
         templateVisitor.visitNode(node);
 
         templateVisitor.resolvedTemplates.forEach((template) => {
-          const {migrated, changed, replacementCount} = addNullCoalescingToSafeNavigations(
+          const {hasSafeNavigation, expressionCount} = findSafeNavigationExpressions(
             template.content,
           );
 
-          if (!changed) {
-            return;
-          }
-
-          const fileToMigrate = template.inline
-            ? file
-            : projectFile(template.filePath as AbsoluteFsPath, info);
-          const end = template.start + template.content.length;
-
-          const replacements = [
-            new Replacement(
-              fileToMigrate,
-              new TextUpdate({
-                position: template.start,
-                end: end,
-                toInsert: migrated,
-              }),
-            ),
-          ];
-
-          const existing = expressionReplacements.find((r) => r.file === file);
-
-          if (existing) {
-            existing.replacements.push(...replacements);
-            existing.replacementCount += replacementCount;
-          } else {
-            expressionReplacements.push({file, replacements, replacementCount});
+          if (hasSafeNavigation) {
+            componentsWithSafeNavigation.push({
+              file,
+              componentName: node.name?.text ?? '<anonymous>',
+              expressionCount,
+            });
           }
         });
       });
     }
 
-    return confirmAsSerializable({expressionReplacements});
+    return confirmAsSerializable({componentsWithSafeNavigation});
   }
 
   override async combine(
@@ -126,9 +109,9 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
     unitB: OptionalChainingCompilationUnitData,
   ): Promise<Serializable<OptionalChainingCompilationUnitData>> {
     return confirmAsSerializable({
-      expressionReplacements: [
-        ...unitA.expressionReplacements,
-        ...unitB.expressionReplacements,
+      componentsWithSafeNavigation: [
+        ...unitA.componentsWithSafeNavigation,
+        ...unitB.componentsWithSafeNavigation,
       ],
     });
   }
@@ -137,26 +120,27 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
     combinedData: OptionalChainingCompilationUnitData,
   ): Promise<Serializable<OptionalChainingCompilationUnitData>> {
     return confirmAsSerializable({
-      expressionReplacements: combinedData.expressionReplacements,
+      componentsWithSafeNavigation: combinedData.componentsWithSafeNavigation,
     });
   }
 
   override async stats(globalMetadata: OptionalChainingCompilationUnitData) {
-    const touchedFilesCount = globalMetadata.expressionReplacements.length;
-    const replacementCount = globalMetadata.expressionReplacements.reduce(
-      (acc, cur) => acc + cur.replacementCount,
+    const totalComponents = globalMetadata.componentsWithSafeNavigation.length;
+    const totalExpressions = globalMetadata.componentsWithSafeNavigation.reduce(
+      (acc, cur) => acc + cur.expressionCount,
       0,
     );
 
     return confirmAsSerializable({
-      touchedFilesCount,
-      replacementCount,
+      componentsWithSafeNavigation: totalComponents,
+      safeNavigationExpressions: totalExpressions,
     });
   }
 
-  override async migrate(globalData: OptionalChainingCompilationUnitData) {
-    return {
-      replacements: globalData.expressionReplacements.flatMap(({replacements}) => replacements),
-    };
+  override async migrate(_globalData: OptionalChainingCompilationUnitData) {
+    // This migration is analysis-only — it does not auto-transform templates.
+    // See class-level JSDoc for the recommended manual migration strategy.
+    return {replacements: []};
   }
 }
+

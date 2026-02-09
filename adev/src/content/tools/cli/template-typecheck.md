@@ -140,7 +140,7 @@ When enabled:
 - The flag only affects components compiled in the current project — libraries from npm retain the semantics they were compiled with
 - The per-template `optionalChainingSemantics` metadata is written into partial declarations so that the linker always respects the intended behavior
 
-**Migration note:** If your code depends on `?.` returning `null` (for example, checking `result === null`), you can preserve the old behavior for individual expressions using the nullish coalescing operator: `a?.b ?? null`.
+**Migration note:** Use `ng generate @angular/core:optional-chaining-semantics-migration` to identify components with `?.` usage in their templates. Review each component to ensure it does not depend on the `null` return value before enabling the flag. Note that `a?.b ?? null` is **not** a safe blanket migration — it would incorrectly change genuinely `undefined` property values (e.g., when the property exists but is `undefined`) to `null`.
 
 If you still have issues after troubleshooting with these flags, fall back to full mode by disabling `strictTemplates`.
 

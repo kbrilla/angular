@@ -7,96 +7,43 @@
  */
 
 /**
- * Adds `?? null` to top-level safe navigation expressions in Angular template interpolations
- * and binding expressions. This preserves the legacy `null` return value when switching to
- * native optional chaining semantics.
+ * Scans an Angular template for safe navigation expressions (`?.`) and returns
+ * information about their locations. This is used by the migration to report
+ * expressions that need manual verification when switching to native optional
+ * chaining semantics.
  *
- * Only wraps the outermost `?.` chain — nested `?.` expressions within a chain are not
- * individually wrapped because the outermost `?? null` covers the entire chain.
+ * NOTE: We intentionally do NOT auto-transform expressions with `?? null`.
+ * While `?? null` would preserve the `null` short-circuit value, it would also
+ * incorrectly convert genuinely `undefined` property values to `null`:
  *
- * Example transformations:
- *   `{{ user?.name }}`           → `{{ user?.name ?? null }}`
- *   `{{ a?.b?.c }}`              → `{{ a?.b?.c ?? null }}`
- *   `{{ a?.b | pipe }}`          → `{{ a?.b ?? null | pipe }}` (NOT done — pipe precedence)
- *   `[title]="obj?.name"`        → `[title]="obj?.name ?? null"`
+ *   `a?.b?.c` where `c` is `undefined` on the object:
+ *     - Legacy: returns `undefined` (no short-circuit happened, `c` IS `undefined`)
+ *     - Native: returns `undefined` (same)
+ *     - Native + `?? null`: returns `null` ← WRONG, changed real `undefined` to `null`
  *
- * Expressions that already have `?? null` or `?? undefined` are not modified.
+ * The correct migration strategy is to keep components on `'legacy'` semantics
+ * (the default) and only opt individual components into `'native'` after manual
+ * verification that their templates do not depend on the `null` return value.
  */
-export function addNullCoalescingToSafeNavigations(template: string): {
-  migrated: string;
-  changed: boolean;
-  replacementCount: number;
+export function findSafeNavigationExpressions(template: string): {
+  /** The number of interpolation expressions containing `?.` */
+  expressionCount: number;
+  /** Whether any `?.` expressions were found */
+  hasSafeNavigation: boolean;
 } {
-  // Match Angular template expressions: interpolations {{ ... }} and property bindings [...]="..."
-  // This is a simplified approach that handles the most common patterns.
-  let changed = false;
-  let replacementCount = 0;
+  let expressionCount = 0;
 
-  // Process interpolation expressions {{ ... }}
-  const migrated = template.replace(
-    /\{\{([\s\S]*?)\}\}/g,
-    (_match: string, exprContent: string) => {
-      const trimmed = exprContent.trim();
+  // Match Angular interpolation expressions {{ ... }}
+  template.replace(/\{\{([\s\S]*?)\}\}/g, (_match: string, exprContent: string) => {
+    if (exprContent.includes('?.')) {
+      expressionCount++;
+    }
+    return _match;
+  });
 
-      // Skip if it already has ?? null or ?? undefined
-      if (/\?\?\s*null\s*$/.test(trimmed) || /\?\?\s*undefined\s*$/.test(trimmed)) {
-        return _match;
-      }
-
-      // Skip if expression doesn't contain ?.
-      if (!trimmed.includes('?.')) {
-        return _match;
-      }
-
-      // Skip expressions that use pipes (precedence is complex)
-      // Only skip if pipe is at the top level (not inside parentheses)
-      if (hasTopLevelPipe(trimmed)) {
-        return _match;
-      }
-
-      // Add ?? null to preserve legacy null behavior
-      changed = true;
-      replacementCount++;
-      return `{{ ${trimmed} ?? null }}`;
-    },
-  );
-
-  return {migrated, changed, replacementCount};
+  return {
+    expressionCount,
+    hasSafeNavigation: expressionCount > 0,
+  };
 }
 
-/**
- * Checks if an expression string has a top-level pipe operator `|`.
- * Pipe operators inside parentheses or string literals are not considered top-level.
- */
-function hasTopLevelPipe(expr: string): boolean {
-  let depth = 0;
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let inBacktick = false;
-
-  for (let i = 0; i < expr.length; i++) {
-    const ch = expr[i];
-    const prev = i > 0 ? expr[i - 1] : '';
-
-    if (prev === '\\') continue;
-
-    if (ch === "'" && !inDoubleQuote && !inBacktick) {
-      inSingleQuote = !inSingleQuote;
-    } else if (ch === '"' && !inSingleQuote && !inBacktick) {
-      inDoubleQuote = !inDoubleQuote;
-    } else if (ch === '`' && !inSingleQuote && !inDoubleQuote) {
-      inBacktick = !inBacktick;
-    }
-
-    if (inSingleQuote || inDoubleQuote || inBacktick) continue;
-
-    if (ch === '(' || ch === '[') depth++;
-    else if (ch === ')' || ch === ']') depth--;
-    else if (ch === '|' && depth === 0 && i + 1 < expr.length && expr[i + 1] !== '|') {
-      // Single | at top level (not ||) is a pipe
-      return true;
-    }
-  }
-
-  return false;
-}

@@ -236,8 +236,8 @@ export interface R3ComponentMetadata<
 
     /**
      * The semantics used for safe navigation (`?.`) expressions in this template.
-     * When set to `OptionalChainingSemantics.Js`, safe navigation returns `undefined`
-     * on short-circuit (matching JS optional chaining). Defaults to `Legacy` (`null`).
+     * When set to `OptionalChainingSemantics.Native`, safe navigation returns `undefined`
+     * on short-circuit (matching native ECMAScript optional chaining). Defaults to `Legacy` (`null`).
      */
     optionalChainingSemantics?: OptionalChainingSemantics;
   };
