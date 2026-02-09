@@ -234,7 +234,11 @@ export function visitAll(visitor: Visitor, nodes: Node[], context: any = null): 
   nodes.forEach((ast) => {
     const astResult = visit(ast);
     if (astResult) {
-      result.push(astResult);
+      if (Array.isArray(astResult)) {
+        result.push(...astResult);
+      } else {
+        result.push(astResult);
+      }
     }
   });
   return result;

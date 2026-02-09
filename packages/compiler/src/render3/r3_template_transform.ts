@@ -349,6 +349,13 @@ class HtmlAstToIvyAst implements html.Visitor {
   }
 
   visitLetDeclaration(decl: html.LetDeclaration, context: any) {
+    const name = decl.name;
+
+    // Handle destructuring patterns: `@let { a, b } = expr;` or `@let [a, b] = expr;`
+    if (name.startsWith('{') || name.startsWith('[')) {
+      return this._desugarLetDestructuring(decl);
+    }
+
     const value = this.bindingParser.parseBinding(
       decl.value,
       false,
@@ -361,6 +368,92 @@ class HtmlAstToIvyAst implements html.Visitor {
     }
 
     return new t.LetDeclaration(decl.name, value, decl.sourceSpan, decl.nameSpan, decl.valueSpan);
+  }
+
+  /**
+   * Desugars a destructuring `@let` declaration into multiple simple `@let` declarations.
+   *
+   * `@let { name, age } = person;` becomes:
+   *   `@let name = person.name;`
+   *   `@let age = person.age;`
+   *
+   * `@let [first, second] = items;` becomes:
+   *   `@let first = items[0];`
+   *   `@let second = items[1];`
+   */
+  private _desugarLetDestructuring(decl: html.LetDeclaration): t.LetDeclaration[] {
+    const pattern = decl.name;
+    const valueExpr = decl.value.trim();
+    const results: t.LetDeclaration[] = [];
+
+    if (pattern.startsWith('{')) {
+      // Object destructuring: extract identifiers from `{ a, b, c }`.
+      const inner = pattern.slice(1, -1).trim();
+      if (inner.length === 0) {
+        this.reportError(
+          '@let object destructuring pattern cannot be empty',
+          decl.nameSpan,
+        );
+        return results;
+      }
+      const props = inner.split(',').map((p) => p.trim()).filter((p) => p.length > 0);
+      for (const prop of props) {
+        // Support renaming: `{ originalName: localName }`.
+        const parts = prop.split(':').map((s) => s.trim());
+        const key = parts[0];
+        const localName = parts.length > 1 ? parts[1] : key;
+        const propValueExpr = `${valueExpr}.${key}`;
+        const value = this.bindingParser.parseBinding(
+          propValueExpr,
+          false,
+          decl.valueSpan,
+          decl.valueSpan.start.offset,
+        );
+        results.push(
+          new t.LetDeclaration(
+            localName,
+            value,
+            decl.sourceSpan,
+            decl.nameSpan,
+            decl.valueSpan,
+          ),
+        );
+      }
+    } else if (pattern.startsWith('[')) {
+      // Array destructuring: extract identifiers from `[ a, b, c ]`.
+      const inner = pattern.slice(1, -1).trim();
+      if (inner.length === 0) {
+        this.reportError(
+          '@let array destructuring pattern cannot be empty',
+          decl.nameSpan,
+        );
+        return results;
+      }
+      const elements = inner.split(',').map((e) => e.trim());
+      for (let i = 0; i < elements.length; i++) {
+        const elem = elements[i];
+        // Skip empty slots (holes): `[a, , b]`.
+        if (elem.length === 0) continue;
+        const elemValueExpr = `${valueExpr}[${i}]`;
+        const value = this.bindingParser.parseBinding(
+          elemValueExpr,
+          false,
+          decl.valueSpan,
+          decl.valueSpan.start.offset,
+        );
+        results.push(
+          new t.LetDeclaration(
+            elem,
+            value,
+            decl.sourceSpan,
+            decl.nameSpan,
+            decl.valueSpan,
+          ),
+        );
+      }
+    }
+
+    return results;
   }
 
   visitComponent(component: html.Component) {

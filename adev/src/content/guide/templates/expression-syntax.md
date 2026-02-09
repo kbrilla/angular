@@ -13,6 +13,7 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 | String                 | `'Hello'`, `"World"`            |
 | Boolean                | `true`, `false`                 |
 | Number                 | `123`, `3.14`                   |
+| BigInt                 | `1n`, `100n`                    |
 | Object                 | `{name: 'Alice'}`               |
 | Array                  | `['Onion', 'Cheese', 'Garlic']` |
 | null                   | `null`                          |
@@ -22,9 +23,7 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 
 ### Unsupported value literals
 
-| Literal type | Example values |
-| ------------ | -------------- |
-| BigInt       | `1n`           |
+There are no unsupported value literal types.
 
 ## Globals
 
@@ -82,6 +81,7 @@ Angular supports the following operators from standard JavaScript.
 | Spread in object literals     | `{...obj, foo: 'bar'}`                         |
 | Spread in array literals      | `[...arr, 1, 2, 3]`                            |
 | Rest in function calls        | `fn(...args)`                                  |
+| Rest in arrow function params | `(...args) => args`                            |
 
 Angular expressions additionally also support the following non-standard operators:
 
@@ -98,10 +98,10 @@ NOTE: Optional chaining behaves differently from the standard JavaScript version
 | Operator              | Example(s)                        |
 | --------------------- | --------------------------------- |
 | All bitwise operators | `&`, `&=`, `~`, `\|=`, `^=`, etc. |
-| Object destructuring  | `const { name } = person`         |
-| Array destructuring   | `const [firstItem] = items`       |
 | Comma operator        | `x = (x++, x)`                    |
 | new                   | `new Car()`                       |
+
+NOTE: Object and array destructuring are supported in `@let` declarations. See the [variables guide](/guide/templates/variables) for details.
 
 ## Lexical context for expressions
 
@@ -122,7 +122,6 @@ Generally speaking, declarations are not supported in Angular expressions. This 
 
 # Event listener statements
 
-Event handlers are **statements** rather than expressions. While they support all of the same syntax as Angular expressions, there are two key differences:
+Event handlers are **statements** rather than expressions. While they support all of the same syntax as Angular expressions, there is one key difference:
 
 1. Statements **do support** assignment operators (but not destructing assignments)
-1. Statements **do not support** pipes

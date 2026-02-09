@@ -24,6 +24,31 @@ Use `@let` to declare a variable whose value is based on the result of a templat
 
 Each `@let` block can declare exactly one variable. You cannot declare multiple variables in the same block with a comma.
 
+### Destructuring with `@let`
+
+`@let` supports object and array destructuring patterns, similar to JavaScript destructuring:
+
+```angular-html
+<!-- Object destructuring -->
+@let { name, age } = user;
+<p>{{ name }} is {{ age }} years old</p>
+
+<!-- Object destructuring with renaming -->
+@let { name: userName, email: userEmail } = user;
+<p>{{ userName }} ({{ userEmail }})</p>
+
+<!-- Array destructuring -->
+@let [first, second] = items;
+<p>First: {{ first }}, Second: {{ second }}</p>
+```
+
+Destructuring is desugared into individual property accesses. For example, `@let { name, age } = person;` is equivalent to:
+
+```angular-html
+@let name = person.name;
+@let age = person.age;
+```
+
 ### Referencing the value of `@let`
 
 Once you've declared a variable with `@let`, you can reuse it in the same template:
