@@ -120,6 +120,43 @@ describe('migrateTemplate', () => {
       expect(r.safeAsIsCount).toBe(1);
     });
 
+    it('negated ternary condition: {{ !a?.b?.c ? x : y }}', () => {
+      // !null → true, !undefined → true — same truthiness
+      const r = migrateTemplate('{{ !a?.b?.c ? x : y }}');
+      expect(r.fullyMigrated).toBe(true);
+      expect(r.safeAsIsCount).toBe(1);
+    });
+
+    it('double-negated ternary condition: {{ !!a?.b ? x : y }}', () => {
+      const r = migrateTemplate('{{ !!a?.b ? x : y }}');
+      expect(r.fullyMigrated).toBe(true);
+      expect(r.safeAsIsCount).toBe(1);
+    });
+
+    it('safe keyed access standalone: {{ a?.[0] }}', () => {
+      const r = migrateTemplate('{{ a?.[0] }}');
+      expect(r.fullyMigrated).toBe(true);
+      expect(r.safeAsIsCount).toBe(1);
+    });
+
+    it('safe keyed access with string key: {{ a?.[\'key\'] }}', () => {
+      const r = migrateTemplate(`{{ a?.['key'] }}`);
+      expect(r.fullyMigrated).toBe(true);
+      expect(r.safeAsIsCount).toBe(1);
+    });
+
+    it('mixed ?. and !. (non-null assertion): {{ a?.b!.c }}', () => {
+      const r = migrateTemplate('{{ a?.b!.c }}');
+      expect(r.fullyMigrated).toBe(true);
+      expect(r.safeAsIsCount).toBe(1);
+    });
+
+    it('deep mixed chain with !.: {{ a?.b!.c?.d!.e }}', () => {
+      const r = migrateTemplate('{{ a?.b!.c?.d!.e }}');
+      expect(r.fullyMigrated).toBe(true);
+      expect(r.safeAsIsCount).toBe(1);
+    });
+
     it('logical AND: {{ a?.b && something }}', () => {
       // a?.b && x: if a?.b is null → false (null is falsy)
       //            if a?.b is undefined → false (undefined is falsy)

@@ -119,12 +119,18 @@ function isNullSafeContext(expr: string): boolean {
   }
 
   // Leading negation: !a?.b or !!a?.b — both null/undefined are falsy
-  if (/^!+\s*[a-zA-Z_$]/.test(expr) && isSimpleSafeChain(expr.replace(/^!+\s*/, ''))) {
+  const negStripped = expr.replace(/^!+\s*/, '');
+  if (negStripped !== expr && isSimpleSafeChain(negStripped)) {
     return true;
   }
 
   // Logical OR fallback: a?.b || 'default' — both null/undefined trigger fallback
   if (/\|\|/.test(expr) && !hasTopLevelPipe(expr)) {
+    return true;
+  }
+
+  // Logical AND: a?.b && x — both null/undefined are falsy, short-circuit same way
+  if (/&&/.test(expr)) {
     return true;
   }
 
@@ -136,7 +142,8 @@ function isNullSafeContext(expr: string): boolean {
     return true;
   }
 
-  // Ternary where ?. is in condition position: a?.b ? x : y
+  // Ternary where ?. is only in condition position: a?.b ? x : y
+  // Also handles negated: !a?.b?.c ? x : y
   // Both null/undefined are falsy, so condition evaluates the same
   if (isSafeNavInTernaryCondition(expr)) {
     return true;
@@ -146,15 +153,17 @@ function isNullSafeContext(expr: string): boolean {
 }
 
 /**
- * Checks if expr is a simple safe property chain like `a?.b?.c.d`
- * (no operators, calls, pipes, etc.)
+ * Checks if expr is a simple safe chain like `a?.b?.c.d`, `a?.b!.c`, `a?.[0]`
+ * (no binary operators, calls, pipes — only property/keyed access with ?. and !.)
  */
 function isSimpleSafeChain(expr: string): boolean {
-  return /^[a-zA-Z_$][a-zA-Z0-9_$.?]*$/.test(expr) && expr.includes('?.');
+  // Allow identifiers, dots, ?., !., brackets for keyed access, numbers, quotes for string keys
+  return /^[a-zA-Z_$][a-zA-Z0-9_$.\[\]'"?!]*$/.test(expr) && expr.includes('?.');
 }
 
 /**
  * Checks if the `?.` part is only in the condition of a ternary `cond ? a : b`.
+ * Also handles negated conditions: `!a?.b ? x : y`
  */
 function isSafeNavInTernaryCondition(expr: string): boolean {
   // Find the first top-level ? that isn't ?. or ??
