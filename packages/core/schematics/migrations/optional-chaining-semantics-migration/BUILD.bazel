@@ -12,6 +12,7 @@ ts_project(
     deps = [
         "//:node_modules/@types/node",
         "//:node_modules/typescript",
+        "//packages/compiler",
         "//packages/compiler-cli",
         "//packages/core/schematics/utils",
         "//packages/core/schematics/utils/tsurge",
@@ -26,6 +27,7 @@ ts_project(
     ),
     deps = [
         ":migration",
+        "//packages/compiler",
     ],
 )
 

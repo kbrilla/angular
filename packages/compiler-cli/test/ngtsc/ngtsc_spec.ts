@@ -5822,6 +5822,282 @@ runInEachFileSystem((os: string) => {
       expect(jsContents).toContain('text(1, " Template with whitespaces ");');
     });
 
+    it('should use legacy null semantics for safe navigation by default', () => {
+      env.tsconfig();
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Legacy: short-circuit to null
+      expect(jsContents).toContain('== null ? null :');
+      expect(jsContents).not.toContain('== null ? undefined :');
+    });
+
+    it('should use undefined for safe navigation when strictOptionalChainingSemantics is enabled', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Native: short-circuit to undefined
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should respect @Component-level optionalChainingSemantics override to native', () => {
+      env.tsconfig(); // project-wide default is legacy (false)
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          optionalChainingSemantics: 'native',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Component override to native should produce undefined
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should respect @Component-level optionalChainingSemantics override to legacy', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true}); // project-wide is native
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          optionalChainingSemantics: 'legacy',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Component override to legacy should produce null even though project is native
+      expect(jsContents).toContain('== null ? null :');
+      expect(jsContents).not.toContain('== null ? undefined :');
+    });
+
+    it('should mix components with different optionalChainingSemantics in same file', () => {
+      env.tsconfig();
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'legacy-cmp',
+          template: '{{ a?.b }}',
+          standalone: true,
+        })
+        export class LegacyCmp {
+          a: {b: string} | null = null;
+        }
+        @Component({
+          selector: 'native-cmp',
+          template: '{{ a?.b }}',
+          optionalChainingSemantics: 'native',
+          standalone: true,
+        })
+        export class NativeCmp {
+          a: {b: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Both null and undefined should appear — one for each component
+      expect(jsContents).toContain('== null ? null :');
+      expect(jsContents).toContain('== null ? undefined :');
+    });
+
+    it('should reject invalid optionalChainingSemantics value in @Component', () => {
+      env.tsconfig();
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          optionalChainingSemantics: 'invalid',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      const diags = env.driveDiagnostics();
+      expect(diags.length).toBe(1);
+      expect(diags[0].messageText).toContain(`optionalChainingSemantics must be 'legacy' or 'native'`);
+    });
+
+    it('should emit optionalChainingSemantics in partial declaration', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true, compilationMode: 'partial'});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain(`optionalChainingSemantics: 'native'`);
+    });
+
+    it('should default to legacy optionalChainingSemantics in partial declaration', () => {
+      env.tsconfig({compilationMode: 'partial'});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ data?.value }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain(`optionalChainingSemantics: 'legacy'`);
+    });
+
+    it('should handle deep safe navigation chains with native semantics', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ a?.b?.c?.d }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          a: any = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Each level should short-circuit to undefined
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should handle safe keyed read with native semantics', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: \`{{ a?.['key'] }}\`,
+          standalone: true,
+        })
+        export class TestCmp {
+          a: any = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain('== null ? undefined :');
+    });
+
+    it('should handle safe method call with native semantics', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ a?.method() }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          a: any = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain('== null ? undefined :');
+    });
+
+    it('should handle safe navigation mixed with non-null assertion and native semantics', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true, strictNullChecks: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '{{ a?.b!.c }}',
+          standalone: true,
+        })
+        export class TestCmp {
+          a: {b: {c: string} | null} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain('== null ? undefined :');
+    });
+
     it('should use proper default value for i18nUseExternalIds config param', () => {
       env.tsconfig(); // default is `true`
       env.write(

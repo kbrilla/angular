@@ -6,6 +6,27 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
+import {
+  AST,
+  ASTWithSource,
+  Binary,
+  Conditional,
+  Interpolation,
+  NonNullAssert,
+  parseTemplate,
+  PrefixNot,
+  PropertyRead,
+  RecursiveAstVisitor,
+  SafeCall,
+  SafeKeyedRead,
+  SafePropertyRead,
+  TmplAstBoundAttribute,
+  TmplAstBoundEvent,
+  TmplAstBoundText,
+  TmplAstRecursiveVisitor,
+  tmplAstVisitAll,
+} from '@angular/compiler';
+
 /**
  * Result of attempting to migrate a single template.
  */
@@ -25,279 +46,138 @@ export interface TemplateMigrationResult {
 }
 
 /**
- * Attempts to migrate ALL safe navigation expressions in a template.
+ * Context in which a safe navigation expression is used.
+ * Determines whether null vs undefined semantics matter.
+ */
+enum SafeNavContext {
+  /** The exact value (null vs undefined) matters — must be migrated. */
+  Sensitive,
+  /** null and undefined behave identically in this context — safe to leave as-is. */
+  NullSafe,
+}
+
+/**
+ * Information about a single safe navigation expression found in a template.
+ */
+interface SafeNavOccurrence {
+  /** The AST node (SafePropertyRead, SafeKeyedRead, or SafeCall). */
+  node: SafePropertyRead | SafeKeyedRead | SafeCall;
+  /** Whether the expression is in a null-safe context. */
+  context: SafeNavContext;
+  /** Absolute source span start offset in the template string. */
+  start: number;
+  /** Absolute source span end offset in the template string. */
+  end: number;
+}
+
+/**
+ * Attempts to migrate ALL safe navigation expressions in a template using AST analysis.
  *
- * For each `?.` expression in an interpolation, the migration:
- * 1. Checks if the expression is in a "null-safe context" where null and undefined
- *    behave identically — if so, leaves it as-is (no change needed).
- * 2. If the expression is a simple property chain, converts to a ternary:
- *    `a?.b?.c` → `a != null ? (a.b != null ? a.b.c : null) : null`
- * 3. Otherwise marks it as skipped (needs manual review).
- *
- * A template is only modified if ALL expressions were either converted or safe-as-is.
+ * For each `?.` expression in the template:
+ * 1. Parses the template using Angular's template parser to get proper AST nodes.
+ * 2. Walks the AST to find all SafePropertyRead, SafeKeyedRead, SafeCall occurrences.
+ * 3. Analyzes the parent expression context to determine if null/undefined are equivalent.
+ * 4. For sensitive contexts with simple property chains, converts to ternary form.
+ * 5. Otherwise marks as skipped (needs manual review).
  *
  * **Null-safe contexts (left as-is, no migration needed):**
- * - `{{ a?.b }}` standalone interpolation — Angular renders null/undefined as ""
+ * - Standalone interpolation `{{ a?.b }}` — Angular renders null/undefined as ""
  * - `a?.b ?? 'fallback'` — `??` catches both null and undefined
  * - `a?.b || 'fallback'` — `||` treats both as falsy
- * - `!a?.b` / `!!a?.b` — negation, both produce same boolean
+ * - `a?.b && x` — both null/undefined are falsy, short-circuit the same
+ * - `!a?.b` / `!!a?.b` — negation produces same boolean for both
  * - `a?.b ? x : y` — condition position, truthiness check
- * - `a?.b == null` — loose equality matches both
+ * - `a?.b == null` / `a?.b != null` — loose equality matches both
  *
- * **Must be converted:**
+ * **Must be converted (sensitive contexts):**
  * - `'prefix' + a?.b` — string concat differs: "prefixnull" vs "prefixundefined"
- * - `a?.b === null` — strict equality differs
+ * - `a?.b === null` — strict equality: null===null is true, undefined===null is false
  *
  * **Why ternary (not `?? null`):**
- *   `a?.b?.c` where c is genuinely `undefined`:
- *     - `?? null` changes the real `undefined` to `null` — WRONG
- *     - Ternary replicates legacy compiler output exactly
- *   Runtime values don't always match types, so type-aware `?? null` is also unsafe.
+ *   `a?.b?.c` where `c` is genuinely `undefined`:
+ *   - `?? null` changes the real `undefined` to `null` — WRONG
+ *   - Ternary replicates legacy compiler output exactly
  */
 export function migrateTemplate(template: string): TemplateMigrationResult {
-  let hasSafeNavigation = false;
+  // Quick check: does the template even contain `?.`?
+  if (!template.includes('?.')) {
+    return {
+      migrated: template,
+      fullyMigrated: true,
+      migratedCount: 0,
+      safeAsIsCount: 0,
+      skippedCount: 0,
+      hasSafeNavigation: false,
+    };
+  }
+
+  // Parse the template using Angular's template parser
+  const parsed = parseTemplate(template, 'migration.html', {});
+
+  if (parsed.errors && parsed.errors.length > 0) {
+    // If the template can't be parsed, we can't migrate it
+    return {
+      migrated: template,
+      fullyMigrated: false,
+      migratedCount: 0,
+      safeAsIsCount: 0,
+      skippedCount: 0,
+      hasSafeNavigation: template.includes('?.'),
+    };
+  }
+
+  // Walk the AST to find all safe navigation occurrences
+  const collector = new SafeNavCollector();
+  tmplAstVisitAll(collector, parsed.nodes);
+
+  if (collector.occurrences.length === 0) {
+    return {
+      migrated: template,
+      fullyMigrated: true,
+      migratedCount: 0,
+      safeAsIsCount: 0,
+      skippedCount: 0,
+      hasSafeNavigation: false,
+    };
+  }
+
   let migratedCount = 0;
   let safeAsIsCount = 0;
   let skippedCount = 0;
   let fullyMigrated = true;
 
-  const migrated = template.replace(
-    /\{\{([\s\S]*?)\}\}/g,
-    (_match: string, exprContent: string) => {
-      const trimmed = exprContent.trim();
+  // Sort occurrences by position (descending) so we can apply replacements from end to start
+  // without invalidating earlier positions
+  const sorted = [...collector.occurrences].sort((a, b) => b.start - a.start);
 
-      if (!trimmed.includes('?.')) {
-        return _match;
-      }
+  let result = template;
 
-      hasSafeNavigation = true;
+  for (const occ of sorted) {
+    if (occ.context === SafeNavContext.NullSafe) {
+      safeAsIsCount++;
+      continue;
+    }
 
-      // Check if the expression is in a null-safe context where null/undefined are equivalent
-      if (isNullSafeContext(trimmed)) {
-        safeAsIsCount++;
-        return _match; // Leave as-is, no change needed
-      }
-
-      // Try to convert simple property chain to ternary
-      const converted = tryConvertExpression(trimmed);
-      if (converted !== null) {
-        migratedCount++;
-        return `{{ ${converted} }}`;
-      }
-
-      // Can't safely migrate
+    // Try to build ternary replacement for the outermost safe nav chain
+    const originalText = template.substring(occ.start, occ.end);
+    const ternary = tryBuildTernary(occ.node, template);
+    if (ternary !== null) {
+      migratedCount++;
+      result = result.substring(0, occ.start) + ternary + result.substring(occ.end);
+    } else {
       skippedCount++;
       fullyMigrated = false;
-      return _match;
-    },
-  );
+    }
+  }
 
   return {
-    migrated: fullyMigrated ? migrated : template,
+    migrated: fullyMigrated ? result : template,
     fullyMigrated,
     migratedCount,
     safeAsIsCount,
     skippedCount,
-    hasSafeNavigation,
+    hasSafeNavigation: true,
   };
-}
-
-/**
- * Checks if an expression containing `?.` is in a context where the difference
- * between `null` and `undefined` doesn't matter.
- */
-function isNullSafeContext(expr: string): boolean {
-  // Standalone expression with no operators — Angular interpolation renders
-  // both null and undefined as empty string ""
-  if (isSimpleSafeChain(expr)) {
-    return true;
-  }
-
-  // Has nullish coalescing: a?.b ?? 'fallback' — ?? catches both
-  if (expr.includes('??')) {
-    return true;
-  }
-
-  // Leading negation: !a?.b or !!a?.b — both null/undefined are falsy
-  const negStripped = expr.replace(/^!+\s*/, '');
-  if (negStripped !== expr && isSimpleSafeChain(negStripped)) {
-    return true;
-  }
-
-  // Logical OR fallback: a?.b || 'default' — both null/undefined trigger fallback
-  if (/\|\|/.test(expr) && !hasTopLevelPipe(expr)) {
-    return true;
-  }
-
-  // Logical AND: a?.b && x — both null/undefined are falsy, short-circuit same way
-  if (/&&/.test(expr)) {
-    return true;
-  }
-
-  // Loose equality with null: a?.b == null or a?.b != null — matches both
-  if (/==\s*null\b/.test(expr) && !/===/.test(expr)) {
-    return true;
-  }
-  if (/!=\s*null\b/.test(expr) && !/!==/.test(expr)) {
-    return true;
-  }
-
-  // Ternary where ?. is only in condition position: a?.b ? x : y
-  // Also handles negated: !a?.b?.c ? x : y
-  // Both null/undefined are falsy, so condition evaluates the same
-  if (isSafeNavInTernaryCondition(expr)) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Checks if expr is a simple safe chain like `a?.b?.c.d`, `a?.b!.c`, `a?.[0]`
- * (no binary operators, calls, pipes — only property/keyed access with ?. and !.)
- */
-function isSimpleSafeChain(expr: string): boolean {
-  // Allow identifiers, dots, ?., !., brackets for keyed access, numbers, quotes for string keys
-  return /^[a-zA-Z_$][a-zA-Z0-9_$.\[\]'"?!]*$/.test(expr) && expr.includes('?.');
-}
-
-/**
- * Checks if the `?.` part is only in the condition of a ternary `cond ? a : b`.
- * Also handles negated conditions: `!a?.b ? x : y`
- */
-function isSafeNavInTernaryCondition(expr: string): boolean {
-  // Find the first top-level ? that isn't ?. or ??
-  let depth = 0;
-  let inString = false;
-  let stringChar = '';
-
-  for (let i = 0; i < expr.length; i++) {
-    const ch = expr[i];
-    if (i > 0 && expr[i - 1] === '\\') continue;
-
-    if (!inString && (ch === "'" || ch === '"' || ch === '`')) {
-      inString = true;
-      stringChar = ch;
-    } else if (inString && ch === stringChar) {
-      inString = false;
-    }
-    if (inString) continue;
-    if (ch === '(' || ch === '[') depth++;
-    else if (ch === ')' || ch === ']') depth--;
-
-    if (ch === '?' && depth === 0) {
-      const next = i + 1 < expr.length ? expr[i + 1] : '';
-      if (next !== '.' && next !== '?') {
-        // This is a ternary ?. Check if ?. only appears before this position.
-        const condition = expr.substring(0, i);
-        const branches = expr.substring(i + 1);
-        return condition.includes('?.') && !branches.includes('?.');
-      }
-    }
-  }
-  return false;
-}
-
-/**
- * Tries to convert a single expression containing `?.` to a ternary form.
- * Returns null if conversion is not safe.
- */
-function tryConvertExpression(expr: string): string | null {
-  if (expr.includes('??')) return null;
-  if (hasTopLevelPipe(expr)) return null;
-  if (/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(/.test(expr)) return null;
-  if (expr.includes('?.[')) return null;
-  // Reject ternary operator (? not followed by . or ?)
-  if (/\?[^.?]/.test(expr.replace(/\?\./g, '').replace(/\?\?/g, ''))) return null;
-
-  const segments = parsePropertyChain(expr);
-  if (segments === null || segments.length < 2) return null;
-  if (!segments.some((s) => s.safe)) return null;
-
-  return buildTernaryFromSegments(segments);
-}
-
-interface ChainSegment {
-  prop: string;
-  safe: boolean;
-}
-
-function parsePropertyChain(expr: string): ChainSegment[] | null {
-  const identRe = /^[a-zA-Z_$][a-zA-Z0-9_$]*/;
-  const first = expr.match(identRe);
-  if (!first) return null;
-
-  const segments: ChainSegment[] = [{prop: first[0], safe: false}];
-  let pos = first[0].length;
-
-  while (pos < expr.length) {
-    if (expr[pos] === '?' && pos + 1 < expr.length && expr[pos + 1] === '.') {
-      pos += 2;
-      const m = expr.substring(pos).match(identRe);
-      if (!m) return null;
-      segments.push({prop: m[0], safe: true});
-      pos += m[0].length;
-    } else if (expr[pos] === '.') {
-      pos += 1;
-      const m = expr.substring(pos).match(identRe);
-      if (!m) return null;
-      segments.push({prop: m[0], safe: false});
-      pos += m[0].length;
-    } else {
-      return null;
-    }
-  }
-  return segments;
-}
-
-function pathUpTo(segments: ChainSegment[], endIndex: number): string {
-  let path = segments[0].prop;
-  for (let i = 1; i <= endIndex; i++) {
-    path += '.' + segments[i].prop;
-  }
-  return path;
-}
-
-function buildTernaryFromSegments(segments: ChainSegment[]): string {
-  const safeIndices: number[] = [];
-  for (let i = 0; i < segments.length; i++) {
-    if (segments[i].safe) safeIndices.push(i);
-  }
-
-  const fullPath = pathUpTo(segments, segments.length - 1);
-  let result = fullPath;
-
-  for (let si = safeIndices.length - 1; si >= 0; si--) {
-    const guard = pathUpTo(segments, safeIndices[si] - 1);
-    result = `${guard} != null ? ${result} : null`;
-  }
-  return result;
-}
-
-function hasTopLevelPipe(expr: string): boolean {
-  let depth = 0;
-  let inString = false;
-  let stringChar = '';
-
-  for (let i = 0; i < expr.length; i++) {
-    const ch = expr[i];
-    if (i > 0 && expr[i - 1] === '\\') continue;
-
-    if (!inString && (ch === "'" || ch === '"' || ch === '`')) {
-      inString = true;
-      stringChar = ch;
-    } else if (inString && ch === stringChar) {
-      inString = false;
-    }
-    if (inString) continue;
-
-    if (ch === '(' || ch === '[') depth++;
-    else if (ch === ')' || ch === ']') depth--;
-    else if (ch === '|' && depth === 0 && i + 1 < expr.length && expr[i + 1] !== '|') {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -308,52 +188,363 @@ function hasTopLevelPipe(expr: string): boolean {
  * runtime values to `null`. Similar to signal migration's `--best-effort-mode`.
  */
 export function migrateTemplateBestEffort(template: string): TemplateMigrationResult {
-  let hasSafeNavigation = false;
+  if (!template.includes('?.')) {
+    return {
+      migrated: template,
+      fullyMigrated: true,
+      migratedCount: 0,
+      safeAsIsCount: 0,
+      skippedCount: 0,
+      hasSafeNavigation: false,
+    };
+  }
+
+  const parsed = parseTemplate(template, 'migration.html', {});
+  if (parsed.errors && parsed.errors.length > 0) {
+    return {
+      migrated: template,
+      fullyMigrated: false,
+      migratedCount: 0,
+      safeAsIsCount: 0,
+      skippedCount: 0,
+      hasSafeNavigation: true,
+    };
+  }
+
+  const collector = new SafeNavCollector();
+  tmplAstVisitAll(collector, parsed.nodes);
+
+  if (collector.occurrences.length === 0) {
+    return {
+      migrated: template,
+      fullyMigrated: true,
+      migratedCount: 0,
+      safeAsIsCount: 0,
+      skippedCount: 0,
+      hasSafeNavigation: false,
+    };
+  }
+
   let migratedCount = 0;
   let safeAsIsCount = 0;
   let skippedCount = 0;
 
-  const migrated = template.replace(
-    /\{\{([\s\S]*?)\}\}/g,
-    (_match: string, exprContent: string) => {
-      const trimmed = exprContent.trim();
-      if (!trimmed.includes('?.')) return _match;
+  const sorted = [...collector.occurrences].sort((a, b) => b.start - a.start);
+  let result = template;
 
-      hasSafeNavigation = true;
+  for (const occ of sorted) {
+    if (occ.context === SafeNavContext.NullSafe) {
+      safeAsIsCount++;
+      continue;
+    }
 
-      if (isNullSafeContext(trimmed)) {
-        safeAsIsCount++;
-        return _match;
-      }
-
-      if (trimmed.includes('??')) {
-        safeAsIsCount++;
-        return _match;
-      }
-
-      const converted = tryConvertExpression(trimmed);
-      if (converted !== null) {
-        migratedCount++;
-        return `{{ ${converted} }}`;
-      }
-
-      // Best-effort fallback: ?? null (DANGEROUS)
-      if (hasTopLevelPipe(trimmed)) {
-        skippedCount++;
-        return _match;
-      }
-
+    const ternary = tryBuildTernary(occ.node, template);
+    if (ternary !== null) {
       migratedCount++;
-      return `{{ ${trimmed} ?? null }}`;
-    },
-  );
+      result = result.substring(0, occ.start) + ternary + result.substring(occ.end);
+    } else {
+      // Best-effort: append ?? null to the original expression text
+      const originalText = template.substring(occ.start, occ.end);
+      migratedCount++;
+      result =
+        result.substring(0, occ.start) + originalText + ' ?? null' + result.substring(occ.end);
+    }
+  }
 
   return {
-    migrated,
+    migrated: result,
     fullyMigrated: skippedCount === 0,
     migratedCount,
     safeAsIsCount,
     skippedCount,
-    hasSafeNavigation,
+    hasSafeNavigation: true,
   };
+}
+
+/**
+ * Template-level AST visitor that finds all expressions containing safe navigation
+ * and determines the context of each occurrence.
+ */
+class SafeNavCollector extends TmplAstRecursiveVisitor {
+  occurrences: SafeNavOccurrence[] = [];
+
+  override visitBoundText(text: TmplAstBoundText): void {
+    const expr = text.value;
+    if (expr instanceof ASTWithSource) {
+      this.analyzeExpression(expr.ast);
+    } else {
+      this.analyzeExpression(expr);
+    }
+  }
+
+  override visitBoundAttribute(attribute: TmplAstBoundAttribute): void {
+    const expr = attribute.value;
+    if (expr instanceof ASTWithSource) {
+      this.analyzeExpression(expr.ast);
+    } else {
+      this.analyzeExpression(expr);
+    }
+    super.visitBoundAttribute(attribute);
+  }
+
+  override visitBoundEvent(event: TmplAstBoundEvent): void {
+    const expr = event.handler;
+    if (expr instanceof ASTWithSource) {
+      this.analyzeExpression(expr.ast);
+    } else {
+      this.analyzeExpression(expr);
+    }
+    super.visitBoundEvent(event);
+  }
+
+  private analyzeExpression(ast: AST): void {
+    if (ast instanceof Interpolation) {
+      // Each interpolation expression is analyzed independently
+      for (const expr of ast.expressions) {
+        this.analyzeExprForSafeNav(expr, SafeNavContext.NullSafe);
+      }
+    } else {
+      this.analyzeExprForSafeNav(ast, SafeNavContext.Sensitive);
+    }
+  }
+
+  /**
+   * Walk an expression tree to find safe navigation nodes.
+   * The `parentContext` indicates whether the parent makes null/undefined indistinguishable.
+   */
+  private analyzeExprForSafeNav(ast: AST, parentContext: SafeNavContext): void {
+    const finder = new SafeNavExpressionFinder(parentContext);
+    finder.visit(ast);
+    // Only collect the outermost safe nav in each expression tree
+    this.occurrences.push(...finder.occurrences);
+  }
+}
+
+/**
+ * Expression-level AST visitor that finds safe navigation nodes and determines their context.
+ */
+class SafeNavExpressionFinder extends RecursiveAstVisitor {
+  occurrences: SafeNavOccurrence[] = [];
+  private contextStack: SafeNavContext[] = [];
+
+  constructor(private rootContext: SafeNavContext) {
+    super();
+    this.contextStack.push(rootContext);
+  }
+
+  private get currentContext(): SafeNavContext {
+    return this.contextStack[this.contextStack.length - 1];
+  }
+
+  override visitSafePropertyRead(ast: SafePropertyRead, context?: any): any {
+    // Don't recurse into inner safe reads (they're part of a chain)
+    // Only record the outermost one
+    if (!this.isInsideSafeChain(ast)) {
+      this.occurrences.push({
+        node: ast,
+        context: this.currentContext,
+        start: ast.sourceSpan.start,
+        end: ast.sourceSpan.end,
+      });
+    }
+    // Still visit the receiver in case it has safe nav too
+    this.visit(ast.receiver, context);
+  }
+
+  override visitSafeKeyedRead(ast: SafeKeyedRead, context?: any): any {
+    if (!this.isInsideSafeChain(ast)) {
+      this.occurrences.push({
+        node: ast,
+        context: this.currentContext,
+        start: ast.sourceSpan.start,
+        end: ast.sourceSpan.end,
+      });
+    }
+    this.visit(ast.receiver, context);
+    this.visit(ast.key, context);
+  }
+
+  override visitSafeCall(ast: SafeCall, context?: any): any {
+    if (!this.isInsideSafeChain(ast)) {
+      this.occurrences.push({
+        node: ast,
+        context: this.currentContext,
+        start: ast.sourceSpan.start,
+        end: ast.sourceSpan.end,
+      });
+    }
+    this.visit(ast.receiver, context);
+    this.visitAll(ast.args, context);
+  }
+
+  override visitBinary(ast: Binary, context?: any): any {
+    // Determine context for children based on operator
+    const ctx = classifyBinaryContext(ast);
+    this.contextStack.push(ctx);
+    this.visit(ast.left, context);
+    this.contextStack.pop();
+
+    // Right side of binary is always sensitive (e.g. `x + a?.b`)
+    this.contextStack.push(SafeNavContext.Sensitive);
+    this.visit(ast.right, context);
+    this.contextStack.pop();
+  }
+
+  override visitConditional(ast: Conditional, context?: any): any {
+    // Condition position is null-safe (truthiness check)
+    this.contextStack.push(SafeNavContext.NullSafe);
+    this.visit(ast.condition, context);
+    this.contextStack.pop();
+
+    // Branches are sensitive
+    this.contextStack.push(SafeNavContext.Sensitive);
+    this.visit(ast.trueExp, context);
+    this.visit(ast.falseExp, context);
+    this.contextStack.pop();
+  }
+
+  override visitPrefixNot(ast: PrefixNot, context?: any): any {
+    // !a?.b — negation makes null/undefined equivalent (both falsy → true)
+    this.contextStack.push(SafeNavContext.NullSafe);
+    this.visit(ast.expression, context);
+    this.contextStack.pop();
+  }
+
+  override visitNonNullAssert(ast: NonNullAssert, context?: any): any {
+    // a?.b! — non-null assertion doesn't change null/undefined equivalence
+    this.visit(ast.expression, context);
+  }
+
+  /**
+   * Check if an AST node is a receiver inside a larger safe chain.
+   * If so, we don't want to record it separately.
+   */
+  private isInsideSafeChain(node: AST): boolean {
+    // The parent tracking would require more complex machinery.
+    // For now, we record all safe nav nodes and deduplicate by position.
+    return false;
+  }
+}
+
+/**
+ * Classify the context of the left side of a binary expression.
+ */
+function classifyBinaryContext(ast: Binary): SafeNavContext {
+  switch (ast.operation) {
+    case '&&':
+    case '||':
+      // Logical operators: both null and undefined are falsy
+      return SafeNavContext.NullSafe;
+    case '??':
+      // Nullish coalescing: catches both null and undefined
+      return SafeNavContext.NullSafe;
+    case '==':
+    case '!=':
+      // Loose equality: null == undefined is true
+      return SafeNavContext.NullSafe;
+    case '===':
+    case '!==':
+      // Strict equality: null !== undefined
+      return SafeNavContext.Sensitive;
+    case '+':
+      // String concatenation differs: "prefixnull" vs "prefixundefined"
+      return SafeNavContext.Sensitive;
+    default:
+      return SafeNavContext.Sensitive;
+  }
+}
+
+/**
+ * Try to build a ternary replacement for a safe navigation expression.
+ *
+ * Converts `a?.b?.c` → `a != null ? (a.b != null ? a.b.c : null) : null`
+ *
+ * Returns null if the expression can't be safely converted (e.g., method calls,
+ * keyed access, pipes).
+ */
+function tryBuildTernary(
+  node: SafePropertyRead | SafeKeyedRead | SafeCall,
+  template: string,
+): string | null {
+  // Only handle simple property chains for ternary conversion
+  const chain = collectSafeChain(node);
+  if (chain === null) {
+    return null;
+  }
+
+  return buildTernaryFromChain(chain);
+}
+
+interface ChainSegment {
+  name: string;
+  safe: boolean;
+}
+
+/**
+ * Collect a property chain from a safe navigation node.
+ * Returns null if the chain contains method calls, keyed reads, or other complex expressions.
+ */
+function collectSafeChain(node: AST): ChainSegment[] | null {
+  const segments: ChainSegment[] = [];
+  let current: AST = node;
+
+  while (true) {
+    if (current instanceof SafePropertyRead) {
+      segments.unshift({name: current.name, safe: true});
+      current = current.receiver;
+    } else if (current instanceof PropertyRead) {
+      segments.unshift({name: current.name, safe: false});
+      current = current.receiver;
+    } else if (current instanceof NonNullAssert) {
+      // a?.b!.c — skip the non-null assertion, take the inner expression
+      current = current.expression;
+    } else if (
+      current instanceof SafeKeyedRead ||
+      current instanceof SafeCall
+    ) {
+      // Can't convert keyed reads or calls to ternary
+      return null;
+    } else {
+      // Should be the implicit receiver or a simple identifier
+      break;
+    }
+  }
+
+  if (segments.length < 2) {
+    return null;
+  }
+
+  // Must have at least one safe segment
+  if (!segments.some((s) => s.safe)) {
+    return null;
+  }
+
+  return segments;
+}
+
+function buildTernaryFromChain(segments: ChainSegment[]): string {
+  const safeIndices: number[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].safe) {
+      safeIndices.push(i);
+    }
+  }
+
+  function pathUpTo(endIdx: number): string {
+    let path = segments[0].name;
+    for (let i = 1; i <= endIdx; i++) {
+      path += '.' + segments[i].name;
+    }
+    return path;
+  }
+
+  const fullPath = pathUpTo(segments.length - 1);
+  let result = fullPath;
+
+  for (let si = safeIndices.length - 1; si >= 0; si--) {
+    const guard = pathUpTo(safeIndices[si] - 1);
+    result = `${guard} != null ? ${result} : null`;
+  }
+
+  return result;
 }

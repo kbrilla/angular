@@ -136,6 +136,7 @@ import {
   compileNgFactoryDefField,
   compileResults,
   createForwardRefResolver,
+  createValueHasWrongTypeError,
   extractClassDebugInfo,
   extractClassMetadata,
   extractSchemas,
@@ -999,9 +1000,11 @@ export class ComponentDecoratorHandler
           ...metadata,
           template: {
             ...template,
-            optionalChainingSemantics: this.strictOptionalChainingSemantics
-              ? OptionalChainingSemantics.Native
-              : OptionalChainingSemantics.Legacy,
+            optionalChainingSemantics:
+              componentOptionalChainingSemantics ??
+              (this.strictOptionalChainingSemantics
+                ? OptionalChainingSemantics.Native
+                : OptionalChainingSemantics.Legacy),
           },
           encapsulation,
           changeDetection,
