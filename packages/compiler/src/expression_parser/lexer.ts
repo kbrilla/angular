@@ -480,10 +480,7 @@ class _Scanner {
     this.advance(); // Skip initial digit.
 
     // Check for hex (0x/0X), octal (0o/0O), or binary (0b/0B) prefixes.
-    if (
-      this.index === start + 1 &&
-      this.input.charCodeAt(start) === chars.$0
-    ) {
+    if (this.index === start + 1 && this.input.charCodeAt(start) === chars.$0) {
       if (this.peek === chars.$x || this.peek === chars.$X) {
         return this.scanRadixNumber(start, chars.isAsciiHexDigit, 16);
       } else if (this.peek === chars.$o || this.peek === chars.$O) {

@@ -514,10 +514,7 @@ export class Parser {
         // Found `/*`, skip until `*/`.
         i += 2;
         while (i < input.length - 1) {
-          if (
-            input.charCodeAt(i) === chars.$STAR &&
-            input.charCodeAt(i + 1) === chars.$SLASH
-          ) {
+          if (input.charCodeAt(i) === chars.$STAR && input.charCodeAt(i + 1) === chars.$SLASH) {
             i += 2;
             break;
           }

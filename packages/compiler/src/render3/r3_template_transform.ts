@@ -439,13 +439,7 @@ class HtmlAstToIvyAst implements html.Visitor {
       decl.valueSpan,
       decl.valueSpan.start.offset,
     );
-    return new t.LetDeclaration(
-      localName,
-      value,
-      decl.sourceSpan,
-      decl.nameSpan,
-      decl.valueSpan,
-    );
+    return new t.LetDeclaration(localName, value, decl.sourceSpan, decl.nameSpan, decl.valueSpan);
   }
 
   private _desugarObjectDestructuring(
@@ -516,7 +510,7 @@ class HtmlAstToIvyAst implements html.Visitor {
           this._parsePropertyBinding(remainder, accessExpr, decl, results);
         } else {
           // Check for default value: `key = default`
-          const eqIdx = key.indexOf('=');
+          const eqIdx = this._findTopLevelChar(key, '=');
           if (eqIdx !== -1) {
             const actualKey = key.substring(0, eqIdx).trim();
             const defaultVal = key.substring(eqIdx + 1).trim();
@@ -532,12 +526,17 @@ class HtmlAstToIvyAst implements html.Visitor {
 
   /** Find the first `:` not inside brackets. */
   private _findTopLevelColon(str: string): number {
+    return this._findTopLevelChar(str, ':');
+  }
+
+  /** Find the first occurrence of a character not inside brackets. */
+  private _findTopLevelChar(str: string, char: string): number {
     let depth = 0;
     for (let i = 0; i < str.length; i++) {
       const ch = str[i];
       if (ch === '[' || ch === '{') depth++;
       else if (ch === ']' || ch === '}') depth--;
-      else if (ch === ':' && depth === 0) return i;
+      else if (ch === char && depth === 0) return i;
     }
     return -1;
   }
@@ -558,7 +557,7 @@ class HtmlAstToIvyAst implements html.Visitor {
       results.push(...nestedResults);
     } else {
       // Check for default value: `localName = default`
-      const eqIdx = target.indexOf('=');
+      const eqIdx = this._findTopLevelChar(target, '=');
       if (eqIdx !== -1) {
         const localName = target.substring(0, eqIdx).trim();
         const defaultVal = target.substring(eqIdx + 1).trim();
@@ -631,7 +630,7 @@ class HtmlAstToIvyAst implements html.Visitor {
       }
 
       // Check for default value: `a = defaultVal`
-      const eqIdx = elem.indexOf('=');
+      const eqIdx = this._findTopLevelChar(elem, '=');
       if (eqIdx !== -1) {
         const localName = elem.substring(0, eqIdx).trim();
         const defaultVal = elem.substring(eqIdx + 1).trim();
