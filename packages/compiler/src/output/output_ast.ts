@@ -1790,6 +1790,9 @@ export class RecursiveAstVisitor implements StatementVisitor, ExpressionVisitor 
         entry.expression.visitExpression(this, context);
       } else {
         entry.value.visitExpression(this, context);
+        if (entry.computedKey) {
+          entry.computedKey.visitExpression(this, context);
+        }
       }
     });
     return this.visitExpression(ast, context);
