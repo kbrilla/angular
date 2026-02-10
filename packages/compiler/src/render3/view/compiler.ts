@@ -22,6 +22,7 @@ import {R3CompiledExpression, typeWithParameters} from '../util';
 import {
   DeclarationListEmitMode,
   DeferBlockDepsEmitMode,
+  OptionalChainingSemantics,
   R3ComponentMetadata,
   R3DeferResolverFunctionMetadata,
   R3DirectiveMetadata,
@@ -248,6 +249,7 @@ export function compileComponentFromMetadata(
     allDeferrableDepsFn,
     meta.relativeTemplatePath,
     getTemplateSourceLocationsEnabled(),
+    meta.template.optionalChainingSemantics ?? OptionalChainingSemantics.Legacy,
   );
 
   // Then the IR is transformed to prepare it for code generation.

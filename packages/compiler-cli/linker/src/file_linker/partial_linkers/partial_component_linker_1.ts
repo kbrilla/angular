@@ -13,6 +13,7 @@ import {
   DeferBlockDepsEmitMode,
   ForwardRefHandling,
   makeBindingParser,
+  OptionalChainingSemantics,
   outputAst as o,
   ParsedTemplate,
   parseTemplate,
@@ -225,12 +226,22 @@ export class PartialComponentLinkerVersion1<TStatement, TExpression>
       }
     }
 
+    // Read optionalChainingSemantics from metadata, defaulting to 'legacy' if not present.
+    // This ensures libraries compiled before this feature retain legacy safe navigation behavior,
+    // regardless of the consuming app's strictOptionalChainingSemantics setting.
+    const optionalChainingSemantics: OptionalChainingSemantics =
+      metaObj.has('optionalChainingSemantics') &&
+      metaObj.getString('optionalChainingSemantics') === 'native'
+        ? OptionalChainingSemantics.Native
+        : OptionalChainingSemantics.Legacy;
+
     return {
       ...baseMeta,
       viewProviders: metaObj.has('viewProviders') ? metaObj.getOpaque('viewProviders') : null,
       template: {
         nodes: template.nodes,
         ngContentSelectors: template.ngContentSelectors,
+        optionalChainingSemantics,
       },
       declarationListEmitMode,
       styles: metaObj.has('styles')
