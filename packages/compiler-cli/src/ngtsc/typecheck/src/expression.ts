@@ -8,6 +8,7 @@
 
 import {
   ArrowFunction,
+  ArrowFunctionRestParameter,
   AST,
   AstVisitor,
   ASTWithSource,
@@ -240,6 +241,13 @@ class AstTranslator implements AstVisitor {
       const value = this.translate(ast.values[idx]);
 
       if (key.kind === 'property') {
+        if (key.isComputed && key.computedKey) {
+          const computedKeyExpr = this.translate(key.computedKey);
+          return ts.factory.createPropertyAssignment(
+            ts.factory.createComputedPropertyName(computedKeyExpr),
+            value,
+          );
+        }
         const keyNode = ts.factory.createStringLiteral(key.key);
         addParseSpanInfo(keyNode, key.sourceSpan);
         return ts.factory.createPropertyAssignment(keyNode, value);
@@ -264,6 +272,8 @@ class AstTranslator implements AstVisitor {
       node = ts.factory.createStringLiteral(ast.value);
     } else if (typeof ast.value === 'number') {
       node = tsNumericExpression(ast.value);
+    } else if (typeof ast.value === 'bigint') {
+      node = ts.factory.createBigIntLiteral(`${ast.value}`);
     } else if (typeof ast.value === 'boolean') {
       node = ast.value ? ts.factory.createTrue() : ts.factory.createFalse();
     } else {
@@ -498,7 +508,12 @@ class AstTranslator implements AstVisitor {
 
   visitArrowFunction(ast: ArrowFunction): ts.ArrowFunction {
     const params = ast.parameters.map((param) => {
-      const paramNode = ts.factory.createParameterDeclaration(undefined, undefined, param.name);
+      const isRest = param instanceof ArrowFunctionRestParameter;
+      const paramNode = ts.factory.createParameterDeclaration(
+        undefined,
+        isRest ? ts.factory.createToken(ts.SyntaxKind.DotDotDotToken) : undefined,
+        param.name,
+      );
       // Ignore diagnostics on the node to skip diagnostics from `noImplicitAny` since
       // users aren't able to set types on the parameters. Note that this is preferable
       // to setting their types to `any`, because it allows us to infer the types when

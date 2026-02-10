@@ -569,7 +569,7 @@ export class RegularExpressionLiteralExpr extends Expression {
 
 export class LiteralExpr extends Expression {
   constructor(
-    public value: number | string | boolean | null | undefined,
+    public value: number | bigint | string | boolean | null | undefined,
     type?: Type | null,
     sourceSpan?: ParseSourceSpan | null,
   ) {
@@ -985,14 +985,15 @@ export class FnParam {
   constructor(
     public name: string,
     public type: Type | null = null,
+    public isRest: boolean = false,
   ) {}
 
   isEquivalent(param: FnParam): boolean {
-    return this.name === param.name;
+    return this.name === param.name && this.isRest === param.isRest;
   }
 
   clone(): FnParam {
-    return new FnParam(this.name, this.type);
+    return new FnParam(this.name, this.type, this.isRest);
   }
 }
 
@@ -1337,6 +1338,8 @@ export class LiteralMapPropertyAssignment {
     public key: string,
     public value: Expression,
     public quoted: boolean,
+    public isComputed?: boolean,
+    public computedKey?: Expression,
   ) {}
 
   isEquivalent(e: LiteralMapPropertyAssignment): boolean {
@@ -1344,7 +1347,13 @@ export class LiteralMapPropertyAssignment {
   }
 
   clone(): LiteralMapPropertyAssignment {
-    return new LiteralMapPropertyAssignment(this.key, this.value.clone(), this.quoted);
+    return new LiteralMapPropertyAssignment(
+      this.key,
+      this.value.clone(),
+      this.quoted,
+      this.isComputed,
+      this.computedKey?.clone(),
+    );
   }
 
   isConstant() {

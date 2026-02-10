@@ -207,7 +207,15 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     return ts.factory.createArrowFunction(
       undefined,
       undefined,
-      parameters.map((param) => ts.factory.createParameterDeclaration(undefined, undefined, param)),
+      parameters.map((param) => {
+        const isRest = param.startsWith('...');
+        const name = isRest ? param.slice(3) : param;
+        return ts.factory.createParameterDeclaration(
+          undefined,
+          isRest ? ts.factory.createToken(ts.SyntaxKind.DotDotDotToken) : undefined,
+          name,
+        );
+      }),
       undefined,
       undefined,
       body,
@@ -224,7 +232,7 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
     return ts.factory.createIfStatement(condition, thenStatement, elseStatement ?? undefined);
   }
 
-  createLiteral(value: string | number | boolean | null | undefined): ts.Expression {
+  createLiteral(value: string | number | bigint | boolean | null | undefined): ts.Expression {
     if (value === undefined) {
       return ts.factory.createIdentifier('undefined');
     } else if (value === null) {
@@ -233,6 +241,8 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
       return value ? ts.factory.createTrue() : ts.factory.createFalse();
     } else if (typeof value === 'number') {
       return tsNumericExpression(value);
+    } else if (typeof value === 'bigint') {
+      return ts.factory.createBigIntLiteral(`${value}`);
     } else {
       return ts.factory.createStringLiteral(value);
     }
@@ -249,12 +259,16 @@ export class TypeScriptAstFactory implements AstFactory<ts.Statement, ts.Express
           return ts.factory.createSpreadAssignment(prop.expression);
         }
 
-        return ts.factory.createPropertyAssignment(
-          prop.quoted
-            ? ts.factory.createStringLiteral(prop.propertyName)
-            : ts.factory.createIdentifier(prop.propertyName),
-          prop.value,
-        );
+        let keyExpr: ts.PropertyName;
+        if (prop.isComputed && prop.computedKey) {
+          keyExpr = ts.factory.createComputedPropertyName(prop.computedKey);
+        } else if (prop.quoted) {
+          keyExpr = ts.factory.createStringLiteral(prop.propertyName);
+        } else {
+          keyExpr = ts.factory.createIdentifier(prop.propertyName);
+        }
+
+        return ts.factory.createPropertyAssignment(keyExpr, prop.value);
       }),
     );
   }

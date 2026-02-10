@@ -10,6 +10,8 @@ import {expect} from '@angular/private/testing/matchers';
 import {
   AbsoluteSourceSpan,
   ArrowFunction,
+  ArrowFunctionIdentifierParameter,
+  ArrowFunctionRestParameter,
   ASTWithSource,
   BindingPipe,
   BindingPipeType,
@@ -1014,6 +1016,123 @@ describe('parser', () => {
       expect((map.keys[0] as LiteralMapPropertyKey).isShorthandInitialized).toBe(true);
     });
 
+    describe('computed property names', () => {
+      it('should parse an object literal with a computed property name', () => {
+        checkBinding('{[key]: value}');
+      });
+
+      it('should parse computed property name with string key', () => {
+        checkBinding("{['name']: value}");
+      });
+
+      it('should parse mixed regular and computed properties', () => {
+        checkBinding('{a: 1, [key]: 2}');
+      });
+    });
+
+    describe('block comments', () => {
+      it('should strip block comments from expressions', () => {
+        checkBinding('a /* comment */ + b', 'a + b');
+      });
+
+      it('should strip block comments in function calls', () => {
+        checkBinding('foo(/* arg */ x)', 'foo(x)');
+      });
+
+      it('should strip block comments at start of expression', () => {
+        checkBinding('/* comment */ x', 'x');
+      });
+
+      it('should strip multiple block comments', () => {
+        checkBinding('a /* c1 */ + /* c2 */ b', 'a + b');
+      });
+
+      it('should not strip block comment markers inside strings', () => {
+        checkBinding("'a /* b */ c'");
+      });
+    });
+
+    describe('unicode braced escapes', () => {
+      it('should parse braced unicode escape in strings', () => {
+        checkBinding("'\\u{4f60}'", "'你'");
+      });
+
+      it('should parse braced unicode escape for emoji', () => {
+        checkBinding("'\\u{1F600}'", "'😀'");
+      });
+
+      it('should still parse 4-digit unicode escapes', () => {
+        checkBinding("'\\u4f60'", "'你'");
+      });
+    });
+
+    describe('hex, octal, and binary number literals', () => {
+      it('should parse hex number literals', () => {
+        checkBinding('0xFF', '255');
+      });
+
+      it('should parse hex number literals with uppercase prefix', () => {
+        checkBinding('0XFF', '255');
+      });
+
+      it('should parse octal number literals', () => {
+        checkBinding('0o77', '63');
+      });
+
+      it('should parse binary number literals', () => {
+        checkBinding('0b1010', '10');
+      });
+
+      it('should parse hex with numeric separators', () => {
+        checkBinding('0xFF_FF', '65535');
+      });
+
+      it('should parse hex in expressions', () => {
+        checkBinding('0xFF + 1', '255 + 1');
+      });
+
+      it('should treat legacy octal-style numbers as decimal', () => {
+        // `0777` is not a valid ES6+ octal (that would be `0o777`).
+        // The lexer scans `0` then continues with decimal digits, treating it as `777`.
+        checkBinding('0777', '777');
+      });
+
+      it('should parse numbers with leading zeros as decimal (not legacy octal)', () => {
+        // In strict mode JS, `09` is decimal 9, not an octal error.
+        // Angular templates follow strict mode semantics.
+        checkBinding('09', '9');
+      });
+    });
+
+    describe('BigInt literals', () => {
+      it('should parse a simple BigInt literal', () => {
+        checkBinding('1n');
+      });
+
+      it('should parse a zero BigInt literal', () => {
+        checkBinding('0n');
+      });
+
+      it('should parse a large BigInt literal', () => {
+        checkBinding('9007199254740991n');
+      });
+
+      it('should parse BigInt in expressions', () => {
+        checkBinding('1n + 2n');
+      });
+
+      it('should parse BigInt with numeric separators', () => {
+        checkBinding('1_000_000n', '1000000n');
+      });
+
+      it('should parse BigInt as LiteralPrimitive with bigint value', () => {
+        const ast = parseBinding('42n');
+        const lit = ast.ast as any;
+        expect(typeof lit.value).toBe('bigint');
+        expect(lit.value).toBe(BigInt(42));
+      });
+    });
+
     describe('arrow functions', () => {
       it('should parse a single-parameter arrow function', () => {
         checkBinding('a => a');
@@ -1055,6 +1174,46 @@ describe('parser', () => {
         checkBinding('(a, b) => [a, b, foo]');
       });
 
+      describe('rest parameters', () => {
+        it('should parse an arrow function with only a rest parameter', () => {
+          checkBinding('(...args) => args');
+        });
+
+        it('should parse an arrow function with regular and rest parameters', () => {
+          checkBinding('(a, b, ...rest) => a + b');
+        });
+
+        it('should parse an arrow function with one regular and a rest parameter', () => {
+          checkBinding('(a, ...rest) => a');
+        });
+
+        it('should parse a rest parameter as ArrowFunctionRestParameter', () => {
+          const ast = parseBinding('(a, ...rest) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(2);
+          expect(arrowFn.parameters[0] instanceof ArrowFunctionIdentifierParameter).toBe(true);
+          expect(arrowFn.parameters[1] instanceof ArrowFunctionRestParameter).toBe(true);
+          expect(arrowFn.parameters[0].name).toBe('a');
+          expect(arrowFn.parameters[1].name).toBe('rest');
+        });
+
+        it('should produce spans for rest parameters', () => {
+          const ast = parseBinding('(a, ...rest) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          const getSource = (span: ParseSpan) => ast.source?.substring(span.start, span.end);
+
+          expect(getSource(arrowFn.parameters[0].span)).toBe('a');
+          expect(getSource(arrowFn.parameters[1].span)).toBe('...rest');
+        });
+
+        it('should report an error when rest parameter is not last', () => {
+          expectBindingError(
+            '(...rest, a) => a',
+            'A rest parameter must be the last parameter in an arrow function',
+          );
+        });
+      });
+
       describe('arrow function spans', () => {
         it('should produce spans for the entire arrow function', () => {
           expect(unparseWithSpan(parseBinding('a => a'))).toEqual([
@@ -1091,11 +1250,8 @@ describe('parser', () => {
       });
 
       describe('arrow function validations', () => {
-        it('should not allow pipe to be used inside an arrow function', () => {
-          expectBindingError(
-            '(a, b) => (a + b | pipe)',
-            'Cannot have a pipe in an action expression',
-          );
+        it('should allow pipe to be used inside an arrow function', () => {
+          checkBinding('(a, b) => (a + b | pipe)', '(a, b) => ((a + b | pipe))');
         });
 
         it('should report an error for an arrow function with a body', () => {

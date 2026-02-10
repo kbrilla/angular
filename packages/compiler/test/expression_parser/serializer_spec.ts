@@ -136,5 +136,45 @@ describe('serializer', () => {
     it('serializes instanceof expressions', () => {
       expect(serialize(parse(' foo   instanceof   Bar '))).toBe('foo instanceof Bar');
     });
+
+    it('serializes arrow function with rest parameter', () => {
+      expect(serialize(parse('(...args) => args'))).toBe('(...args) => args');
+    });
+
+    it('serializes arrow function with regular and rest parameters', () => {
+      expect(serialize(parse('(a, b, ...rest) => a + b'))).toBe('(a, b, ...rest) => a + b');
+    });
+
+    it('serializes BigInt literal', () => {
+      expect(serialize(parse('1n'))).toBe('1n');
+    });
+
+    it('serializes large BigInt literal', () => {
+      expect(serialize(parse('9007199254740991n'))).toBe('9007199254740991n');
+    });
+
+    it('serializes BigInt in expression', () => {
+      expect(serialize(parse('1n + 2n'))).toBe('1n + 2n');
+    });
+
+    it('serializes hex number literal as decimal', () => {
+      expect(serialize(parse('0xFF'))).toBe('255');
+    });
+
+    it('serializes octal number literal as decimal', () => {
+      expect(serialize(parse('0o77'))).toBe('63');
+    });
+
+    it('serializes binary number literal as decimal', () => {
+      expect(serialize(parse('0b1010'))).toBe('10');
+    });
+
+    it('serializes computed property name in object literal', () => {
+      expect(serialize(parse('{[key]: value}'))).toBe('{[key]: value}');
+    });
+
+    it('serializes mixed regular and computed properties', () => {
+      expect(serialize(parse('{a: 1, [key]: 2}'))).toBe('{a: 1, [key]: 2}');
+    });
   });
 });

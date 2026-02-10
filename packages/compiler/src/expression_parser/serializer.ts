@@ -62,11 +62,14 @@ class SerializeExpressionVisitor implements expr.AstVisitor {
         if (literal.kind === 'spread') {
           return '...';
         }
+        if (literal.isComputed && literal.computedKey) {
+          return `[${literal.computedKey.visit(this, context)}]`;
+        }
         return literal.quoted ? `'${literal.key}'` : literal.key;
       }),
       ast.values.map((value) => value.visit(this, context)),
     )
-      .map(([key, value]) => `${key}: ${value}`)
+      .map(([key, value]) => (key === '...' ? `...${value}` : `${key}: ${value}`))
       .join(', ')}}`;
   }
 
@@ -77,6 +80,8 @@ class SerializeExpressionVisitor implements expr.AstVisitor {
       case 'number':
       case 'boolean':
         return ast.value.toString();
+      case 'bigint':
+        return `${ast.value}n`;
       case 'undefined':
         return 'undefined';
       case 'string':
@@ -144,10 +149,16 @@ class SerializeExpressionVisitor implements expr.AstVisitor {
   visitArrowFunction(ast: expr.ArrowFunction, context: any) {
     let params: string;
 
-    if (ast.parameters.length === 1) {
+    const formatParam = (p: expr.ArrowFunctionParameter) =>
+      p instanceof expr.ArrowFunctionRestParameter ? `...${p.name}` : p.name;
+
+    if (
+      ast.parameters.length === 1 &&
+      !(ast.parameters[0] instanceof expr.ArrowFunctionRestParameter)
+    ) {
       params = ast.parameters[0].name;
     } else {
-      params = `(${ast.parameters.map((e) => e.name).join(', ')})`;
+      params = `(${ast.parameters.map(formatParam).join(', ')})`;
     }
 
     return `${params} => ${ast.body.visit(this, context)}`;

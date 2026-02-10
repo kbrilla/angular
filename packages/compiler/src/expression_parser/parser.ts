@@ -19,6 +19,7 @@ import {
   ArrowFunction,
   ArrowFunctionParameter,
   ArrowFunctionIdentifierParameter,
+  ArrowFunctionRestParameter,
   AST,
   ASTWithSource,
   Binary,
@@ -454,10 +455,81 @@ export class Parser {
   }
 
   private _stripComments(input: string): {stripped: string; hasComments: boolean} {
-    const i = this._commentStart(input);
-    return i != null
-      ? {stripped: input.substring(0, i), hasComments: true}
-      : {stripped: input, hasComments: false};
+    let hasComments = false;
+    let result = input;
+
+    // Strip block comments /* ... */ first (can appear in the middle of expressions).
+    result = this._stripBlockComments(result);
+    if (result !== input) {
+      hasComments = true;
+    }
+
+    // Strip line comments // ... (must be at the end).
+    const i = this._commentStart(result);
+    if (i != null) {
+      result = result.substring(0, i);
+      hasComments = true;
+    }
+
+    return {stripped: result, hasComments};
+  }
+
+  /**
+   * Strips block comments (/* ... *​/) from an expression string,
+   * respecting quoted strings.
+   */
+  private _stripBlockComments(input: string): string {
+    let outerQuote: number | null = null;
+    let result = '';
+    let i = 0;
+
+    while (i < input.length) {
+      const char = input.charCodeAt(i);
+
+      if (outerQuote !== null) {
+        result += input[i];
+        if (char === outerQuote) {
+          outerQuote = null;
+        } else if (char === chars.$BACKSLASH && i + 1 < input.length) {
+          // Skip escaped character in string.
+          i++;
+          result += input[i];
+        }
+        i++;
+        continue;
+      }
+
+      if (chars.isQuote(char)) {
+        outerQuote = char;
+        result += input[i];
+        i++;
+        continue;
+      }
+
+      if (
+        char === chars.$SLASH &&
+        i + 1 < input.length &&
+        input.charCodeAt(i + 1) === chars.$STAR
+      ) {
+        // Found `/*`, skip until `*/`.
+        i += 2;
+        while (i < input.length - 1) {
+          if (input.charCodeAt(i) === chars.$STAR && input.charCodeAt(i + 1) === chars.$SLASH) {
+            i += 2;
+            break;
+          }
+          i++;
+        }
+        // Replace comment with a single space to preserve token boundaries.
+        result += ' ';
+        continue;
+      }
+
+      result += input[i];
+      i++;
+    }
+
+    return result;
   }
 
   private _commentStart(input: string): number | null {
@@ -821,10 +893,6 @@ class _ParseAST {
     const start = this.inputIndex;
     let result = this.parseExpression();
     if (this.consumeOptionalOperator('|')) {
-      if (this.parseFlags & ParseFlags.Action) {
-        this.error(`Cannot have a pipe in an action expression`);
-      }
-
       do {
         const nameStart = this.inputIndex;
         let nameId = this.expectIdentifierOrKeyword();
@@ -1164,6 +1232,10 @@ class _ParseAST {
       const value = this.next.toNumber();
       this.advance();
       return new LiteralPrimitive(this.span(start), this.sourceSpan(start), value);
+    } else if (this.next.isBigInt()) {
+      const value = BigInt(this.next.strValue);
+      this.advance();
+      return new LiteralPrimitive(this.span(start), this.sourceSpan(start), value);
     } else if (this.next.isTemplateLiteralEnd()) {
       return this.parseNoInterpolationTemplateLiteral();
     } else if (this.next.isTemplateLiteralPart()) {
@@ -1222,6 +1294,27 @@ class _ParseAST {
             span: this.span(keyStart),
             sourceSpan: this.sourceSpan(keyStart),
           } satisfies LiteralMapSpreadKey);
+          values.push(this.parsePipe());
+          continue;
+        }
+
+        // Computed property name: `{[expr]: value}`
+        if (this.next.isCharacter(chars.$LBRACKET)) {
+          this.advance(); // consume '['
+          const computedKey = this.parsePipe();
+          this.expectCharacter(chars.$RBRACKET);
+          const keySpan = this.span(keyStart);
+          const keySourceSpan = this.sourceSpan(keyStart);
+          keys.push({
+            kind: 'property',
+            key: '',
+            quoted: false,
+            isComputed: true,
+            computedKey,
+            span: keySpan,
+            sourceSpan: keySourceSpan,
+          } satisfies LiteralMapPropertyKey);
+          this.expectCharacter(chars.$COLON);
           values.push(this.parsePipe());
           continue;
         }
@@ -1744,7 +1837,29 @@ class _ParseAST {
 
     if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
       while (this.next !== EOF) {
-        if (this.next.isIdentifier()) {
+        if (this.next.isOperator('...')) {
+          const restStart = this.inputIndex;
+          this.advance();
+          if (this.next.isIdentifier()) {
+            const token = this.next;
+            this.advance();
+            params.push(
+              new ArrowFunctionRestParameter(
+                token.strValue,
+                this.span(restStart),
+                this.sourceSpan(restStart),
+              ),
+            );
+
+            if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
+              this.error('A rest parameter must be the last parameter in an arrow function');
+            }
+            break;
+          } else {
+            this.error(`Unexpected token ${this.next}`);
+            break;
+          }
+        } else if (this.next.isIdentifier()) {
           const token = this.next;
           this.advance();
           params.push(this.getArrowFunctionIdentifierArg(token));
@@ -1791,7 +1906,11 @@ class _ParseAST {
       let i = start + 1;
 
       for (i; i < tokens.length; i++) {
-        if (!tokens[i].isIdentifier() && !tokens[i].isCharacter(chars.$COMMA)) {
+        if (
+          !tokens[i].isIdentifier() &&
+          !tokens[i].isCharacter(chars.$COMMA) &&
+          !tokens[i].isOperator('...')
+        ) {
           break;
         }
       }

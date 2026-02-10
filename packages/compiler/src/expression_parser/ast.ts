@@ -188,7 +188,7 @@ export class LiteralPrimitive extends AST {
   constructor(
     span: ParseSpan,
     sourceSpan: AbsoluteSourceSpan,
-    public value: string | number | boolean | null | undefined,
+    public value: string | number | bigint | boolean | null | undefined,
   ) {
     super(span, sourceSpan);
   }
@@ -230,6 +230,8 @@ export interface LiteralMapPropertyKey {
   span: ParseSpan;
   sourceSpan: AbsoluteSourceSpan;
   isShorthandInitialized?: boolean;
+  isComputed?: boolean;
+  computedKey?: AST;
 }
 
 export interface LiteralMapSpreadKey {
@@ -551,7 +553,15 @@ export class ArrowFunctionIdentifierParameter {
   ) {}
 }
 
-export type ArrowFunctionParameter = ArrowFunctionIdentifierParameter; // TODO(crisbeto): also rest parameters?
+export class ArrowFunctionRestParameter {
+  constructor(
+    public name: string,
+    public span: ParseSpan,
+    public sourceSpan: AbsoluteSourceSpan,
+  ) {}
+}
+
+export type ArrowFunctionParameter = ArrowFunctionIdentifierParameter | ArrowFunctionRestParameter;
 
 export class ArrowFunction extends AST {
   constructor(
@@ -765,6 +775,11 @@ export class RecursiveAstVisitor implements AstVisitor {
     this.visitAll(ast.expressions, context);
   }
   visitLiteralMap(ast: LiteralMap, context: any): any {
+    for (const key of ast.keys) {
+      if (key.kind === 'property' && key.isComputed && key.computedKey) {
+        this.visit(key.computedKey, context);
+      }
+    }
     this.visitAll(ast.values, context);
   }
   visitLiteralPrimitive(ast: LiteralPrimitive, context: any): any {}

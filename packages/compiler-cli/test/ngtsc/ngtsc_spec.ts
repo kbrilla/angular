@@ -5524,26 +5524,32 @@ runInEachFileSystem((os: string) => {
       expect(errors[0].messageText).toContain('/test.ts@7:17');
     });
 
-    it('should throw in case pipes are used in host listeners', () => {
+    it('should allow pipes in host listeners', () => {
       env.write(
         `test.ts`,
         `
-        import {Component} from '@angular/core';
+        import {Component, Pipe, PipeTransform} from '@angular/core';
+
+        @Pipe({name: 'myPipe'})
+        class MyPipe implements PipeTransform {
+          transform(value: any): any { return value; }
+        }
 
         @Component({
           selector: 'test',
           template: '...',
+          imports: [MyPipe],
           host: {
             '(click)': 'doSmth() | myPipe'
           }
         })
-        class FooCmp {}
+        class FooCmp {
+          doSmth() { return 'value'; }
+        }
       `,
       );
       const errors = env.driveDiagnostics();
-      expect(trim(errors[0].messageText as string)).toContain(
-        'Cannot have a pipe in an action expression',
-      );
+      expect(errors.length).toBe(0);
     });
 
     it('should throw in case pipes are used in host bindings (defined as `value | pipe`)', () => {

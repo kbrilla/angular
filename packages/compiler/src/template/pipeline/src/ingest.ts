@@ -1138,9 +1138,19 @@ function convertAst(
 
       // TODO: should literals have source maps, or do we just map the whole surrounding
       // expression?
-      return key.kind === 'spread'
-        ? new o.LiteralMapSpreadAssignment(value)
-        : new o.LiteralMapPropertyAssignment(key.key, value, key.quoted);
+      if (key.kind === 'spread') {
+        return new o.LiteralMapSpreadAssignment(value);
+      }
+      if (key.isComputed && key.computedKey) {
+        return new o.LiteralMapPropertyAssignment(
+          '',
+          value,
+          false,
+          true,
+          convertAst(key.computedKey, job, baseSourceSpan),
+        );
+      }
+      return new o.LiteralMapPropertyAssignment(key.key, value, key.quoted);
     });
     return new o.LiteralMapExpr(entries, undefined, convertSourceSpan(ast.span, baseSourceSpan));
   } else if (ast instanceof e.LiteralArray) {
@@ -1217,7 +1227,9 @@ function convertAst(
   } else if (ast instanceof e.ArrowFunction) {
     return updateParameterReferences(
       o.arrowFn(
-        ast.parameters.map((arg) => new o.FnParam(arg.name)),
+        ast.parameters.map(
+          (arg) => new o.FnParam(arg.name, null, arg instanceof e.ArrowFunctionRestParameter),
+        ),
         convertAst(ast.body, job, baseSourceSpan),
       ),
     );
