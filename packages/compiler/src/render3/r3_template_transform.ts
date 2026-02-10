@@ -12,6 +12,12 @@ import {
   ParsedEvent,
   ParsedProperty,
   ParsedVariable,
+  LiteralMap,
+  LiteralArray,
+  ImplicitReceiver,
+  PropertyRead,
+  ParseSpan,
+  AbsoluteSourceSpan,
 } from '../expression_parser/ast';
 import * as i18n from '../i18n/i18n_ast';
 import * as html from '../ml_parser/ast';
@@ -31,6 +37,7 @@ import {
   createSwitchBlock,
   isConnectedForLoopBlock,
   isConnectedIfLoopBlock,
+  extractDestructuringLets,
 } from './r3_control_flow';
 import {createDeferredBlock, isConnectedDeferLoopBlock} from './r3_deferred_blocks';
 import {I18N_ICU_VAR_PREFIX} from './view/i18n/util';
@@ -349,13 +356,6 @@ class HtmlAstToIvyAst implements html.Visitor {
   }
 
   visitLetDeclaration(decl: html.LetDeclaration, context: any) {
-    const name = decl.name;
-
-    // Handle destructuring patterns: `@let { a, b } = expr;` or `@let [a, b] = expr;`
-    if (name.startsWith('{') || name.startsWith('[')) {
-      return this._desugarLetDestructuring(decl);
-    }
-
     const value = this.bindingParser.parseBinding(
       decl.value,
       false,
@@ -365,6 +365,47 @@ class HtmlAstToIvyAst implements html.Visitor {
 
     if (value.errors.length === 0 && value.ast instanceof EmptyExpr) {
       this.reportError('@let declaration value cannot be empty', decl.valueSpan);
+    }
+
+    const nameAST = this.bindingParser.parseBinding(
+      decl.name,
+      false,
+      decl.nameSpan,
+      decl.nameSpan.start.offset,
+    );
+
+    if (nameAST.ast instanceof LiteralMap || nameAST.ast instanceof LiteralArray) {
+      const index = Array.isArray(context) ? context.indexOf(decl) : 0;
+      const tempName = `_let_${index}_${decl.nameSpan.start.offset}`;
+
+      // Use a span that ends before the destructuring pattern starts
+      // to avoid "usage before declaration" errors in type check.
+      const tempSpan = new ParseSourceSpan(decl.sourceSpan.start, decl.nameSpan.start);
+
+      const tempLet = new t.LetDeclaration(tempName, value, tempSpan, tempSpan, decl.valueSpan);
+
+      const destructuredLets: t.LetDeclaration[] = [];
+      const accessSpan = new AbsoluteSourceSpan(
+        decl.nameSpan.start.offset,
+        decl.nameSpan.end.offset,
+      );
+      const accessExpr = new PropertyRead(
+        new ParseSpan(0, 0),
+        accessSpan,
+        accessSpan,
+        new ImplicitReceiver(new ParseSpan(0, 0), accessSpan),
+        tempName,
+      );
+
+      extractDestructuringLets(
+        nameAST.ast,
+        accessExpr,
+        destructuredLets,
+        decl.nameSpan,
+        this.bindingParser.errors,
+      );
+
+      return [tempLet, ...destructuredLets];
     }
 
     return new t.LetDeclaration(decl.name, value, decl.sourceSpan, decl.nameSpan, decl.valueSpan);

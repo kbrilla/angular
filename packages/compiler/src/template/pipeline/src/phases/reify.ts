@@ -94,7 +94,15 @@ function reifyCreateOperations(unit: CompilationUnit, ops: ir.OpList<ir.CreateOp
   for (const op of ops) {
     ir.transformExpressionsInOp(
       op,
-      (expr) => reifyIrExpression(unit, expr),
+      (expr, flags) => {
+        // Expressions inside listener/animation handler ops (InChildOperation) contain
+        // PipeBindingExpr that must be reified with listener-specific instructions.
+        // Skip them here; they will be processed later by reifyListenerHandler.
+        if (flags & ir.VisitorContextFlag.InChildOperation) {
+          return expr;
+        }
+        return reifyIrExpression(unit, expr);
+      },
       ir.VisitorContextFlag.None,
     );
 
@@ -607,11 +615,15 @@ function reifyCreateOperations(unit: CompilationUnit, ops: ir.OpList<ir.CreateOp
   }
 }
 
-function reifyUpdateOperations(unit: CompilationUnit, ops: ir.OpList<ir.UpdateOp>): void {
+function reifyUpdateOperations(
+  unit: CompilationUnit,
+  ops: ir.OpList<ir.UpdateOp>,
+  isListenerHandler = false,
+): void {
   for (const op of ops) {
     ir.transformExpressionsInOp(
       op,
-      (expr) => reifyIrExpression(unit, expr),
+      (expr) => reifyIrExpression(unit, expr, isListenerHandler),
       ir.VisitorContextFlag.None,
     );
 
@@ -755,7 +767,11 @@ function reifyControl(op: ir.ControlOp): ir.UpdateOp {
   return ng.control(op.sourceSpan);
 }
 
-function reifyIrExpression(unit: CompilationUnit, expr: o.Expression): o.Expression {
+function reifyIrExpression(
+  unit: CompilationUnit,
+  expr: o.Expression,
+  isListenerHandler = false,
+): o.Expression {
   if (!ir.isIrExpression(expr)) {
     return expr;
   }
@@ -801,8 +817,14 @@ function reifyIrExpression(unit: CompilationUnit, expr: o.Expression): o.Express
     case ir.ExpressionKind.PureFunctionParameterExpr:
       throw new Error(`AssertionError: expected PureFunctionParameterExpr to have been extracted`);
     case ir.ExpressionKind.PipeBinding:
+      if (isListenerHandler) {
+        return ng.listenerPipeBind(expr.targetSlot.slot!, expr.args);
+      }
       return ng.pipeBind(expr.targetSlot.slot!, expr.varOffset!, expr.args);
     case ir.ExpressionKind.PipeBindingVariadic:
+      if (isListenerHandler) {
+        return ng.listenerPipeBindV(expr.targetSlot.slot!, expr.args);
+      }
       return ng.pipeBindV(expr.targetSlot.slot!, expr.varOffset!, expr.args);
     case ir.ExpressionKind.SlotLiteralExpr:
       return o.literal(expr.slot.slot!);
@@ -841,7 +863,8 @@ function reifyListenerHandler(
   consumesDollarEvent: boolean,
 ): o.FunctionExpr {
   // First, reify all instruction calls within `handlerOps`.
-  reifyUpdateOperations(unit, handlerOps);
+  // Pass isListenerHandler=true so pipes use listener-specific instructions.
+  reifyUpdateOperations(unit, handlerOps, /* isListenerHandler */ true);
 
   // Next, extract all the `o.Statement`s from the reified operations. We can expect that at this
   // point, all operations have been converted to statements.

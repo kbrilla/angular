@@ -986,6 +986,8 @@ export class FnParam {
     public name: string,
     public type: Type | null = null,
     public isRest: boolean = false,
+    /** For destructuring parameters, the list of identifier names bound by the pattern. */
+    public boundNames: string[] | null = null,
   ) {}
 
   isEquivalent(param: FnParam): boolean {
@@ -993,7 +995,7 @@ export class FnParam {
   }
 
   clone(): FnParam {
-    return new FnParam(this.name, this.type, this.isRest);
+    return new FnParam(this.name, this.type, this.isRest, this.boundNames);
   }
 }
 

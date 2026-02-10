@@ -266,3 +266,51 @@ export declare class PipeWithoutName implements PipeTransform {
     static ɵpipe: i0.ɵɵPipeDeclaration<PipeWithoutName, null, true>;
 }
 
+/****************************************************************************************************
+ * PARTIAL FILE: pipe_in_event_handler.js
+ ****************************************************************************************************/
+import { Component, Pipe } from '@angular/core';
+import * as i0 from "@angular/core";
+export class MyPipe {
+    transform(value, ...args) {
+        return value;
+    }
+    static ɵfac = i0.ɵɵngDeclareFactory({ minVersion: "12.0.0", version: "0.0.0-PLACEHOLDER", ngImport: i0, type: MyPipe, deps: [], target: i0.ɵɵFactoryTarget.Pipe });
+    static ɵpipe = i0.ɵɵngDeclarePipe({ minVersion: "14.0.0", version: "0.0.0-PLACEHOLDER", ngImport: i0, type: MyPipe, isStandalone: true, name: "myPipe" });
+}
+i0.ɵɵngDeclareClassMetadata({ minVersion: "12.0.0", version: "0.0.0-PLACEHOLDER", ngImport: i0, type: MyPipe, decorators: [{
+            type: Pipe,
+            args: [{ name: 'myPipe' }]
+        }] });
+export class MyApp {
+    value = 'test';
+    handleClick(v) { }
+    static ɵfac = i0.ɵɵngDeclareFactory({ minVersion: "12.0.0", version: "0.0.0-PLACEHOLDER", ngImport: i0, type: MyApp, deps: [], target: i0.ɵɵFactoryTarget.Component });
+    static ɵcmp = i0.ɵɵngDeclareComponent({ minVersion: "14.0.0", version: "0.0.0-PLACEHOLDER", type: MyApp, isStandalone: true, selector: "my-app", ngImport: i0, template: '<button (click)="handleClick(value | myPipe)">Click</button>', isInline: true, dependencies: [{ kind: "pipe", type: MyPipe, name: "myPipe" }] });
+}
+i0.ɵɵngDeclareClassMetadata({ minVersion: "12.0.0", version: "0.0.0-PLACEHOLDER", ngImport: i0, type: MyApp, decorators: [{
+            type: Component,
+            args: [{
+                    selector: 'my-app',
+                    template: '<button (click)="handleClick(value | myPipe)">Click</button>',
+                    imports: [MyPipe],
+                }]
+        }] });
+
+/****************************************************************************************************
+ * PARTIAL FILE: pipe_in_event_handler.d.ts
+ ****************************************************************************************************/
+import { PipeTransform } from '@angular/core';
+import * as i0 from "@angular/core";
+export declare class MyPipe implements PipeTransform {
+    transform(value: any, ...args: any[]): any;
+    static ɵfac: i0.ɵɵFactoryDeclaration<MyPipe, never>;
+    static ɵpipe: i0.ɵɵPipeDeclaration<MyPipe, "myPipe", true>;
+}
+export declare class MyApp {
+    value: string;
+    handleClick(v: any): void;
+    static ɵfac: i0.ɵɵFactoryDeclaration<MyApp, never>;
+    static ɵcmp: i0.ɵɵComponentDeclaration<MyApp, "my-app", never, {}, {}, never, never, true, never>;
+}
+

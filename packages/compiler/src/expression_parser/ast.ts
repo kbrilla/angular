@@ -561,7 +561,26 @@ export class ArrowFunctionRestParameter {
   ) {}
 }
 
-export type ArrowFunctionParameter = ArrowFunctionIdentifierParameter | ArrowFunctionRestParameter;
+export class ArrowFunctionDestructuringParameter {
+  constructor(
+    /** The full destructuring pattern string, e.g. `{ a, b: c }` or `[a, b]`. */
+    public pattern: string,
+    /** All identifiers bound by the destructuring pattern. */
+    public boundNames: string[],
+    public span: ParseSpan,
+    public sourceSpan: AbsoluteSourceSpan,
+    public isRest: boolean = false,
+  ) {}
+
+  get name(): string {
+    return this.pattern;
+  }
+}
+
+export type ArrowFunctionParameter =
+  | ArrowFunctionIdentifierParameter
+  | ArrowFunctionRestParameter
+  | ArrowFunctionDestructuringParameter;
 
 export class ArrowFunction extends AST {
   constructor(

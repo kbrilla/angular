@@ -9,6 +9,7 @@
 import {
   ArrowFunction,
   ArrowFunctionRestParameter,
+  ArrowFunctionDestructuringParameter,
   AST,
   AstVisitor,
   ASTWithSource,
@@ -273,7 +274,7 @@ class AstTranslator implements AstVisitor {
     } else if (typeof ast.value === 'number') {
       node = tsNumericExpression(ast.value);
     } else if (typeof ast.value === 'bigint') {
-      node = ts.factory.createBigIntLiteral(`${ast.value}`);
+      node = ts.factory.createBigIntLiteral(`${ast.value}n`);
     } else if (typeof ast.value === 'boolean') {
       node = ast.value ? ts.factory.createTrue() : ts.factory.createFalse();
     } else {
@@ -507,8 +508,24 @@ class AstTranslator implements AstVisitor {
   }
 
   visitArrowFunction(ast: ArrowFunction): ts.ArrowFunction {
+    // Collect all bound names from all parameters (including destructuring patterns).
+    const allBoundNames = new Set<string>();
+
     const params = ast.parameters.map((param) => {
+      if (param instanceof ArrowFunctionDestructuringParameter) {
+        param.boundNames.forEach((n) => allBoundNames.add(n));
+        const bindingName = createBindingPatternFromString(param.pattern);
+        const paramNode = ts.factory.createParameterDeclaration(
+          undefined,
+          param.isRest ? ts.factory.createToken(ts.SyntaxKind.DotDotDotToken) : undefined,
+          bindingName,
+        );
+        markIgnoreDiagnostics(paramNode);
+        return paramNode;
+      }
+
       const isRest = param instanceof ArrowFunctionRestParameter;
+      allBoundNames.add(param.name);
       const paramNode = ts.factory.createParameterDeclaration(
         undefined,
         isRest ? ts.factory.createToken(ts.SyntaxKind.DotDotDotToken) : undefined,
@@ -533,9 +550,7 @@ class AstTranslator implements AstVisitor {
           return this.maybeResolve(innerAst);
         }
 
-        const correspondingParam = ast.parameters.find((arg) => arg.name === innerAst.name);
-
-        if (correspondingParam) {
+        if (allBoundNames.has(innerAst.name)) {
           const node = ts.factory.createIdentifier(innerAst.name);
           addParseSpanInfo(node, innerAst.sourceSpan);
           return node;
@@ -689,4 +704,26 @@ class VeSafeLhsInferenceBugDetector implements AstVisitor {
   visitArrowFunction(ast: ArrowFunction, context: any) {
     return false;
   }
+}
+
+/**
+ * Creates a TypeScript binding pattern (ObjectBindingPattern or ArrayBindingPattern)
+ * from a destructuring pattern string like `{ a, b: c }` or `[a, b]`.
+ *
+ * This uses TypeScript's parser to create a proper AST node, by parsing a
+ * temporary variable declaration with the pattern and extracting the binding name.
+ */
+function createBindingPatternFromString(pattern: string): ts.BindingPattern {
+  // Use TypeScript's own parser to handle the pattern correctly.
+  const tempSource = `var ${pattern} = 0;`;
+  const sourceFile = ts.createSourceFile('temp.ts', tempSource, ts.ScriptTarget.Latest, false);
+  const stmt = sourceFile.statements[0];
+  if (ts.isVariableStatement(stmt) && stmt.declarationList.declarations.length === 1) {
+    const decl = stmt.declarationList.declarations[0];
+    if (ts.isObjectBindingPattern(decl.name) || ts.isArrayBindingPattern(decl.name)) {
+      return decl.name;
+    }
+  }
+  // Fallback: return an object binding pattern with a single element
+  return ts.factory.createObjectBindingPattern([]);
 }

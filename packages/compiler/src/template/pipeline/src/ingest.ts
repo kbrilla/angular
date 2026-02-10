@@ -1227,9 +1227,12 @@ function convertAst(
   } else if (ast instanceof e.ArrowFunction) {
     return updateParameterReferences(
       o.arrowFn(
-        ast.parameters.map(
-          (arg) => new o.FnParam(arg.name, null, arg instanceof e.ArrowFunctionRestParameter),
-        ),
+        ast.parameters.map((arg) => {
+          if (arg instanceof e.ArrowFunctionDestructuringParameter) {
+            return new o.FnParam(arg.pattern, null, arg.isRest, arg.boundNames);
+          }
+          return new o.FnParam(arg.name, null, arg instanceof e.ArrowFunctionRestParameter);
+        }),
         convertAst(ast.body, job, baseSourceSpan),
       ),
     );
@@ -1945,14 +1948,25 @@ function ingestControlFlowInsertionPoint(
  * @param root Root arrow function.
  */
 function updateParameterReferences(root: o.ArrowFunctionExpr): o.ArrowFunctionExpr {
-  const parameterNames = new Set(root.params.map((param) => param.name));
+  const parameterNames = new Set<string>();
+  for (const param of root.params) {
+    if (param.boundNames) {
+      param.boundNames.forEach((n) => parameterNames.add(n));
+    } else {
+      parameterNames.add(param.name);
+    }
+  }
 
   return ir.transformExpressionsInExpression(
     root,
     (expr) => {
       if (expr instanceof o.ArrowFunctionExpr) {
         for (const param of expr.params) {
-          parameterNames.add(param.name);
+          if (param.boundNames) {
+            param.boundNames.forEach((n) => parameterNames.add(n));
+          } else {
+            parameterNames.add(param.name);
+          }
         }
       } else if (expr instanceof ir.LexicalReadExpr && parameterNames.has(expr.name)) {
         return o.variable(expr.name);
