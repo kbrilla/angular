@@ -145,6 +145,22 @@ describe('serializer', () => {
       expect(serialize(parse('(a, b, ...rest) => a + b'))).toBe('(a, b, ...rest) => a + b');
     });
 
+    it('serializes arrow function with object destructuring parameter', () => {
+      expect(serialize(parse('({a, b}) => a + b'))).toBe('({a, b}) => a + b');
+    });
+
+    it('serializes arrow function with array destructuring parameter', () => {
+      expect(serialize(parse('([a, b]) => a + b'))).toBe('([a, b]) => a + b');
+    });
+
+    it('serializes arrow function with mixed params including destructuring', () => {
+      expect(serialize(parse('(x, {a, b}) => x + a + b'))).toBe('(x, {a, b}) => x + a + b');
+    });
+
+    it('serializes arrow function with rest destructuring parameter', () => {
+      expect(serialize(parse('(...{length}) => length'))).toBe('(...{length}) => length');
+    });
+
     it('serializes BigInt literal', () => {
       expect(serialize(parse('1n'))).toBe('1n');
     });

@@ -2248,7 +2248,9 @@ describe('R3 template transform', () => {
         const errorPattern =
           /Cannot parse expression\. @for loop expression must match the pattern "<identifier> of <expression>"/;
 
-        expect(() => parse(`@for (//invalid of items) {hello}`)).toThrowError(errorPattern);
+        expect(() => parse(`@for (//invalid of items) {hello}`)).toThrowError(
+          /Unexpected node in destructuring pattern/,
+        );
         expect(() => parse(`@for (item) {hello}`)).toThrowError(errorPattern);
         expect(() => parse(`@for (item in items) {hello}`)).toThrowError(errorPattern);
         expect(() => parse(`@for (item of    ) {hello}`)).toThrowError(errorPattern);

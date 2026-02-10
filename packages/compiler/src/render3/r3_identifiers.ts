@@ -244,6 +244,27 @@ export class Identifiers {
   static pipeBind4: o.ExternalReference = {name: 'ɵɵpipeBind4', moduleName: CORE};
   static pipeBindV: o.ExternalReference = {name: 'ɵɵpipeBindV', moduleName: CORE};
 
+  static listenerPipeBind1: o.ExternalReference = {
+    name: 'ɵɵlistenerPipeBind1',
+    moduleName: CORE,
+  };
+  static listenerPipeBind2: o.ExternalReference = {
+    name: 'ɵɵlistenerPipeBind2',
+    moduleName: CORE,
+  };
+  static listenerPipeBind3: o.ExternalReference = {
+    name: 'ɵɵlistenerPipeBind3',
+    moduleName: CORE,
+  };
+  static listenerPipeBind4: o.ExternalReference = {
+    name: 'ɵɵlistenerPipeBind4',
+    moduleName: CORE,
+  };
+  static listenerPipeBindV: o.ExternalReference = {
+    name: 'ɵɵlistenerPipeBindV',
+    moduleName: CORE,
+  };
+
   static domProperty: o.ExternalReference = {name: 'ɵɵdomProperty', moduleName: CORE};
 
   static ariaProperty: o.ExternalReference = {name: 'ɵɵariaProperty', moduleName: CORE};

@@ -12,6 +12,7 @@ import {
   ArrowFunction,
   ArrowFunctionIdentifierParameter,
   ArrowFunctionRestParameter,
+  ArrowFunctionDestructuringParameter,
   ASTWithSource,
   BindingPipe,
   BindingPipeType,
@@ -26,7 +27,11 @@ import {
   VariableBinding,
 } from '../../src/expression_parser/ast';
 import {Lexer} from '../../src/expression_parser/lexer';
-import {Parser, SplitInterpolation} from '../../src/expression_parser/parser';
+import {
+  Parser,
+  SplitInterpolation,
+  extractBoundNamesFromPattern,
+} from '../../src/expression_parser/parser';
 import {ParseError} from '../../src/parse_util';
 
 import {getFakeSpan} from './utils/span';
@@ -1300,6 +1305,143 @@ describe('parser', () => {
           );
         });
       });
+
+      describe('destructuring parameters', () => {
+        it('should parse an arrow function with object destructuring', () => {
+          checkBinding('({a, b}) => a + b');
+        });
+
+        it('should parse an arrow function with array destructuring', () => {
+          checkBinding('([a, b]) => a + b');
+        });
+
+        it('should parse an arrow function with object destructuring and renaming', () => {
+          checkBinding('({a: x, b: y}) => x + y');
+        });
+
+        it('should parse an arrow function with object destructuring and defaults', () => {
+          checkBinding('({a = 1, b = 2}) => a + b');
+        });
+
+        it('should parse an arrow function with mixed params including destructuring', () => {
+          checkBinding('(x, {a, b}, y) => x + a + b + y');
+        });
+
+        it('should parse an arrow function with nested object destructuring', () => {
+          checkBinding('({a: {x, y}}) => x + y');
+        });
+
+        it('should parse an arrow function with nested array destructuring', () => {
+          checkBinding('([[a, b], c]) => a + b + c');
+        });
+
+        it('should parse an arrow function with array destructuring and rest', () => {
+          checkBinding('([a, ...rest]) => a');
+        });
+
+        it('should parse an arrow function with object destructuring and rest', () => {
+          checkBinding('({a, ...rest}) => a');
+        });
+
+        it('should parse an arrow function with array destructuring and holes', () => {
+          checkBinding('([a, , b]) => a + b');
+        });
+
+        it('should parse an arrow function with rest destructuring parameter', () => {
+          checkBinding('(...{length}) => length');
+        });
+
+        it('should parse an arrow function with rest array destructuring parameter', () => {
+          checkBinding('(...[first, second]) => first + second');
+        });
+
+        it('should parse a destructuring parameter as ArrowFunctionDestructuringParameter', () => {
+          const ast = parseBinding('({a, b: c}) => a + c');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(1);
+          expect(arrowFn.parameters[0] instanceof ArrowFunctionDestructuringParameter).toBe(true);
+          const param = arrowFn.parameters[0] as ArrowFunctionDestructuringParameter;
+          expect(param.pattern).toBe('{a, b: c}');
+          expect(param.boundNames).toEqual(['a', 'c']);
+          expect(param.isRest).toBe(false);
+        });
+
+        it('should parse array destructuring parameter with correct bound names', () => {
+          const ast = parseBinding('([a, , b, ...rest]) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          const param = arrowFn.parameters[0] as ArrowFunctionDestructuringParameter;
+          expect(param.pattern).toBe('[a, , b, ...rest]');
+          expect(param.boundNames).toEqual(['a', 'b', 'rest']);
+        });
+
+        it('should parse a rest destructuring parameter correctly', () => {
+          const ast = parseBinding('(...{length}) => length');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(1);
+          const param = arrowFn.parameters[0] as ArrowFunctionDestructuringParameter;
+          expect(param.isRest).toBe(true);
+          expect(param.pattern).toBe('{length}');
+          expect(param.boundNames).toEqual(['length']);
+        });
+      });
+    });
+  });
+
+  describe('extractBoundNamesFromPattern', () => {
+    it('should extract names from simple object pattern', () => {
+      expect(extractBoundNamesFromPattern('{ a, b }')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from object pattern with renaming', () => {
+      expect(extractBoundNamesFromPattern('{ a: x, b: y }')).toEqual(['x', 'y']);
+    });
+
+    it('should extract names from object pattern with defaults', () => {
+      expect(extractBoundNamesFromPattern('{ a = 1, b = 2 }')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from object pattern with renaming and defaults', () => {
+      expect(extractBoundNamesFromPattern('{ a: x = 1, b: y = 2 }')).toEqual(['x', 'y']);
+    });
+
+    it('should extract names from object pattern with rest', () => {
+      expect(extractBoundNamesFromPattern('{ a, ...rest }')).toEqual(['a', 'rest']);
+    });
+
+    it('should extract names from simple array pattern', () => {
+      expect(extractBoundNamesFromPattern('[a, b]')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from array pattern with holes', () => {
+      expect(extractBoundNamesFromPattern('[a, , b]')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from array pattern with rest', () => {
+      expect(extractBoundNamesFromPattern('[a, ...rest]')).toEqual(['a', 'rest']);
+    });
+
+    it('should extract names from array pattern with defaults', () => {
+      expect(extractBoundNamesFromPattern('[a = 1, b = 2]')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from nested object patterns', () => {
+      expect(extractBoundNamesFromPattern('{ a: { x, y } }')).toEqual(['x', 'y']);
+    });
+
+    it('should extract names from nested array patterns', () => {
+      expect(extractBoundNamesFromPattern('[[a, b], c]')).toEqual(['a', 'b', 'c']);
+    });
+
+    it('should extract names from nested mixed patterns', () => {
+      expect(extractBoundNamesFromPattern('{ a: [x, y], b }')).toEqual(['x', 'y', 'b']);
+    });
+
+    it('should extract names from deeply nested patterns', () => {
+      expect(extractBoundNamesFromPattern('{ a: { b: { c } } }')).toEqual(['c']);
+    });
+
+    it('should extract names from rest with nested destructuring', () => {
+      expect(extractBoundNamesFromPattern('{ ...{ x, y } }')).toEqual(['x', 'y']);
     });
   });
 

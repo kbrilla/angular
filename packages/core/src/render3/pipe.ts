@@ -26,7 +26,7 @@ import {
   pureFunction4Internal,
   pureFunctionVInternal,
 } from './pure_function';
-import {getBindingRoot, getCurrentTNode, getLView, getTView} from './state';
+import {getBindingRoot, getContextLView, getCurrentTNode, getLView, getTView} from './state';
 import {load, store} from './util/view_utils';
 
 /**
@@ -313,6 +313,90 @@ export function ɵɵpipeBindV(index: number, slotOffset: number, values: [any, .
         pipeInstance,
       )
     : pipeInstance.transform.apply(pipeInstance, values);
+}
+
+/**
+ * Invokes a pipe with 1 argument inside a listener/event handler context.
+ * Uses `getContextLView()` instead of `getLView()` since listeners execute
+ * outside the normal create/update instruction frame.
+ * Skips pure function memoization as it is not meaningful for event handlers.
+ *
+ * @param index Pipe index where the pipe was stored on creation.
+ * @param v1 1st argument to {@link PipeTransform#transform}.
+ *
+ * @codeGenApi
+ */
+export function ɵɵlistenerPipeBind1(index: number, v1: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
+  const lView = getContextLView();
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return pipeInstance.transform(v1);
+}
+
+/**
+ * Invokes a pipe with 2 arguments inside a listener/event handler context.
+ *
+ * @param index Pipe index where the pipe was stored on creation.
+ * @param v1 1st argument to {@link PipeTransform#transform}.
+ * @param v2 2nd argument to {@link PipeTransform#transform}.
+ *
+ * @codeGenApi
+ */
+export function ɵɵlistenerPipeBind2(index: number, v1: any, v2: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
+  const lView = getContextLView();
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return pipeInstance.transform(v1, v2);
+}
+
+/**
+ * Invokes a pipe with 3 arguments inside a listener/event handler context.
+ *
+ * @param index Pipe index where the pipe was stored on creation.
+ * @param v1 1st argument to {@link PipeTransform#transform}.
+ * @param v2 2nd argument to {@link PipeTransform#transform}.
+ * @param v3 3rd argument to {@link PipeTransform#transform}.
+ *
+ * @codeGenApi
+ */
+export function ɵɵlistenerPipeBind3(index: number, v1: any, v2: any, v3: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
+  const lView = getContextLView();
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return pipeInstance.transform(v1, v2, v3);
+}
+
+/**
+ * Invokes a pipe with 4 arguments inside a listener/event handler context.
+ *
+ * @param index Pipe index where the pipe was stored on creation.
+ * @param v1 1st argument to {@link PipeTransform#transform}.
+ * @param v2 2nd argument to {@link PipeTransform#transform}.
+ * @param v3 3rd argument to {@link PipeTransform#transform}.
+ * @param v4 4th argument to {@link PipeTransform#transform}.
+ *
+ * @codeGenApi
+ */
+export function ɵɵlistenerPipeBind4(index: number, v1: any, v2: any, v3: any, v4: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
+  const lView = getContextLView();
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return pipeInstance.transform(v1, v2, v3, v4);
+}
+
+/**
+ * Invokes a pipe with variable number of arguments inside a listener/event handler context.
+ *
+ * @param index Pipe index where the pipe was stored on creation.
+ * @param values Array of arguments to pass to {@link PipeTransform#transform} method.
+ *
+ * @codeGenApi
+ */
+export function ɵɵlistenerPipeBindV(index: number, values: [any, ...any[]]): any {
+  const adjustedIndex = index + HEADER_OFFSET;
+  const lView = getContextLView();
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return pipeInstance.transform.apply(pipeInstance, values);
 }
 
 function isPure(lView: LView, index: number): boolean {
