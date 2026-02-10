@@ -378,13 +378,11 @@ class HtmlAstToIvyAst implements html.Visitor {
       const index = Array.isArray(context) ? context.indexOf(decl) : 0;
       const tempName = `_let_${index}_${decl.nameSpan.start.offset}`;
 
-      const tempLet = new t.LetDeclaration(
-        tempName,
-        value,
-        decl.sourceSpan,
-        decl.nameSpan,
-        decl.valueSpan,
-      );
+      // Use a span that ends before the destructuring pattern starts
+      // to avoid "usage before declaration" errors in type check.
+      const tempSpan = new ParseSourceSpan(decl.sourceSpan.start, decl.nameSpan.start);
+
+      const tempLet = new t.LetDeclaration(tempName, value, tempSpan, tempSpan, decl.valueSpan);
 
       const destructuredLets: t.LetDeclaration[] = [];
       const accessSpan = new AbsoluteSourceSpan(
