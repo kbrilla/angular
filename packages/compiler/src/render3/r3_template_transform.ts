@@ -380,7 +380,9 @@ class HtmlAstToIvyAst implements html.Visitor {
 
       // Use a span that ends before the destructuring pattern starts
       // to avoid "usage before declaration" errors in type check.
-      const tempSpan = new ParseSourceSpan(decl.sourceSpan.start, decl.nameSpan.start);
+      // The tempSpan must end strictly before the access expression spans start,
+      // so the isValidLetDeclarationAccess check (astStart > targetEnd) passes.
+      const tempSpan = new ParseSourceSpan(decl.sourceSpan.start, decl.sourceSpan.start);
 
       const tempLet = new t.LetDeclaration(tempName, value, tempSpan, tempSpan, decl.valueSpan);
 
