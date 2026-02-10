@@ -1345,7 +1345,13 @@ export class LiteralMapPropertyAssignment {
   ) {}
 
   isEquivalent(e: LiteralMapPropertyAssignment): boolean {
-    return this.key === e.key && this.value.isEquivalent(e.value);
+    return (
+      this.key === e.key &&
+      this.value.isEquivalent(e.value) &&
+      this.isComputed === e.isComputed &&
+      (this.computedKey == null) === (e.computedKey == null) &&
+      (this.computedKey == null || this.computedKey.isEquivalent(e.computedKey!))
+    );
   }
 
   clone(): LiteralMapPropertyAssignment {
@@ -1359,7 +1365,7 @@ export class LiteralMapPropertyAssignment {
   }
 
   isConstant() {
-    return this.value.isConstant();
+    return this.value.isConstant() && (this.computedKey == null || this.computedKey.isConstant());
   }
 }
 
@@ -1790,6 +1796,9 @@ export class RecursiveAstVisitor implements StatementVisitor, ExpressionVisitor 
         entry.expression.visitExpression(this, context);
       } else {
         entry.value.visitExpression(this, context);
+        if (entry.computedKey) {
+          entry.computedKey.visitExpression(this, context);
+        }
       }
     });
     return this.visitExpression(ast, context);
