@@ -440,6 +440,18 @@ export enum ErrorCode {
   FORM_FIELD_UNSUPPORTED_BINDING = 8022,
 
   /**
+   * Raised when a required view query (e.g. `viewChild.required('foo')`) references a template
+   * variable or component that does not exist in the component's template.
+   */
+  MISSING_REQUIRED_VIEW_QUERY_TARGET = 8023,
+
+  /**
+   * Raised as a warning when an optional view query (e.g. `viewChild('foo')`) references a
+   * template variable or component that does not exist in the component's template.
+   */
+  MISSING_VIEW_QUERY_TARGET = 8024,
+
+  /**
    * A two way binding in a template has an incorrect syntax,
    * parentheses outside brackets. For example:
    *

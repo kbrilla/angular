@@ -231,10 +231,12 @@ const isUsedPipe = (decl: AnyUsedType): decl is UsedPipe =>
 /**
  * `DecoratorHandler` which handles the `@Component` annotation.
  */
-export class ComponentDecoratorHandler
-  implements
-    DecoratorHandler<Decorator, ComponentAnalysisData, ComponentSymbol, ComponentResolutionData>
-{
+export class ComponentDecoratorHandler implements DecoratorHandler<
+  Decorator,
+  ComponentAnalysisData,
+  ComponentSymbol,
+  ComponentResolutionData
+> {
   constructor(
     private reflector: ReflectionHost,
     private evaluator: PartialEvaluator,
@@ -1189,6 +1191,12 @@ export class ComponentDecoratorHandler
       templateContext,
       hostBindingsContext,
       meta.meta.isStandalone,
+      meta.meta.viewQueries.map((q) => ({
+        propertyName: q.propertyName,
+        stringPredicates: Array.isArray(q.predicate) ? q.predicate : null,
+        isRequired: q.isRequired,
+        first: q.first,
+      })),
     );
   }
 

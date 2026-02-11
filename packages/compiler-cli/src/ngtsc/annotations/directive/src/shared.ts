@@ -584,6 +584,7 @@ export function extractDecoratorQueryMetadata(
     read,
     static: isStatic,
     emitDistinctChangesOnly,
+    isRequired: false,
   };
 }
 

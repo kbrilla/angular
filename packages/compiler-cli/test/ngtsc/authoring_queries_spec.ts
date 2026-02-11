@@ -391,6 +391,142 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(0);
       });
 
+      it('should report an error when a required viewChild targets a non-existent template ref', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div>no refs here</div>',
+          })
+          export class TestComp {
+            el = viewChild.required('missing');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`Required view query 'el'`);
+        expect(diagnostics[0].messageText).toContain(`'missing'`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should not report for optional viewChild targeting a non-existent template ref', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div>no refs here</div>',
+          })
+          export class TestComp {
+            el = viewChild('missing');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not report when viewChild matches an existing template ref', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef></div>',
+          })
+          export class TestComp {
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not report when viewChild matches a ref inside @if block', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@if (true) { <div #myRef></div> }',
+          })
+          export class TestComp {
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not report when viewChild matches a ref inside @for block', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@for (item of [1]; track item) { <div #myRef></div> }',
+          })
+          export class TestComp {
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not report for viewChild with type predicate', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, ElementRef, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div></div>',
+          })
+          export class TestComp {
+            el = viewChild(ElementRef);
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not report for viewChildren with non-existent template ref', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChildren} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div>no refs</div>',
+          })
+          export class TestComp {
+            els = viewChildren('missing');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
       it('should capture a viewChild query in the setClasMetadata call', () => {
         env.write(
           'test.ts',

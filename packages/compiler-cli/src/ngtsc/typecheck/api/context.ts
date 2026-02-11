@@ -56,6 +56,20 @@ export interface HostBindingsContext {
 }
 
 /**
+ * Metadata about a view query that should be validated against the component's template.
+ */
+export interface ViewQueryCheckMeta {
+  /** Property name on the component class. */
+  propertyName: string;
+  /** String predicates (e.g. template reference variable names), or null for type predicates. */
+  stringPredicates: string[] | null;
+  /** Whether the query was declared as required (e.g. `viewChild.required('foo')`). */
+  isRequired: boolean;
+  /** Whether this is a single query (viewChild/contentChild) or multi query (viewChildren/contentChildren). */
+  first: boolean;
+}
+
+/**
  * A currently pending type checking operation, into which templates for type-checking can be
  * registered.
  */
@@ -76,6 +90,7 @@ export interface TypeCheckContext {
    * @param hostBindingContext Contextual information necessary for checking the host bindings of
    * a directive.
    * @param isStandalone a boolean indicating whether the directive is standalone.
+   * @param viewQueries Optional metadata about view queries to validate against the template.
    */
   addDirective(
     ref: Reference<ClassDeclaration<ts.ClassDeclaration>>,
@@ -84,6 +99,7 @@ export interface TypeCheckContext {
     templateContext: TemplateContext | null,
     hostBindingContext: HostBindingsContext | null,
     isStandalone: boolean,
+    viewQueries?: ViewQueryCheckMeta[],
   ): void;
 }
 

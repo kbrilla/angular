@@ -14,6 +14,8 @@ import {
   SchemaMetadata,
   TmplAstHostElement,
   TmplAstNode,
+  TmplAstReference,
+  TmplAstRecursiveVisitor,
 } from '@angular/compiler';
 import MagicString from 'magic-string';
 import ts from 'typescript';
@@ -36,6 +38,7 @@ import {
   TypeCheckingConfig,
   TypeCtorMetadata,
   TemplateContext,
+  ViewQueryCheckMeta,
 } from '../api';
 import {makeTemplateDiagnostic} from '../diagnostics';
 
@@ -241,6 +244,7 @@ export class TypeCheckContextImpl implements TypeCheckContext {
     templateContext: TemplateContext | null,
     hostBindingContext: HostBindingsContext | null,
     isStandalone: boolean,
+    viewQueries?: ViewQueryCheckMeta[],
   ): void {
     if (!this.host.shouldCheckClass(ref.node)) {
       return;
@@ -268,6 +272,37 @@ export class TypeCheckContextImpl implements TypeCheckContext {
               directives: hostBindingContext.directives,
             },
     });
+
+    // Validate view query targets against the bound template.
+    // Required queries produce errors (NG8023) — they will throw NG0951 at runtime.
+    // Optional queries are not flagged here; they may legitimately resolve to undefined.
+    // Skip validation for empty templates (no nodes) since they may be placeholders.
+    if (
+      viewQueries !== undefined &&
+      viewQueries.length > 0 &&
+      templateContext?.nodes != null &&
+      templateContext.nodes.length > 0
+    ) {
+      const requiredStringQueries = viewQueries.filter(
+        (q) => q.isRequired && q.stringPredicates !== null,
+      );
+      if (requiredStringQueries.length > 0) {
+        const templateRefs = collectTemplateReferenceNames(templateContext.nodes);
+        for (const query of requiredStringQueries) {
+          for (const predicate of query.stringPredicates!) {
+            if (!templateRefs.has(predicate)) {
+              shimData.oobRecorder.missingViewQueryTarget(
+                id,
+                ref.node,
+                query.propertyName,
+                predicate,
+                query.isRequired,
+              );
+            }
+          }
+        }
+      }
+    }
 
     if (this.inlining === InliningMode.InlineOps) {
       // Get all of the directives used in the template and record inline type constructors when
@@ -744,4 +779,22 @@ function splitStringAtPoints(str: string, points: number[]): string[] {
   }
   splits.push(str.substring(start));
   return splits;
+}
+
+/**
+ * Recursively collects all template reference variable names (`#ref`) from a template AST.
+ * This walks into all child scopes including control flow blocks (`@if`, `@for`, etc.)
+ * because view queries can match references in any part of the template.
+ */
+function collectTemplateReferenceNames(nodes: TmplAstNode[]): Set<string> {
+  const refs = new Set<string>();
+  const visitor = new (class extends TmplAstRecursiveVisitor {
+    override visitReference(reference: TmplAstReference): void {
+      refs.add(reference.name);
+    }
+  })();
+  for (const node of nodes) {
+    node.visit(visitor);
+  }
+  return refs;
 }

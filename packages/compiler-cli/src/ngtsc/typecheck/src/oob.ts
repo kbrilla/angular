@@ -247,6 +247,23 @@ export interface OutOfBandDiagnosticRecorder {
     id: TypeCheckId,
     node: TmplAstBoundAttribute | TmplAstTextAttribute,
   ): void;
+
+  /**
+   * Reports that a view query predicate does not match any target in the component's template.
+   *
+   * @param id the type-checking ID of the template.
+   * @param componentNode the component class declaration.
+   * @param queryPropertyName the name of the class property with the query.
+   * @param predicateName the string predicate or type name that could not be matched.
+   * @param isRequired whether the query was declared as required.
+   */
+  missingViewQueryTarget(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+    isRequired: boolean,
+  ): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -895,6 +912,33 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
         message,
       ),
     );
+  }
+
+  missingViewQueryTarget(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+    isRequired: boolean,
+  ): void {
+    const errorCode = isRequired
+      ? ErrorCode.MISSING_REQUIRED_VIEW_QUERY_TARGET
+      : ErrorCode.MISSING_VIEW_QUERY_TARGET;
+    const category = isRequired ? ts.DiagnosticCategory.Error : ts.DiagnosticCategory.Warning;
+    const requiredOrOptional = isRequired ? 'Required' : 'Optional';
+    const message =
+      `${requiredOrOptional} view query '${queryPropertyName}' expects a target matching ` +
+      `'${predicateName}', but no such target exists in the component's template. ` +
+      (isRequired
+        ? `This will cause a runtime error (NG0951).`
+        : `This query will always return 'undefined'.`);
+
+    this._diagnostics.push({
+      ...makeDiagnostic(errorCode, componentNode, message),
+      category,
+      sourceFile: componentNode.getSourceFile(),
+      typeCheckId: id,
+    });
   }
 }
 
