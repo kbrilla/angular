@@ -623,6 +623,8 @@ export interface NgLanguageService extends ts.LanguageService {
    * @returns An array of inlay hints
    */
   getInlayHints(fileName: string, span: ts.TextSpan): InlayHint[];
+
+  getSelectionRangeAtPosition(fileName: string, position: number): ts.SelectionRange | undefined;
 }
 
 export function isNgLanguageService(

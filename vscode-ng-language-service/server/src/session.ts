@@ -49,6 +49,7 @@ import {onInitialize} from './handlers/initialization';
 import {onLinkedEditingRange} from './handlers/linked_editing_range';
 import {onDocumentSymbol} from './handlers/document_symbols';
 import {onRenameRequest, onPrepareRename} from './handlers/rename';
+import {onSelectionRange} from './handlers/selection_range';
 import {onSignatureHelp} from './handlers/signature';
 import {onGetTcb} from './handlers/tcb';
 import {onGetTemplateLocationForComponent, isInAngularProject} from './handlers/template_info';
@@ -251,6 +252,7 @@ export class Session {
     conn.onFoldingRanges((p) => onFoldingRanges(this, p));
     conn.languages.onLinkedEditingRange((p) => onLinkedEditingRange(this, p));
     conn.onDocumentSymbol(async (p) => await onDocumentSymbol(this, p));
+    conn.onSelectionRanges((p) => onSelectionRange(this, p));
     conn.onCompletion((p) => onCompletion(this, p));
     conn.onCompletionResolve((p) => onCompletionResolve(this, p));
     conn.onRequest(GetComponentsWithTemplateFile, (p) => getComponentsWithTemplateFile(this, p));
