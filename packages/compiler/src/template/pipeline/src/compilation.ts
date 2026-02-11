@@ -8,7 +8,7 @@
 
 import {ConstantPool} from '../../../constant_pool';
 import * as o from '../../../output/output_ast';
-import {R3ComponentDeferMetadata} from '../../../render3/view/api';
+import {OptionalChainingSemantics, R3ComponentDeferMetadata} from '../../../render3/view/api';
 import * as ir from '../ir';
 
 export enum CompilationJobKind {
@@ -86,6 +86,7 @@ export class ComponentCompilationJob extends CompilationJob {
     readonly allDeferrableDepsFn: o.ReadVarExpr | null,
     readonly relativeTemplatePath: string | null,
     readonly enableDebugLocations: boolean,
+    readonly optionalChainingSemantics: OptionalChainingSemantics = OptionalChainingSemantics.Legacy,
   ) {
     super(componentName, pool, compatibility, mode);
     this.root = new ViewCompilationUnit(this, this.allocateXrefId(), null);

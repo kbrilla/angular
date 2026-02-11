@@ -119,6 +119,11 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
             preserveWhitespaces = false;
           }
         }
+        // Resolve optional chaining semantics: component metadata → JIT options → default 'legacy'
+        let optionalChainingSemantics: 'legacy' | 'native' | undefined = undefined;
+        if (options !== null && options.strictOptionalChainingSemantics) {
+          optionalChainingSemantics = 'native';
+        }
         let encapsulation = metadata.encapsulation;
         if (encapsulation === undefined) {
           if (options !== null && options.defaultEncapsulation !== undefined) {
@@ -135,6 +140,7 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
           typeSourceSpan: compiler.createParseSourceSpan('Component', type.name, templateUrl),
           template: metadata.template || '',
           preserveWhitespaces,
+          optionalChainingSemantics,
           styles:
             typeof metadata.styles === 'string'
               ? [metadata.styles]

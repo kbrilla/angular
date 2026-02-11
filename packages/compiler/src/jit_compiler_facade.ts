@@ -78,6 +78,7 @@ import {
 import {
   DeclarationListEmitMode,
   DeferBlockDepsEmitMode,
+  OptionalChainingSemantics,
   R3ComponentDeferMetadata,
   R3ComponentMetadata,
   R3DirectiveDependencyMetadata,
@@ -300,11 +301,18 @@ export class CompilerFacadeImpl implements CompilerFacade {
     );
 
     // Compile the component metadata, including template, into an expression.
+    const optionalChainingSemantics =
+      facade.optionalChainingSemantics === 'native'
+        ? OptionalChainingSemantics.Native
+        : OptionalChainingSemantics.Legacy;
     const meta: R3ComponentMetadata<R3TemplateDependency> = {
       ...facade,
       ...convertDirectiveFacadeToMetadata(facade),
       selector: facade.selector || this.elementSchemaRegistry.getDefaultComponentElementName(),
-      template,
+      template: {
+        ...template,
+        optionalChainingSemantics,
+      },
       declarations: facade.declarations.map(convertDeclarationFacadeToMetadata),
       declarationListEmitMode: DeclarationListEmitMode.Direct,
       defer,
@@ -657,9 +665,17 @@ function convertDeclareComponentFacadeToMetadata(
       kind === R3TemplateDependencyKind.Directive || kind === R3TemplateDependencyKind.NgModule,
   );
 
+  const declOptionalChainingSemantics =
+    decl.optionalChainingSemantics === 'native'
+      ? OptionalChainingSemantics.Native
+      : OptionalChainingSemantics.Legacy;
+
   return {
     ...convertDeclareDirectiveFacadeToMetadata(decl, typeSourceSpan),
-    template,
+    template: {
+      ...template,
+      optionalChainingSemantics: declOptionalChainingSemantics,
+    },
     styles: decl.styles ?? [],
     declarations,
     viewProviders:
