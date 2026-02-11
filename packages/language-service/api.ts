@@ -444,6 +444,8 @@ export interface NgLanguageService extends ts.LanguageService {
   prepareTypeHierarchy(fileName: string, position: number): TypeHierarchyItem[] | undefined;
   getTypeHierarchySupertypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
   getTypeHierarchySubtypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
+
+  getSelectionRangeAtPosition(fileName: string, position: number): ts.SelectionRange | undefined;
 }
 
 export function isNgLanguageService(
