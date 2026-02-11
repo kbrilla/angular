@@ -51,6 +51,11 @@ import {onRenameRequest, onPrepareRename} from './handlers/rename';
 import {onSignatureHelp} from './handlers/signature';
 import {onGetTcb} from './handlers/tcb';
 import {onGetTemplateLocationForComponent, isInAngularProject} from './handlers/template_info';
+import {
+  onPrepareTypeHierarchy,
+  onTypeHierarchySupertypes,
+  onTypeHierarchySubtypes,
+} from './handlers/type_hierarchy';
 import {onDidChangeWatchedFiles} from './handlers/did_change_watched_files';
 import {onInlayHint, onInlayHintResolve} from './handlers/inlay_hints';
 
@@ -266,6 +271,11 @@ export class Session {
     // Inlay hints (LSP 3.17)
     conn.onRequest(lsp.InlayHintRequest.type, (p) => onInlayHint(this, p));
     conn.onRequest(lsp.InlayHintResolveRequest.type, (p) => onInlayHintResolve(this, p));
+
+    // Type hierarchy (LSP 3.17)
+    conn.languages.typeHierarchy.onPrepare((p) => onPrepareTypeHierarchy(this, p));
+    conn.languages.typeHierarchy.onSupertypes((p) => onTypeHierarchySupertypes(this, p));
+    conn.languages.typeHierarchy.onSubtypes((p) => onTypeHierarchySubtypes(this, p));
   }
 
   private enableLanguageServiceForProject(project: ts.server.Project): void {

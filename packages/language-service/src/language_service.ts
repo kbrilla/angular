@@ -49,6 +49,12 @@ import {
   TargetNodeKind,
 } from './template_target';
 import {
+  prepareTypeHierarchy,
+  getSupertypes,
+  getSubtypes,
+  TypeHierarchyItem,
+} from './type_hierarchy';
+import {
   findTightestNode,
   getClassDeclFromDecoratorProp,
   getParentClassDeclaration,
@@ -1000,6 +1006,24 @@ export class LanguageService {
   getOutliningSpans(fileName: string): ts.OutliningSpan[] {
     return this.withCompilerAndPerfTracing(PerfPhase.OutliningSpans, (compiler) => {
       return getOutliningSpans(compiler, fileName);
+    });
+  }
+
+  prepareTypeHierarchy(fileName: string, position: number): TypeHierarchyItem[] | undefined {
+    return this.withCompilerAndPerfTracing(PerfPhase.LsReferencesAndRenames, (compiler) => {
+      return prepareTypeHierarchy(compiler, fileName, position);
+    });
+  }
+
+  getTypeHierarchySupertypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined {
+    return this.withCompilerAndPerfTracing(PerfPhase.LsReferencesAndRenames, (compiler) => {
+      return getSupertypes(compiler, item);
+    });
+  }
+
+  getTypeHierarchySubtypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined {
+    return this.withCompilerAndPerfTracing(PerfPhase.LsReferencesAndRenames, (compiler) => {
+      return getSubtypes(compiler, item);
     });
   }
 

@@ -14,6 +14,29 @@
 
 import type ts from 'typescript';
 
+/**
+ * Represents an item in the type hierarchy.
+ */
+export interface TypeHierarchyItem {
+  /** The name of this item */
+  name: string;
+  /** The kind of this item (class, interface, etc.) */
+  kind: ts.ScriptElementKind;
+  /** More detail for this item, e.g. the module name */
+  detail?: string;
+  /** The file path containing this item */
+  uri: string;
+  /** The full range of the symbol definition */
+  range: ts.TextSpan;
+  /** The range of the symbol name (for highlighting) */
+  selectionRange: ts.TextSpan;
+  /** Data to help resolve supertypes/subtypes */
+  data?: {
+    fileName: string;
+    position: number;
+  };
+}
+
 export interface PluginConfig {
   /**
    * If true, return only Angular results. Otherwise, return Angular + TypeScript
@@ -415,15 +438,12 @@ export interface NgLanguageService extends ts.LanguageService {
 
   /**
    * Gets inlay hints for the specified file and span.
-   *
-   * Inlay hints are inline annotations that appear directly in the code,
-   * showing type information without requiring hover.
-   *
-   * @param fileName The file to get inlay hints for
-   * @param span The text span to get inlay hints for
-   * @returns An array of inlay hints
    */
   getInlayHints(fileName: string, span: ts.TextSpan): InlayHint[];
+
+  prepareTypeHierarchy(fileName: string, position: number): TypeHierarchyItem[] | undefined;
+  getTypeHierarchySupertypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
+  getTypeHierarchySubtypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
 }
 
 export function isNgLanguageService(
