@@ -209,7 +209,6 @@ export interface ApplyRefactoringResult extends Omit<ts.RefactorEditInfo, 'notAp
 }
 
 /**
-/**
  * Result for linked editing ranges containing the ranges and optional word pattern.
  */
 export interface LinkedEditingRanges {
@@ -376,6 +375,37 @@ export interface InlayHintsConfig {
 }
 
 /**
+ * Angular-specific LSP SymbolKind values for template symbols.
+ */
+export enum AngularSymbolKind {
+  Namespace = 3,
+  Array = 18,
+  Object = 19,
+  Struct = 23,
+  Event = 24,
+}
+
+/**
+ * A document symbol representing an Angular template element.
+ */
+export interface TemplateDocumentSymbol {
+  text: string;
+  kind: ts.ScriptElementKind;
+  lspKind?: AngularSymbolKind;
+  spans: ts.TextSpan[];
+  nameSpan?: ts.TextSpan;
+  childItems?: TemplateDocumentSymbol[];
+  className?: string;
+}
+
+/**
+ * Options for customizing document symbols behavior.
+ */
+export interface DocumentSymbolsOptions {
+  showImplicitForVariables?: boolean;
+}
+
+/**
  * `NgLanguageService` describes an instance of an Angular language service,
  * whose API surface is a strict superset of TypeScript's language service.
  */
@@ -406,23 +436,20 @@ export interface NgLanguageService extends ts.LanguageService {
 
   /**
    * Provide Angular-specific inlay hints for templates.
-   *
-   * Returns hints for:
-   * - @for loop variable types: `@for (user: User of users)`
-   * - @if alias types: `@if (data; as result: ApiResult)`
-   * - Event parameter types: `(click)="onClick($event: MouseEvent)"`
-   * - Pipe output types
-   * - @let declaration types
-   *
-   * @param fileName The file to get inlay hints for
-   * @param span The text span to get hints within
-   * @param config Optional configuration for which hints to show
    */
   getAngularInlayHints(
     fileName: string,
     span: ts.TextSpan,
     config?: InlayHintsConfig,
   ): AngularInlayHint[];
+
+  /**
+   * Gets document symbols for Angular templates.
+   */
+  getTemplateDocumentSymbols(
+    fileName: string,
+    options?: DocumentSymbolsOptions,
+  ): TemplateDocumentSymbol[];
 
   applyRefactoring(
     fileName: string,

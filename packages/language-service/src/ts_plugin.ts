@@ -11,6 +11,7 @@ import type ts from 'typescript';
 import {
   ApplyRefactoringProgressFn,
   ApplyRefactoringResult,
+  DocumentSymbolsOptions,
   GetComponentLocationsForTemplateResponse,
   GetTcbResponse,
   GetTemplateLocationForComponentResponse,
@@ -20,6 +21,7 @@ import {
   NgLanguageService,
   AngularInlayHint,
   InlayHintsConfig,
+  TemplateDocumentSymbol,
 } from '../api';
 
 import {LanguageService} from './language_service';
@@ -382,25 +384,17 @@ export function create(info: ts.server.PluginCreateInfo): NgLanguageService {
     fileName: string,
     position: number,
   ): LinkedEditingRanges | undefined {
-    // Only handle inline templates in TypeScript files.
-    // For external HTML template files, VS Code's built-in HTML language support
-    // provides linked editing, so we don't need to handle them here.
     if (!isTypeScriptFile(fileName)) {
       return undefined;
     }
-
-    // Try Angular's implementation first for inline templates
     const ngResult = ngLS.getLinkedEditingRangeAtPosition(fileName, position);
     if (ngResult) {
       return ngResult;
     }
-
-    // Fall back to TypeScript for JSX/TSX files
     if (!angularOnly) {
       const tsResult = tsLS.getLinkedEditingRangeAtPosition(fileName, position);
       return tsResult ?? undefined;
     }
-
     return undefined;
   }
 
@@ -414,6 +408,13 @@ export function create(info: ts.server.PluginCreateInfo): NgLanguageService {
     config?: InlayHintsConfig,
   ): AngularInlayHint[] {
     return ngLS.provideInlayHints(fileName, span, config);
+  }
+
+  function getTemplateDocumentSymbols(
+    fileName: string,
+    options?: DocumentSymbolsOptions,
+  ): TemplateDocumentSymbol[] {
+    return ngLS.getTemplateDocumentSymbols(fileName, options);
   }
 
   return {
@@ -445,6 +446,7 @@ export function create(info: ts.server.PluginCreateInfo): NgLanguageService {
     getSignatureHelpItems,
     getOutliningSpans,
     getTemplateLocationForComponent,
+    getTemplateDocumentSymbols,
     hasCodeFixesForErrorCode: ngLS.hasCodeFixesForErrorCode.bind(ngLS),
     getCodeFixesAtPosition,
     getCombinedCodeFix,

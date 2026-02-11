@@ -266,6 +266,16 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show type hints for `@defer` trigger types."
+        },
+        "angular.documentSymbols.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable Angular-specific document symbols in the Outline view and breadcrumbs. Shows control flow blocks (`@if`, `@for`, `@defer`), elements, variables, and structural directives."
+        },
+        "angular.documentSymbols.showImplicitForVariables": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show all implicit `@for` loop variables (`$index`, `$count`, `$first`, `$last`, `$even`, `$odd`) in document symbols. When disabled (default), only explicitly aliased variables like `let i = $index` are shown."
         }
       }
     },

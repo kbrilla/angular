@@ -38,6 +38,11 @@ import {CompilerFactory} from './compiler_factory';
 import {CompletionBuilder} from './completions';
 import {DefinitionBuilder} from './definitions';
 import {getLinkedEditingRangeAtPosition} from './linked_editing_range';
+import {
+  DocumentSymbolsOptions,
+  getTemplateDocumentSymbols,
+  TemplateDocumentSymbol,
+} from './document_symbols';
 import {getOutliningSpans} from './outlining_spans';
 import {QuickInfoBuilder} from './quick_info';
 import {ReferencesBuilder, RenameBuilder} from './references_and_rename';
@@ -1031,6 +1036,15 @@ export class LanguageService {
   getTypeHierarchySubtypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined {
     return this.withCompilerAndPerfTracing(PerfPhase.LsReferencesAndRenames, (compiler) => {
       return getSubtypes(compiler, item);
+    });
+  }
+
+  getTemplateDocumentSymbols(
+    fileName: string,
+    options?: DocumentSymbolsOptions,
+  ): TemplateDocumentSymbol[] {
+    return this.withCompilerAndPerfTracing(PerfPhase.LsComponentLocations, (compiler) => {
+      return getTemplateDocumentSymbols(compiler, fileName, options);
     });
   }
 

@@ -78,23 +78,6 @@ export async function getWorkspaceConfiguration<T = unknown>(
 
 /**
  * Request a single configuration section from the client.
- *
- * This is a convenience wrapper around getWorkspaceConfiguration for
- * requesting a single section.
- *
- * @param connection The LSP connection to the client
- * @param section The configuration section to request
- * @param scopeUri Optional URI to scope the configuration to a specific file/folder
- * @returns The configuration value for the requested section
- *
- * @example
- * ```typescript
- * const config = await getConfigurationSection(
- *   session.connection,
- *   'angular.inlayHints',
- *   documentUri
- * );
- * ```
  */
 export async function getConfigurationSection<T = unknown>(
   connection: lsp.Connection,
@@ -107,21 +90,6 @@ export async function getConfigurationSection<T = unknown>(
 
 /**
  * Flatten a nested configuration object into a flat object with dot-notation keys.
- *
- * VS Code returns configuration as nested objects based on the section hierarchy.
- * This utility flattens them into a format that's easier to work with when
- * mapping to internal configuration formats.
- *
- * @param config The nested configuration object
- * @param prefix The prefix to use for the keys (typically the section name)
- * @returns A flat object with dot-notation keys
- *
- * @example
- * ```typescript
- * // Input: { parameterNames: { enabled: 'all' } }
- * // Output: { 'typescript.inlayHints.parameterNames.enabled': 'all' }
- * const flat = flattenConfiguration(tsConfig, 'typescript.inlayHints');
- * ```
  */
 export function flattenConfiguration(
   config: Record<string, unknown>,
