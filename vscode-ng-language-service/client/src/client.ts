@@ -254,6 +254,18 @@ export class AngularLanguageClient implements vscode.Disposable {
             return next(document, position, token);
           }
         },
+        provideInlayHints: async (
+          document: vscode.TextDocument,
+          range: vscode.Range,
+          token: vscode.CancellationToken,
+          next,
+        ) => {
+          // Only provide inlay hints for Angular projects
+          if (!(await this.isInAngularProject(document))) {
+            return null;
+          }
+          return next(document, range, token);
+        },
       },
     };
   }

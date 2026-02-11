@@ -59,6 +59,17 @@ import {ActiveRefactoring, allRefactorings} from './refactorings/refactoring';
 import {getAngularInlayHints} from './inlay_hints';
 import {getClassificationsForTemplate, TokenEncodingConsts} from './semantic_tokens';
 import {isExternalResource} from '@angular/compiler-cli/src/ngtsc/metadata';
+import {getInlayHintsForTemplate} from './inlay_hints';
+import type {AngularInlayHint, InlayHintsConfig, CssDiagnosticsConfig} from '../api';
+import {getCssDiagnostics, DEFAULT_CSS_DIAGNOSTICS_CONFIG} from './css';
+import {getAriaDiagnostics, AriaDiagnosticsConfig, DEFAULT_ARIA_DIAGNOSTICS_CONFIG} from './aria';
+import {computeAttrDiagnostics} from './attrs/attr_diagnostics';
+import {
+  getEventDiagnostics,
+  getOutputDefinitionDiagnostics,
+  EventDiagnosticsConfig,
+  DEFAULT_EVENT_DIAGNOSTICS_CONFIG,
+} from './events';
 
 type LanguageServiceConfig = Omit<PluginConfig, 'angularOnly'>;
 
@@ -106,18 +117,201 @@ export class LanguageService {
   getSemanticDiagnostics(fileName: string): ts.Diagnostic[] {
     return this.withCompilerAndPerfTracing(PerfPhase.LsDiagnostics, (compiler) => {
       let diagnostics: ts.Diagnostic[] = [];
+      // @ts-ignore DEBUG
+      console.log(`[LS_DIAG] getSemanticDiagnostics called for: ${fileName}`);
       if (isTypeScriptFile(fileName)) {
+        // @ts-ignore DEBUG
+        console.log(`[LS_DIAG] TypeScript file detected`);
         const program = compiler.getCurrentProgram();
         const sourceFile = program.getSourceFile(fileName);
         if (sourceFile) {
           const ngDiagnostics = compiler.getDiagnosticsForFile(sourceFile, OptimizeFor.SingleFile);
           diagnostics.push(...filterNgDiagnosticsForFile(ngDiagnostics, sourceFile.fileName));
+          // @ts-ignore DEBUG
+          console.log(`[LS_DIAG] NG diagnostics: ${ngDiagnostics.length}`);
+
+          // Add CSS and ARIA diagnostics for components in this file
+          // Note: This pattern (walking class declarations, using ttc.getTemplate) is similar
+          // to getInlayHintsAtPosition - could be refactored to share a utility function.
+          const cssConfig = this.getCssDiagnosticsConfig();
+          const ariaConfig = this.getAriaDiagnosticsConfig();
+          const eventConfig = this.getEventDiagnosticsConfig();
+
+          if (cssConfig.enabled || ariaConfig.enabled || eventConfig.enabled) {
+            const ttc = compiler.getTemplateTypeChecker();
+            // Find all class declarations that are components/directives
+            // Walk the AST once to collect CSS, ARIA, and Event diagnostics
+            const visit = (node: ts.Node): void => {
+              if (ts.isClassDeclaration(node)) {
+                const className = node.name?.getText() || '<anonymous>';
+                try {
+                  // Get directive metadata - works for both components and directives
+                  const meta = ttc.getDirectiveMetadata(node);
+
+                  // For template-based diagnostics, we need a template
+                  const template = ttc.getTemplate(node);
+                  if (template) {
+                    // @ts-ignore DEBUG
+                    console.log(`[LS_DIAG] Found component: ${className} with template`);
+
+                    // Check if this component uses an external template
+                    // For external templates, template diagnostics will be reported when processing the HTML file
+                    // but we still need to collect TS-file diagnostics (host binding conflicts)
+                    const resources = compiler.getDirectiveResources(node);
+                    const hasExternalTemplate =
+                      resources?.template && isExternalResource(resources.template);
+
+                    // Collect CSS diagnostics
+                    // For components with external templates, skip template binding diagnostics
+                    // (they'll be collected when processing the HTML file), but still check host bindings
+                    // For inline templates, collect both template and host binding diagnostics
+                    if (cssConfig.enabled) {
+                      const skipTemplateBindings = !!hasExternalTemplate;
+                      const cssDiags = getCssDiagnostics(
+                        node,
+                        compiler,
+                        cssConfig,
+                        undefined,
+                        skipTemplateBindings,
+                      );
+                      diagnostics.push(...cssDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length} (skipTemplate=${skipTemplateBindings})`,
+                      );
+                    }
+
+                    // Collect ARIA diagnostics
+                    if (ariaConfig.enabled && !hasExternalTemplate) {
+                      const ariaDiags = getAriaDiagnostics(node, compiler, ariaConfig);
+                      diagnostics.push(...ariaDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] ARIA diagnostics for ${className}: ${ariaDiags.length}`,
+                      );
+                    }
+
+                    // Collect Event template binding diagnostics
+                    if (eventConfig.enabled && !hasExternalTemplate) {
+                      const eventDiags = getEventDiagnostics(node, compiler, eventConfig);
+                      diagnostics.push(...eventDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`,
+                      );
+                    }
+
+                    // Collect Attribute binding conflict diagnostics
+                    if (!hasExternalTemplate) {
+                      const attrDiags = this.getAttrDiagnosticsForComponent(node, compiler);
+                      diagnostics.push(...attrDiags);
+                      // @ts-ignore DEBUG
+                      console.log(
+                        `[LS_DIAG] Attr diagnostics for ${className}: ${attrDiags.length}`,
+                      );
+                    }
+                  }
+
+                  // CSS host binding conflict diagnostics apply to ANY directive (with or without template)
+                  // This detects conflicts within the directive's own host bindings
+                  // (e.g., host: {[style.prop]} vs @HostBinding('style.prop'))
+                  if (cssConfig.enabled && meta && !template) {
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Checking host binding conflicts for directive without template: ${className}`,
+                    );
+                    // For directives without templates, we still need to check host binding conflicts
+                    // Use skipTemplateBindings=true since there's no template to check
+                    const cssDiags = getCssDiagnostics(
+                      node,
+                      compiler,
+                      cssConfig,
+                      undefined,
+                      true, // skipTemplateBindings - no template to check
+                    );
+                    diagnostics.push(...cssDiags);
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] CSS host binding diagnostics for ${className}: ${cssDiags.length}`,
+                    );
+                  }
+
+                  // Output definition diagnostics apply to ANY directive (with or without template)
+                  // This detects @Output() that shadow DOM events at the class definition level
+                  if (eventConfig.enabled && meta) {
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Checking output definitions for directive: ${className}`,
+                    );
+                    const outputDefDiags = getOutputDefinitionDiagnostics(
+                      node,
+                      compiler,
+                      eventConfig,
+                    );
+                    diagnostics.push(...outputDefDiags);
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Event output definition diagnostics for ${className}: ${outputDefDiags.length}`,
+                    );
+                  }
+                } catch {
+                  // Not a component/directive or error, skip
+                }
+              }
+              ts.forEachChild(node, visit);
+            };
+            visit(sourceFile);
+          }
         }
       } else {
+        // @ts-ignore DEBUG
+        console.log(`[LS_DIAG] Template file detected`);
         const components = compiler.getComponentsWithTemplateFile(fileName);
+        // @ts-ignore DEBUG
+        console.log(`[LS_DIAG] Found ${components.length} components for template`);
         for (const component of components) {
           if (ts.isClassDeclaration(component)) {
+            const className = component.name?.getText() || '<anonymous>';
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] Processing component: ${className}`);
             diagnostics.push(...compiler.getDiagnosticsForComponent(component));
+            // Add CSS property validation diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const cssDiags = this.getCssDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...cssDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] CSS diagnostics for ${className}: ${cssDiags.length}`);
+            // Add ARIA diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const ariaDiags = this.getAriaDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...ariaDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] ARIA diagnostics for ${className}: ${ariaDiags.length}`);
+            // Add Event diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const eventDiags = this.getEventDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...eventDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] Event diagnostics for ${className}: ${eventDiags.length}`);
+
+            // Add Attribute binding conflict diagnostics
+            // Pass the template file name so diagnostics point to the correct file
+            const attrDiags = this.getAttrDiagnosticsForComponent(component, compiler, fileName);
+            diagnostics.push(...attrDiags);
+            // @ts-ignore DEBUG
+            console.log(`[LS_DIAG] Attr diagnostics for ${className}: ${attrDiags.length}`);
+
+            // Definition-level Event diagnostics (e.g., @Output shadowing DOM events)
+            const outputDefDiags = getOutputDefinitionDiagnostics(
+              component,
+              compiler,
+              this.getEventDiagnosticsConfig(),
+            );
+            diagnostics.push(...outputDefDiags);
+            // @ts-ignore DEBUG
+            console.log(
+              `[LS_DIAG] Event output definition diagnostics for ${className}: ${outputDefDiags.length}`,
+            );
           }
         }
       }
@@ -129,8 +323,257 @@ export class LanguageService {
       if (enableG3Suppression) {
         diagnostics = diagnostics.filter((diag) => !suppressDiagnosticsInG3.includes(diag.code));
       }
+      // @ts-ignore DEBUG
+      console.log(`[LS_DIAG] TOTAL diagnostics returned: ${diagnostics.length}`);
       return diagnostics;
     });
+  }
+
+  /**
+   * Gets CSS property validation diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  private getCssDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const cssConfig = this.getCssDiagnosticsConfig();
+    if (!cssConfig.enabled) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] Created synthetic source file for external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    return getCssDiagnostics(component, compiler, cssConfig, templateSourceFile);
+  }
+
+  /**
+   * Normalizes the CSS diagnostics configuration from the plugin config.
+   * @internal
+   */
+  private getCssDiagnosticsConfig(): {
+    enabled: boolean;
+    severity: 'error' | 'warning' | 'suggestion';
+    strictUnitValues?: boolean;
+    warnOnInputShadowing: boolean;
+  } {
+    const cssValidation = this.config.cssPropertyValidation;
+
+    if (cssValidation === undefined || cssValidation === true) {
+      // Default: enabled with warning severity
+      return DEFAULT_CSS_DIAGNOSTICS_CONFIG;
+    }
+
+    if (cssValidation === false) {
+      // Explicitly disabled
+      return {enabled: false, severity: 'warning', warnOnInputShadowing: false};
+    }
+
+    // Custom configuration object
+    return {
+      enabled: cssValidation.enabled !== false,
+      severity: cssValidation.severity ?? 'warning',
+      strictUnitValues: cssValidation.strictUnitValues ?? false,
+      warnOnInputShadowing: cssValidation.warnOnInputShadowing ?? true,
+    };
+  }
+
+  /**
+   * Gets ARIA diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  /**
+   * Gets ARIA diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  private getAriaDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const ariaConfig = this.getAriaDiagnosticsConfig();
+    if (!ariaConfig.enabled) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] Created synthetic source file for ARIA external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    return getAriaDiagnostics(component, compiler, ariaConfig, templateSourceFile);
+  }
+
+  /**
+   * Normalizes the ARIA diagnostics configuration from the plugin config.
+   * @internal
+   */
+  private getAriaDiagnosticsConfig(): AriaDiagnosticsConfig {
+    // For now, use default configuration
+    // TODO: Add configuration options to plugin config API
+    return DEFAULT_ARIA_DIAGNOSTICS_CONFIG;
+  }
+
+  /**
+   * Gets Event binding diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name. If provided and the template is external,
+   *                        a synthetic source file will be created for proper diagnostic positioning.
+   * @internal
+   */
+  private getEventDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const eventConfig = this.getEventDiagnosticsConfig();
+    if (!eventConfig.enabled) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[LS_DIAG] Created synthetic source file for Event external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    return getEventDiagnostics(component, compiler, eventConfig, templateSourceFile);
+  }
+
+  /**
+   * Normalizes the Event diagnostics configuration from the plugin config.
+   * @internal
+   */
+  private getEventDiagnosticsConfig(): EventDiagnosticsConfig {
+    // For now, use default configuration
+    // TODO: Add configuration options to plugin config API
+    return DEFAULT_EVENT_DIAGNOSTICS_CONFIG;
+  }
+
+  /**
+   * Gets Attribute binding conflict diagnostics for a component.
+   * @param component The component class declaration.
+   * @param compiler The Angular compiler instance.
+   * @param templateFileName Optional template file name for external templates.
+   * @internal
+   */
+  private getAttrDiagnosticsForComponent(
+    component: ts.ClassDeclaration,
+    compiler: NgCompiler,
+    templateFileName?: string,
+  ): ts.Diagnostic[] {
+    const templateTypeChecker = compiler.getTemplateTypeChecker();
+    const templateData = templateTypeChecker.getTemplate(component);
+    if (templateData === null) {
+      return [];
+    }
+
+    // For external templates, create a synthetic source file so diagnostics point to the correct location
+    let templateSourceFile: ts.SourceFile | undefined;
+    if (templateFileName) {
+      // Check if this component uses an external template
+      const resources = compiler.getDirectiveResources(component);
+      if (resources?.template && isExternalResource(resources.template)) {
+        // Read the template content and create a synthetic source file
+        const templateContent = this.project.readFile(templateFileName);
+        if (templateContent) {
+          templateSourceFile = ts.createSourceFile(
+            templateFileName,
+            templateContent,
+            ts.ScriptTarget.Latest,
+            /* setParentNodes */ false,
+            ts.ScriptKind.JSX,
+          );
+          // @ts-ignore DEBUG
+          console.log(
+            `[ATTR_DIAG] Created synthetic source file for external template: ${templateFileName}`,
+          );
+        }
+      }
+    }
+
+    // Fall back to component source file for inline templates
+    const diagnosticSourceFile = templateSourceFile || component.getSourceFile();
+    return computeAttrDiagnostics(
+      compiler,
+      diagnosticSourceFile,
+      component,
+      templateData,
+      ts.DiagnosticCategory.Warning,
+    );
   }
 
   getSuggestionDiagnostics(fileName: string): ts.DiagnosticWithLocation[] {
@@ -204,6 +647,85 @@ export class LanguageService {
     return this.withCompilerAndPerfTracing(PerfPhase.LsQuickInfo, (compiler) => {
       return this.getQuickInfoAtPositionImpl(fileName, position, compiler);
     });
+  }
+
+  /**
+   * Provide Angular-specific inlay hints for templates.
+   *
+   * This returns hints for:
+   * - @for loop variable types: `@for (user: User of users)`
+   * - @if alias types: `@if (data; as result: ApiResult)`
+   * - Event parameter types: `(click)="onClick($event: MouseEvent)"`
+   * - Pipe output types: `{{ value | async: Observable<T> }}`
+   * - @let declaration types
+   *
+   * @param fileName The file to get inlay hints for
+   * @param span The text span to get hints within
+   * @param config Optional configuration for which hints to show
+   */
+  provideInlayHints(
+    fileName: string,
+    span: ts.TextSpan,
+    config?: InlayHintsConfig,
+  ): AngularInlayHint[] {
+    // Use LsQuickInfo phase since inlay hints are similar in cost
+    return (
+      this.withCompilerAndPerfTracing(PerfPhase.LsQuickInfo, (compiler) => {
+        const hints: AngularInlayHint[] = [];
+
+        if (isTypeScriptFile(fileName)) {
+          // For TypeScript files, find all components and process their templates
+          const program = compiler.getCurrentProgram();
+          const sourceFile = program.getSourceFile(fileName);
+          if (!sourceFile) {
+            return hints;
+          }
+
+          const ttc = compiler.getTemplateTypeChecker();
+
+          // Walk the source file to find component/directive classes
+          const visit = (node: ts.Node): void => {
+            if (ts.isClassDeclaration(node) && node.name) {
+              // Try to get the template for this class (component) or host element (directive)
+              try {
+                const template = ttc.getTemplate(node);
+                const hostElement = ttc.getHostElement(node);
+
+                // Process if we have either a template or host element
+                if (template || hostElement) {
+                  // This is a component with a template or a directive with host bindings
+                  const typeCheckInfo: TypeCheckInfo = {
+                    declaration: node,
+                    nodes: template ?? [],
+                  };
+                  const templateHints = getInlayHintsForTemplate(
+                    compiler,
+                    typeCheckInfo,
+                    span,
+                    config,
+                  );
+                  hints.push(...templateHints);
+                }
+              } catch {
+                // Not a component/directive or error getting template, skip
+              }
+            }
+            ts.forEachChild(node, visit);
+          };
+
+          visit(sourceFile);
+        } else {
+          // For external template files (HTML), find the associated component
+          const typeCheckInfo = getTypeCheckInfoAtPosition(fileName, span.start, compiler);
+          if (typeCheckInfo) {
+            const templateHints = getInlayHintsForTemplate(compiler, typeCheckInfo, span, config);
+            hints.push(...templateHints);
+          }
+        }
+
+        return hints;
+      }) ?? []
+    );
   }
 
   private getQuickInfoAtPositionImpl(

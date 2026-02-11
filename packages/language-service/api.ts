@@ -89,6 +89,64 @@ export interface PluginConfig {
      */
     domPropertyBindingTypes?: boolean;
   };
+
+  /**
+   * Configuration for CSS property validation in style bindings.
+   * When enabled, provides diagnostics for invalid CSS property names like `[style.colro]`.
+   */
+  cssPropertyValidation?: boolean | CssDiagnosticsConfig;
+}
+
+/**
+ * Configuration for CSS property validation diagnostics.
+ */
+export interface CssDiagnosticsConfig {
+  /** Enable or disable CSS property validation. Default: true */
+  enabled?: boolean;
+
+  /**
+   * Severity level for invalid CSS property diagnostics.
+   * - 'error': Show as error (red squiggly)
+   * - 'warning': Show as warning (yellow squiggly)
+   * - 'suggestion': Show as suggestion (gray dots)
+   * Default: 'warning'
+   */
+  severity?: 'error' | 'warning' | 'suggestion';
+
+  /**
+   * Enable fuzzy matching to suggest corrections for misspelled properties.
+   * Default: true
+   */
+  suggestCorrections?: boolean;
+
+  /**
+   * Maximum edit distance for fuzzy matching suggestions.
+   * Higher values find more suggestions but with less similarity.
+   * Default: 2
+   */
+  maxEditDistance?: number;
+
+  /**
+   * Maximum number of correction suggestions to show per invalid property.
+   * Default: 3
+   */
+  maxSuggestions?: number;
+
+  /**
+   * Enable strict unit value validation.
+   * When enabled, provides suggestions for:
+   * - Using numeric strings like '100' instead of numbers with unit suffixes (e.g., [style.width.px]="'100'" → [style.width.px]="100")
+   * - Using numbers without units for length properties (e.g., [style.width]="100" → [style.width.px]="100")
+   * Default: false
+   */
+  strictUnitValues?: boolean;
+
+  /**
+   * Whether to warn when [class]/[style] bindings shadow directive @Input('class')/@Input('style').
+   * This is informational - both the directive input AND DOM attribute will be updated.
+   * Default: true
+   */
+  warnOnInputShadowing?: boolean;
 }
 
 export type GetTcbResponse = {
@@ -127,6 +185,7 @@ export interface ApplyRefactoringResult extends Omit<ts.RefactorEditInfo, 'notAp
   warningMessage?: string;
 }
 
+/**
 /**
  * Result for linked editing ranges containing the ranges and optional word pattern.
  */
@@ -204,18 +263,12 @@ export interface InlayHint {
   tooltip?: string | MarkupContent;
 
   /**
-   * Render padding before the hint. Note: Padding should use the
-   * editor's background color, not the background color of the hint
-   * itself. That means padding can be used to visually align/separate
-   * an inlay hint.
+   * Render padding before the hint.
    */
   paddingLeft?: boolean;
 
   /**
-   * Render padding after the hint. Note: Padding should use the
-   * editor's background color, not the background color of the hint
-   * itself. That means padding can be used to visually align/separate
-   * an inlay hint.
+   * Render padding after the hint.
    */
   paddingRight?: boolean;
 
@@ -224,6 +277,79 @@ export interface InlayHint {
    * a `textDocument/inlayHint` and a `inlayHint/resolve` request.
    */
   data?: any;
+}
+
+/**
+ * A display part for interactive inlay hints.
+ * When clicked, can navigate to the definition of the type/parameter.
+ */
+export interface InlayHintDisplayPart {
+  /** The text to display */
+  text: string;
+  /** Optional navigation target span */
+  span?: {
+    /** Start offset in the target file */
+    start: number;
+    /** Length of the span */
+    length: number;
+  };
+  /** Optional target file path for navigation */
+  file?: string;
+}
+
+/**
+ * Represents an Angular-specific inlay hint to be displayed in the editor.
+ */
+export interface AngularInlayHint {
+  /** Offset position where the hint should appear */
+  position: number;
+  text: string;
+  kind: 'Type' | 'Parameter';
+  paddingLeft?: boolean;
+  paddingRight?: boolean;
+  tooltip?: string;
+  displayParts?: InlayHintDisplayPart[];
+}
+
+/**
+ * Configuration for which Angular inlay hints to show.
+ */
+export interface InlayHintsConfig {
+  forLoopVariableTypes?: boolean;
+  ifAliasTypes?:
+    | boolean
+    | 'complex'
+    | {
+        simpleExpressions?: boolean;
+        complexExpressions?: boolean;
+      };
+  letDeclarationTypes?: boolean;
+  referenceVariableTypes?: boolean;
+  variableTypeHintsWhenTypeMatchesName?: boolean;
+  arrowFunctionParameterTypes?: boolean;
+  arrowFunctionReturnTypes?: boolean;
+  parameterNameHints?: 'none' | 'literals' | 'all';
+  parameterNameHintsWhenArgumentMatchesName?: boolean;
+  eventParameterTypes?:
+    | boolean
+    | {
+        nativeEvents?: boolean;
+        componentEvents?: boolean;
+        animationEvents?: boolean;
+      };
+  pipeOutputTypes?: boolean;
+  propertyBindingTypes?:
+    | boolean
+    | {
+        nativeProperties?: boolean;
+        componentInputs?: boolean;
+      };
+  twoWayBindingSignalTypes?: boolean;
+  requiredInputIndicator?: 'none' | 'asterisk' | 'exclamation';
+  interactiveInlayHints?: boolean;
+  hostListenerArgumentTypes?: boolean;
+  switchExpressionTypes?: boolean;
+  deferTriggerTypes?: boolean;
 }
 
 /**
@@ -254,6 +380,26 @@ export interface NgLanguageService extends ts.LanguageService {
     position: number,
   ): GetTemplateLocationForComponentResponse;
   getTypescriptLanguageService(): ts.LanguageService;
+
+  /**
+   * Provide Angular-specific inlay hints for templates.
+   *
+   * Returns hints for:
+   * - @for loop variable types: `@for (user: User of users)`
+   * - @if alias types: `@if (data; as result: ApiResult)`
+   * - Event parameter types: `(click)="onClick($event: MouseEvent)"`
+   * - Pipe output types
+   * - @let declaration types
+   *
+   * @param fileName The file to get inlay hints for
+   * @param span The text span to get hints within
+   * @param config Optional configuration for which hints to show
+   */
+  getAngularInlayHints(
+    fileName: string,
+    span: ts.TextSpan,
+    config?: InlayHintsConfig,
+  ): AngularInlayHint[];
 
   applyRefactoring(
     fileName: string,

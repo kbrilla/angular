@@ -53,6 +53,18 @@ import {
   getAttributeCompletionSymbol,
 } from './attribute_completions';
 import {
+  getCSSPropertyCompletions,
+  getCSSUnitCompletions,
+  getCSSValueCompletions,
+  getNumericUnitCompletions,
+} from './css';
+import {
+  getAriaAttributeCompletions,
+  getAriaAttributeQuickInfo,
+  getAriaValueCompletions,
+} from './aria';
+import {HTML_ATTRIBUTES} from './html_attributes';
+import {
   DisplayInfo,
   DisplayInfoKind,
   getDirectiveDisplayInfo,
@@ -272,6 +284,75 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
     this: LiteralCompletionBuilder,
     options: ts.GetCompletionsAtPositionOptions | undefined,
   ): ts.WithMetadata<ts.CompletionInfo> | undefined {
+    // Check if we're inside a style binding value first
+    if (this.node instanceof LiteralPrimitive && typeof this.node.value === 'string') {
+      const cssCompletions = this.getCSSValueCompletionsForStyleBinding(undefined);
+      if (cssCompletions.length > 0) {
+        // Calculate replacement span for the string value
+        let replacementSpan: ts.TextSpan | undefined;
+        if (this.node.value.length > 0) {
+          replacementSpan = {
+            start: this.node.sourceSpan.start + 1, // Skip opening quote
+            length: this.node.value.length,
+          };
+        }
+        return {
+          entries: cssCompletions.map((entry) => ({
+            ...entry,
+            replacementSpan,
+          })),
+          isGlobalCompletion: false,
+          isMemberCompletion: false,
+          isNewIdentifierLocation: true,
+        };
+      }
+
+      // Check if we're inside an ARIA attribute binding value (e.g., [attr.aria-atomic]="''")
+      const ariaCompletions = this.getAriaValueCompletionsForBinding();
+      if (ariaCompletions.length > 0) {
+        let replacementSpan: ts.TextSpan | undefined;
+        if (this.node.value.length > 0) {
+          replacementSpan = {
+            start: this.node.sourceSpan.start + 1, // Skip opening quote
+            length: this.node.value.length,
+          };
+        }
+        return {
+          entries: ariaCompletions.map((entry) => ({
+            ...entry,
+            replacementSpan,
+          })),
+          isGlobalCompletion: false,
+          isMemberCompletion: false,
+          isNewIdentifierLocation: true,
+        };
+      }
+    }
+
+    // Check if we're inside an ARIA text attribute value (e.g., aria-atomic="")
+    if (this.node instanceof TextAttribute && this.node.name.startsWith('aria-')) {
+      const ariaCompletions = getAriaValueCompletions(this.node.name, this.node.value);
+      if (ariaCompletions.length > 0) {
+        // Calculate replacement span for the value
+        let replacementSpan: ts.TextSpan | undefined;
+        if (this.node.valueSpan && this.node.value.length > 0) {
+          replacementSpan = {
+            start: this.node.valueSpan.start.offset,
+            length: this.node.value.length,
+          };
+        }
+        return {
+          entries: ariaCompletions.map((entry) => ({
+            ...entry,
+            replacementSpan,
+          })),
+          isGlobalCompletion: false,
+          isMemberCompletion: false,
+          isNewIdentifierLocation: true,
+        };
+      }
+    }
+
     const location = this.compiler
       .getTemplateTypeChecker()
       .getLiteralCompletionLocation(this.node, this.component);
@@ -320,10 +401,193 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
         });
       }
     }
+
+    // Add CSS value completions if we're inside a style binding value
+    if (this.node instanceof LiteralPrimitive && typeof this.node.value === 'string') {
+      const cssValueEntries = this.getCSSValueCompletionsForStyleBinding(replacementSpan);
+      if (cssValueEntries.length > 0) {
+        ngResults = [...cssValueEntries, ...ngResults];
+      }
+    }
+
     return {
       ...tsResults,
       entries: ngResults,
     };
+  }
+
+  /**
+   * Gets CSS value completions when inside a style binding's string value.
+   * For example, for `[style.display]="'|'"`, suggests 'block', 'flex', 'none', etc.
+   */
+  private getCSSValueCompletionsForStyleBinding(
+    replacementSpan: ts.TextSpan | undefined,
+  ): ts.CompletionEntry[] {
+    // We need to find if this literal is inside a style binding
+    // Check by looking at the template context parents to find ASTWithSource
+
+    if (!(this.node instanceof LiteralPrimitive)) {
+      return [];
+    }
+
+    // Try to find the ASTWithSource parent which holds the full expression source
+    let astWithSource: ASTWithSource | undefined;
+    const context = this.targetDetails.context;
+    if ('parents' in context && Array.isArray(context.parents)) {
+      astWithSource = context.parents.find((p): p is ASTWithSource => p instanceof ASTWithSource);
+    }
+
+    // If we didn't find it, check the immediate parent
+    if (!astWithSource && this.nodeParent instanceof ASTWithSource) {
+      astWithSource = this.nodeParent;
+    }
+
+    // Also check by walking up to the node's parent context for bound attributes
+    // The style binding info is in the TmplAstBoundAttribute, not the expression AST
+    // We need to check the attribute node that contains this expression
+
+    // For now, use a different approach: look at the template file's text
+    // Get the template source from the component's resource
+    const program = this.compiler.getCurrentProgram();
+    const templateUrl = this.compiler.getTemplateTypeChecker().getTemplate(this.component)?.[0]
+      ?.sourceSpan?.start?.file?.url;
+
+    if (!templateUrl) {
+      return [];
+    }
+
+    // Get the source file for the template
+    const templateSourceFile = program.getSourceFile(templateUrl);
+    if (!templateSourceFile) {
+      return [];
+    }
+
+    const text = templateSourceFile.text;
+    const literalStart = this.node.sourceSpan.start;
+
+    // Look backwards from the literal position to find [style.propertyName]="
+    // We need to find the pattern: [style.propertyName]=" or [style.propertyName.unit]="
+    const searchStart = Math.max(0, literalStart - 100);
+    const textBefore = text.substring(searchStart, literalStart);
+
+    // Match patterns like:
+    // [style.display]="'
+    // [style.width.px]="'
+    // Note: the quote after = is included in the search to ensure we're inside the value
+    const styleBindingMatch = textBefore.match(/\[style\.([a-zA-Z-]+)(?:\.([a-zA-Z]+))?\]=["']$/);
+
+    if (!styleBindingMatch) {
+      return [];
+    }
+
+    const propertyName = styleBindingMatch[1];
+    const hasUnitSuffix = styleBindingMatch[2] !== undefined;
+
+    // Calculate what portion of the string value is before the cursor
+    // The literal starts at literalStart, but the actual string content starts after the opening quote
+    // For a string like "'red'" starting at position 10:
+    //   position 10: opening quote '
+    //   position 11: r
+    //   position 12: e
+    //   position 13: d
+    //   position 14: closing quote '
+    // If cursor is at position 11, valueBeforeCursor = ""
+    // If cursor is at position 13, valueBeforeCursor = "re"
+    const stringContentStart = literalStart + 1; // Skip opening quote
+    const cursorOffsetInString = this.position - stringContentStart;
+    const fullValue =
+      typeof this.node.value === 'string' ? this.node.value : String(this.node.value ?? '');
+    const valueBeforeCursor =
+      cursorOffsetInString >= 0 ? fullValue.substring(0, cursorOffsetInString) : '';
+
+    // Check if the value before cursor is numeric or starts with a number
+    // Patterns like: '100', '100p', '100px', '2.5', etc.
+    const numericMatch = valueBeforeCursor.match(/^(-?\d+(?:\.\d+)?)([a-zA-Z%]*)$/);
+
+    const completions: ts.CompletionEntry[] = [];
+
+    // If user typed a number (with or without partial unit), suggest numeric + unit completions
+    // But only if the binding doesn't already have a unit suffix (e.g., [style.width.px])
+    if (numericMatch && !hasUnitSuffix) {
+      const numericValue = numericMatch[1];
+      const partialUnit = numericMatch[2] || '';
+
+      // Add numeric + unit completions (e.g., '100px', '100em', '100rem')
+      const unitCompletions = getNumericUnitCompletions(numericValue, propertyName, partialUnit);
+      completions.push(
+        ...unitCompletions.map((entry) => ({
+          ...entry,
+          replacementSpan,
+        })),
+      );
+    }
+
+    // Also add enumerated value completions (e.g., 'block', 'none', 'flex')
+    // But only if the value before cursor doesn't look like a number with units
+    if (!numericMatch || numericMatch[2] === '') {
+      const cssValues = getCSSValueCompletions(propertyName);
+      // Only filter if user has typed something
+      const filteredValues =
+        valueBeforeCursor.length > 0
+          ? cssValues.filter((entry) =>
+              entry.name.toLowerCase().startsWith(valueBeforeCursor.toLowerCase()),
+            )
+          : cssValues;
+      completions.push(
+        ...filteredValues.map((entry) => ({
+          ...entry,
+          replacementSpan,
+        })),
+      );
+    }
+
+    return completions;
+  }
+
+  /**
+   * Gets ARIA value completions when inside an ARIA attribute binding's string value.
+   * For example, for `[attr.aria-atomic]="'|'"`, suggests 'true', 'false'.
+   */
+  private getAriaValueCompletionsForBinding(): ts.CompletionEntry[] {
+    if (!(this.node instanceof LiteralPrimitive)) {
+      return [];
+    }
+
+    // Get the template source to find if we're inside an ARIA attribute binding
+    const program = this.compiler.getCurrentProgram();
+    const templateUrl = this.compiler.getTemplateTypeChecker().getTemplate(this.component)?.[0]
+      ?.sourceSpan?.start?.file?.url;
+
+    if (!templateUrl) {
+      return [];
+    }
+
+    const templateSourceFile = program.getSourceFile(templateUrl);
+    if (!templateSourceFile) {
+      return [];
+    }
+
+    const text = templateSourceFile.text;
+    const literalStart = this.node.sourceSpan.start;
+
+    // Look backwards from the literal position to find [attr.aria-*]="
+    const searchStart = Math.max(0, literalStart - 100);
+    const textBefore = text.substring(searchStart, literalStart);
+
+    // Match patterns like:
+    // [attr.aria-atomic]="'
+    // [attr.aria-hidden]="'
+    const ariaBindingMatch = textBefore.match(/\[attr\.(aria-[a-zA-Z-]+)\]=["']$/);
+
+    if (!ariaBindingMatch) {
+      return [];
+    }
+
+    const ariaAttribute = ariaBindingMatch[1];
+    const currentValue =
+      typeof this.node.value === 'string' ? this.node.value : String(this.node.value ?? '');
+
+    return getAriaValueCompletions(ariaAttribute, currentValue);
   }
 
   /**
@@ -1146,6 +1410,137 @@ export class CompletionBuilder<N extends TmplAstNode | AST> {
         replacementSpan,
         insertSnippet,
       );
+    }
+
+    // Add CSS property completions for style bindings
+    // When the user is typing after `[style.`, provide CSS property name completions
+    if (
+      this.node instanceof TmplAstBoundAttribute &&
+      this.node.type === BindingType.Style &&
+      this.node.keySpan !== undefined
+    ) {
+      // Extract the typed prefix after 'style.'
+      // For example, if the user typed '[style.back', the name will be 'style.back' or similar
+      // We need to get what they've typed after 'style.'
+      const typedName = this.node.name;
+      const cssPropertyPrefix = typedName.includes('.')
+        ? typedName.substring(typedName.indexOf('.') + 1)
+        : '';
+
+      // Check if the user is typing a unit suffix (e.g., style.width.|)
+      const hasUnit = this.node.unit !== null && this.node.unit.length > 0;
+      const hasTwoDots = typedName.split('.').length > 2;
+
+      if (hasUnit || hasTwoDots) {
+        // User is typing a unit suffix - provide unit completions
+        const unitEntries = getCSSUnitCompletions(cssPropertyPrefix.split('.')[0] || '');
+        // Calculate replacement span for just the unit portion
+        const unitStart = this.node.keySpan.start.offset + typedName.lastIndexOf('.') + 1;
+        const unitLength = hasTwoDots
+          ? typedName.length - typedName.lastIndexOf('.') - 1
+          : (this.node.unit?.length ?? 0);
+        const unitReplacementSpan = {
+          start: unitStart,
+          length: unitLength,
+        };
+        for (const entry of unitEntries) {
+          entries.push({
+            ...entry,
+            replacementSpan: unitReplacementSpan,
+          });
+        }
+      } else {
+        // User is typing a CSS property name - provide property completions
+        const cssEntries = getCSSPropertyCompletions(cssPropertyPrefix);
+        // Calculate replacement span for just the property portion
+        const propertyStart = this.node.keySpan.start.offset + 'style.'.length;
+        const propertyLength = cssPropertyPrefix.length;
+        const cssReplacementSpan = {
+          start: propertyStart,
+          length: propertyLength,
+        };
+        for (const entry of cssEntries) {
+          entries.push({
+            ...entry,
+            replacementSpan: cssReplacementSpan,
+            // Prepend '[style.' to the insert text to complete the full binding syntax
+            insertText: entry.insertText,
+          });
+        }
+      }
+    }
+
+    // Add attribute name completions for attribute bindings
+    // When the user is typing after `[attr.`, provide attribute name completions including ARIA
+    if (
+      this.node instanceof TmplAstBoundAttribute &&
+      this.node.type === BindingType.Attribute &&
+      this.node.keySpan !== undefined
+    ) {
+      // Extract the typed prefix after 'attr.'
+      // For example, if the user typed '[attr.aria-', the name will be 'attr.aria-' or similar
+      const typedName = this.node.name;
+      const attrPrefix = typedName.includes('.')
+        ? typedName.substring(typedName.indexOf('.') + 1)
+        : '';
+
+      // Calculate replacement span for just the attribute name portion (after 'attr.')
+      const attrStart = this.node.keySpan.start.offset + 'attr.'.length;
+      const attrLength = attrPrefix.length;
+      const attrReplacementSpan = {
+        start: attrStart,
+        length: attrLength,
+      };
+
+      // Add all attributes from the completion table
+      for (const [name, completion] of attrTable.entries()) {
+        // Only include attributes that match the prefix
+        if (name.toLowerCase().startsWith(attrPrefix.toLowerCase())) {
+          // Include attribute/property completions, but not directive-specific ones
+          if (
+            completion.kind === AttributeCompletionKind.DomAttribute ||
+            completion.kind === AttributeCompletionKind.DomProperty
+          ) {
+            const attrName =
+              completion.kind === AttributeCompletionKind.DomAttribute
+                ? completion.attribute
+                : completion.property;
+            entries.push({
+              kind: unsafeCastDisplayInfoKindToScriptElementKind(DisplayInfoKind.ATTRIBUTE),
+              name: attrName,
+              insertText: attrName,
+              sortText: attrName,
+              replacementSpan: attrReplacementSpan,
+            });
+          }
+        }
+      }
+
+      // Add common HTML attributes
+      for (const htmlAttr of HTML_ATTRIBUTES) {
+        if (htmlAttr.toLowerCase().startsWith(attrPrefix.toLowerCase())) {
+          // Don't add if already in entries
+          const alreadyAdded = entries.some((e) => e.name === htmlAttr);
+          if (!alreadyAdded) {
+            entries.push({
+              kind: unsafeCastDisplayInfoKindToScriptElementKind(DisplayInfoKind.ATTRIBUTE),
+              name: htmlAttr,
+              insertText: htmlAttr,
+              sortText: htmlAttr,
+              replacementSpan: attrReplacementSpan,
+            });
+          }
+        }
+      }
+
+      // Get ARIA attribute completions
+      const ariaEntries = getAriaAttributeCompletions(attrPrefix);
+      for (const entry of ariaEntries) {
+        entries.push({
+          ...entry,
+          replacementSpan: attrReplacementSpan,
+        });
+      }
     }
 
     directiveInfoForCompletionDetailCache = directiveCompletionDetailMap;

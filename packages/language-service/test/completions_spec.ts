@@ -2199,6 +2199,222 @@ describe('completions', () => {
       expectContain(completions, ts.ScriptElementKind.memberVariableElement, ['title', 'hero']);
     });
   });
+
+  describe('CSS style binding completions', () => {
+    it('should provide CSS property completions for [style.] binding', () => {
+      const {templateFile} = setup(`<div [style.back]="'red'"></div>`, '');
+      templateFile.moveCursorToText('[style.back¦]');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include properties starting with 'back'
+      const cssEntries = completions!.entries.filter((e) =>
+        e.name.toLowerCase().includes('background'),
+      );
+      expect(cssEntries.length).toBeGreaterThan(0);
+      expect(cssEntries.some((e) => e.name === 'backgroundColor')).toBeTrue();
+    });
+
+    it('should provide CSS unit completions for [style.prop.] binding', () => {
+      const {templateFile} = setup(`<div [style.width.p]="100"></div>`, '');
+      templateFile.moveCursorToText('[style.width.p¦]');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include units starting with 'p'
+      const unitEntries = completions!.entries.filter(
+        (e) => e.name === 'px' || e.name === 'pt' || e.name === 'pc',
+      );
+      expect(unitEntries.length).toBeGreaterThan(0);
+      expect(unitEntries.some((e) => e.name === 'px')).toBeTrue();
+    });
+
+    it('should provide full list of CSS properties for [style.] with empty prefix', () => {
+      const {templateFile} = setup(`<div [style.]="'100px'"></div>`, '');
+      templateFile.moveCursorToText('[style.¦]');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should have many CSS properties
+      const cssEntries = completions!.entries.filter((e) =>
+        // Common CSS properties
+        ['width', 'height', 'color', 'display', 'backgroundColor'].includes(e.name),
+      );
+      expect(cssEntries.length).toBeGreaterThan(3);
+    });
+
+    it('should provide CSS units for [style.prop.] with cursor after the second dot', () => {
+      // Use a non-empty unit prefix to ensure cursor position is after the second dot
+      const {templateFile} = setup(`<div [style.width.px]="100"></div>`, '');
+      templateFile.moveCursorToText('[style.width.px¦]');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should have CSS unit completions
+      const unitEntries = completions!.entries.filter((e) =>
+        ['px', 'em', 'rem', 'vh', 'vw'].includes(e.name),
+      );
+      expect(unitEntries.length).toBeGreaterThan(0);
+    });
+
+    it('should filter CSS properties by prefix', () => {
+      const {templateFile} = setup(`<div [style.marg]="'10px'"></div>`, '');
+      templateFile.moveCursorToText('[style.marg¦]');
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include margin properties
+      const marginEntries = completions!.entries.filter((e) =>
+        e.name.toLowerCase().startsWith('margin'),
+      );
+      expect(marginEntries.length).toBeGreaterThan(0);
+      // Verify that margin* properties are present
+      expect(marginEntries.some((e) => e.name === 'margin')).toBeTrue();
+    });
+
+    it('should provide CSS value completions for style binding value', () => {
+      const {templateFile} = setup(`<div [style.display]="'block'"></div>`, '');
+      templateFile.moveCursorToText(`[style.display]="'blo¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include common display values
+      const displayValues = completions!.entries.filter((e) =>
+        ['block', 'inline', 'flex', 'grid', 'none'].includes(e.name),
+      );
+      expect(displayValues.length).toBeGreaterThan(0);
+      expect(displayValues.some((e) => e.name === 'block')).toBeTrue();
+    });
+
+    it('should provide CSS value completions for position property', () => {
+      const {templateFile} = setup(`<div [style.position]="'relative'"></div>`, '');
+      templateFile.moveCursorToText(`[style.position]="'¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include position values
+      const positionValues = completions!.entries.filter((e) =>
+        ['static', 'relative', 'absolute', 'fixed', 'sticky'].includes(e.name),
+      );
+      expect(positionValues.length).toBeGreaterThan(0);
+      expect(positionValues.some((e) => e.name === 'relative')).toBeTrue();
+    });
+
+    it('should provide CSS value completions for visibility property', () => {
+      const {templateFile} = setup(`<div [style.visibility]="'visible'"></div>`, '');
+      templateFile.moveCursorToText(`[style.visibility]="'¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include visibility values
+      const visibilityValues = completions!.entries.filter((e) =>
+        ['visible', 'hidden', 'collapse'].includes(e.name),
+      );
+      expect(visibilityValues.length).toBeGreaterThan(0);
+      expect(visibilityValues.some((e) => e.name === 'visible')).toBeTrue();
+    });
+
+    it('should provide CSS color value completions for color properties', () => {
+      const {templateFile} = setup(`<div [style.backgroundColor]="'red'"></div>`, '');
+      templateFile.moveCursorToText(`[style.backgroundColor]="'¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include common color names
+      const colorValues = completions!.entries.filter((e) =>
+        ['red', 'blue', 'green', 'black', 'white', 'transparent'].includes(e.name),
+      );
+      expect(colorValues.length).toBeGreaterThan(0);
+      expect(colorValues.some((e) => e.name === 'red')).toBeTrue();
+      expect(colorValues.some((e) => e.name === 'transparent')).toBeTrue();
+    });
+
+    it('should provide CSS value completions for flexDirection property', () => {
+      const {templateFile} = setup(`<div [style.flexDirection]="'row'"></div>`, '');
+      templateFile.moveCursorToText(`[style.flexDirection]="'¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include flex-direction values
+      const flexValues = completions!.entries.filter((e) =>
+        ['row', 'row-reverse', 'column', 'column-reverse'].includes(e.name),
+      );
+      expect(flexValues.length).toEqual(4);
+    });
+
+    it('should provide CSS value completions for cursor property', () => {
+      const {templateFile} = setup(`<div [style.cursor]="'pointer'"></div>`, '');
+      templateFile.moveCursorToText(`[style.cursor]="'¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include cursor values
+      const cursorValues = completions!.entries.filter((e) =>
+        ['pointer', 'default', 'auto', 'grab', 'move', 'text'].includes(e.name),
+      );
+      expect(cursorValues.length).toBeGreaterThan(3);
+    });
+
+    it('should provide CSS value completions for text-decoration color property', () => {
+      const {templateFile} = setup(`<div [style.textDecorationColor]="'red'"></div>`, '');
+      templateFile.moveCursorToText(`[style.textDecorationColor]="'¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include color values since textDecorationColor accepts colors
+      const colorValues = completions!.entries.filter((e) =>
+        ['red', 'blue', 'black', 'inherit'].includes(e.name),
+      );
+      expect(colorValues.length).toBeGreaterThan(0);
+    });
+
+    it('should provide numeric + unit completions for width property', () => {
+      const {templateFile} = setup(`<div [style.width]="'100'"></div>`, '');
+      templateFile.moveCursorToText(`[style.width]="'100¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include numeric + unit completions
+      const unitCompletions = completions!.entries.filter((e) =>
+        ['100px', '100em', '100rem', '100%', '100vh', '100vw'].includes(e.name),
+      );
+      expect(unitCompletions.length).toBeGreaterThan(3);
+    });
+
+    it('should filter numeric + unit completions by partial unit', () => {
+      const {templateFile} = setup(`<div [style.width]="'100p'"></div>`, '');
+      templateFile.moveCursorToText(`[style.width]="'100p¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should filter to px only (starts with 'p')
+      const pxCompletions = completions!.entries.filter((e) => e.name === '100px');
+      expect(pxCompletions.length).toBe(1);
+      // Should not include units that don't start with 'p'
+      const emCompletions = completions!.entries.filter((e) => e.name === '100em');
+      expect(emCompletions.length).toBe(0);
+    });
+
+    it('should provide time unit completions for animation duration', () => {
+      const {templateFile} = setup(`<div [style.animationDuration]="'500'"></div>`, '');
+      templateFile.moveCursorToText(`[style.animationDuration]="'500¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include time units for animation properties
+      const timeCompletions = completions!.entries.filter((e) =>
+        ['500s', '500ms'].includes(e.name),
+      );
+      expect(timeCompletions.length).toBe(2);
+    });
+
+    it('should not provide numeric + unit completions when unit suffix is present', () => {
+      const {templateFile} = setup(`<div [style.width.px]="'100'"></div>`, '');
+      templateFile.moveCursorToText(`[style.width.px]="'100¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      // Should not provide unit completions when [style.width.px] already has unit
+      // (the .px suffix means the value should just be a number)
+      const unitCompletions = completions?.entries.filter((e) => e.name.includes('px')) ?? [];
+      expect(unitCompletions.length).toBe(0);
+    });
+
+    it('should support decimal numeric values', () => {
+      const {templateFile} = setup(`<div [style.lineHeight]="'1.5'"></div>`, '');
+      templateFile.moveCursorToText(`[style.lineHeight]="'1.5¦`);
+      const completions = templateFile.getCompletionsAtPosition();
+      expect(completions).toBeDefined();
+      // Should include unit completions for decimal values
+      const unitCompletions = completions!.entries.filter((e) =>
+        ['1.5em', '1.5rem', '1.5px'].includes(e.name),
+      );
+      expect(unitCompletions.length).toBeGreaterThan(0);
+    });
+  });
 });
 
 function expectContainInsertText(

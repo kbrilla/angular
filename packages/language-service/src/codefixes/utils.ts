@@ -29,6 +29,8 @@ export interface CodeActionContext {
   formatOptions: ts.FormatCodeSettings;
   preferences: ts.UserPreferences;
   tsLs: ts.LanguageService;
+  /** All diagnostics for the file, to help code fixes find the relevant diagnostic. */
+  diagnostics?: ts.Diagnostic[];
 }
 
 /**
@@ -139,4 +141,10 @@ export enum FixIdForCodeFixesAll {
   FIX_MISSING_IMPORT = 'fixMissingImport',
   FIX_UNUSED_STANDALONE_IMPORTS = 'fixUnusedStandaloneImports',
   FIX_MISSING_REQUIRED_INPUTS = 'fixMissingRequiredInputs',
+  FIX_CSS_PROPERTY = 'fixCssProperty',
+  FIX_CSS_SHORTHAND_CONFLICT = 'fixCssShorthandConflict',
+  FIX_CSS_UNIT_VALUE = 'fixCssUnitValue',
+  FIX_NGCLASS_TO_CLASS = 'fixNgClassToClass',
+  FIX_STYLE_OBJECT_TO_INDIVIDUAL = 'fixStyleObjectToIndividual',
+  FIX_INDIVIDUAL_TO_STYLE_OBJECT = 'fixIndividualToStyleObject',
 }

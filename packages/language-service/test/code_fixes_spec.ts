@@ -1419,6 +1419,394 @@ describe('code fixes', () => {
       });
     });
   });
+
+  describe('CSS property fixes', () => {
+    it('should suggest fixes for unknown CSS property in style binding', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.backgroundColour]="myColor"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           myColor = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99001);
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('backgroundColour¦');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have suggestions
+      expect(codeActions.length).toBeGreaterThan(0);
+      // First suggestion should be backgroundColor
+      expect(codeActions[0].description).toContain('backgroundColor');
+    });
+
+    it('should suggest fixes for unknown CSS property with kebab-case', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.backgrond-color]="myColor"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           myColor = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99001);
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('backgrond-color¦');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have suggestions in kebab-case
+      expect(codeActions.length).toBeGreaterThan(0);
+      expect(codeActions[0].description).toContain('background-color');
+    });
+
+    it('should fix all unknown CSS properties', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.colro]="c1" [style.wdith]="c2"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           c1 = 'red';
+           c2 = '100px';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const appFile = project.openFile('app.ts');
+
+      const fixesAllActions = project.getCombinedCodeFix(
+        'app.ts',
+        FixIdForCodeFixesAll.FIX_CSS_PROPERTY,
+      );
+
+      // Should have changes for both properties
+      expect(fixesAllActions.changes.length).toBe(1);
+      expect(fixesAllActions.changes[0].textChanges.length).toBe(2);
+    });
+  });
+
+  describe('CSS shorthand conflict fixes', () => {
+    it('should offer to remove conflicting longhand property', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.background]="bg" [style.backgroundColor]="bgColor"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           bg = 'url(test.png)';
+           bgColor = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99014); // SHORTHAND_OVERRIDE
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('backgroundColor¦');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have fix action
+      expect(codeActions.length).toBeGreaterThan(0);
+      expect(codeActions[0].description).toContain('Remove');
+      expect(codeActions[0].description).toContain('background-color');
+    });
+  });
+
+  describe('CSS unit value fixes', () => {
+    it('should offer to remove unit suffix when value is non-numeric', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.width.px]="\\'red\\'"></div>',
+           standalone: true,
+         })
+         export class AppComponent {}
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99011); // INVALID_UNIT_VALUE
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText("\\'red\\'¦");
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have fix action
+      expect(codeActions.length).toBeGreaterThan(0);
+      expect(codeActions[0].description).toContain('.px');
+      expect(codeActions[0].description).toContain('Remove');
+    });
+  });
+
+  describe('ngClass to class migration fixes', () => {
+    it('should offer to convert [ngClass] to [class]', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+         import {NgClass} from '@angular/common';
+
+         @Component({
+           imports: [NgClass],
+           template: '<div [ngClass]="\\'active\\'"></div>',
+           standalone: true,
+         })
+         export class AppComponent {}
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99017); // PREFER_CLASS_OVER_NGCLASS
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('ngClass¦');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have fix action
+      expect(codeActions.length).toBeGreaterThan(0);
+      expect(codeActions[0].description).toContain('[class]');
+    });
+
+    it('should correctly replace ngClass with class in binding', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+         import {NgClass} from '@angular/common';
+
+         @Component({
+           imports: [NgClass],
+           template: '<div [ngClass]="{active: isActive}"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           isActive = true;
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99017); // PREFER_CLASS_OVER_NGCLASS
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('ngClass¦');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // The fix should replace 'ngClass' with 'class'
+      expectIncludeReplacementText({
+        codeActions,
+        content: appFile.contents,
+        text: 'ngClass',
+        newText: 'class',
+        fileName: 'app.ts',
+      });
+    });
+  });
+
+  describe('style object to individual bindings fixes', () => {
+    it('should offer to convert [style] object to individual bindings', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style]="{width: w, height: h}"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           w = '100px';
+           h = '200px';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99018); // PREFER_INDIVIDUAL_STYLE_BINDINGS
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('sty¦le');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have fix action
+      expect(codeActions.length).toBeGreaterThan(0);
+      expect(codeActions[0].description).toContain('individual');
+    });
+
+    it('should generate individual bindings for each property', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style]="{color: textColor}"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           textColor = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99018); // PREFER_INDIVIDUAL_STYLE_BINDINGS
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('sty¦le');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // The fix should replace '[style]="{color: textColor}"' with '[style.color]="textColor"'
+      expectIncludeReplacementText({
+        codeActions,
+        content: appFile.contents,
+        text: null, // Don't check exact old text
+        newText: '[style.color]="textColor"',
+        fileName: 'app.ts',
+      });
+    });
+
+    it('should not offer fix for style binding with variable reference', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style]="styles"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           styles = {width: '100px'};
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99018); // PREFER_INDIVIDUAL_STYLE_BINDINGS
+
+      // Should NOT have diagnostic for variable reference (not an object literal)
+      expect(cssDiag).toBeUndefined();
+    });
+  });
+
+  describe('individual style bindings to [style] object fixes', () => {
+    it('should offer to consolidate multiple individual [style.x] bindings', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+
+         @Component({
+           template: '<div [style.width]="w" [style.height]="h" [style.color]="c"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           w = '100px';
+           h = '200px';
+           c = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99019); // PREFER_STYLE_OBJECT_BINDING
+      expect(cssDiag).toBeDefined();
+
+      const appFile = project.openFile('app.ts');
+      appFile.moveCursorToText('style.wid¦th');
+      const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+        cssDiag!.code,
+      ]);
+
+      // Should have fix action
+      expect(codeActions.length).toBeGreaterThan(0);
+      expect(codeActions[0].description).toContain('Consolidate');
+      expect(codeActions[0].description).toContain('[style]');
+    });
+
+    it('should not offer fix when bindings use pipes', () => {
+      const files = {
+        'app.ts': `
+         import {Component} from '@angular/core';
+         import {AsyncPipe} from '@angular/common';
+
+         @Component({
+           imports: [AsyncPipe],
+           template: '<div [style.width]="w$ | async" [style.height]="h" [style.color]="c"></div>',
+           standalone: true,
+         })
+         export class AppComponent {
+           w$ = of('100px');
+           h = '200px';
+           c = 'red';
+         }
+       `,
+      };
+
+      const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+      const diags = project.getDiagnosticsForFile('app.ts');
+      const cssDiag = diags.find((d) => d.code === 99019); // PREFER_STYLE_OBJECT_BINDING
+
+      // Should NOT have diagnostic when pipes are used (pipes not supported in object literals)
+      expect(cssDiag).toBeUndefined();
+    });
+  });
 });
 
 type ActionChanges = {
