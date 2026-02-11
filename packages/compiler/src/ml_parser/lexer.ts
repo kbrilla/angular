@@ -396,7 +396,14 @@ class _Tokenizer {
       return;
     }
 
-    const startToken = this._endToken([this._getLetDeclarationName()]);
+    // Check for destructuring patterns: `{...}` or `[...]`.
+    const nextChar = this._cursor.peek();
+    let startToken;
+    if (nextChar === chars.$LBRACE || nextChar === chars.$LBRACKET) {
+      startToken = this._endToken([this._getLetDestructuringPattern()]);
+    } else {
+      startToken = this._endToken([this._getLetDeclarationName()]);
+    }
 
     // Skip over white space before the equals character.
     this._attemptCharCodeUntilFn(isNotWhitespace);
@@ -442,6 +449,27 @@ class _Tokenizer {
     });
 
     return this._cursor.getChars(nameCursor).trim();
+  }
+
+  /**
+   * Scans a destructuring pattern (`{...}` or `[...]`) for a `@let` declaration.
+   * Handles nested brackets by tracking bracket depth.
+   */
+  private _getLetDestructuringPattern(): string {
+    const patternCursor = this._cursor.clone();
+    const openChar = this._cursor.peek();
+    const closeChar = openChar === chars.$LBRACE ? chars.$RBRACE : chars.$RBRACKET;
+    let depth = 0;
+
+    do {
+      const ch = this._cursor.peek();
+      if (ch === chars.$EOF) break;
+      if (ch === openChar) depth++;
+      else if (ch === closeChar) depth--;
+      this._cursor.advance();
+    } while (depth > 0);
+
+    return this._cursor.getChars(patternCursor).trim();
   }
 
   private _consumeLetDeclarationValue(): void {

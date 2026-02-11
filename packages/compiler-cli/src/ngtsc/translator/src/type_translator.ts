@@ -154,6 +154,8 @@ class TypeTranslatorVisitor implements o.ExpressionVisitor, o.TypeVisitor {
       );
     } else if (typeof ast.value === 'number') {
       return ts.factory.createLiteralTypeNode(tsNumericExpression(ast.value));
+    } else if (typeof ast.value === 'bigint') {
+      return ts.factory.createLiteralTypeNode(ts.factory.createBigIntLiteral(`${ast.value}`));
     } else {
       return ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(ast.value));
     }

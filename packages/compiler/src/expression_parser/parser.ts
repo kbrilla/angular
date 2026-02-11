@@ -19,6 +19,8 @@ import {
   ArrowFunction,
   ArrowFunctionParameter,
   ArrowFunctionIdentifierParameter,
+  ArrowFunctionRestParameter,
+  ArrowFunctionDestructuringParameter,
   AST,
   ASTWithSource,
   Binary,
@@ -454,10 +456,81 @@ export class Parser {
   }
 
   private _stripComments(input: string): {stripped: string; hasComments: boolean} {
-    const i = this._commentStart(input);
-    return i != null
-      ? {stripped: input.substring(0, i), hasComments: true}
-      : {stripped: input, hasComments: false};
+    let hasComments = false;
+    let result = input;
+
+    // Strip block comments /* ... */ first (can appear in the middle of expressions).
+    result = this._stripBlockComments(result);
+    if (result !== input) {
+      hasComments = true;
+    }
+
+    // Strip line comments // ... (must be at the end).
+    const i = this._commentStart(result);
+    if (i != null) {
+      result = result.substring(0, i);
+      hasComments = true;
+    }
+
+    return {stripped: result, hasComments};
+  }
+
+  /**
+   * Strips block comments (/* ... *​/) from an expression string,
+   * respecting quoted strings.
+   */
+  private _stripBlockComments(input: string): string {
+    let outerQuote: number | null = null;
+    let result = '';
+    let i = 0;
+
+    while (i < input.length) {
+      const char = input.charCodeAt(i);
+
+      if (outerQuote !== null) {
+        result += input[i];
+        if (char === outerQuote) {
+          outerQuote = null;
+        } else if (char === chars.$BACKSLASH && i + 1 < input.length) {
+          // Skip escaped character in string.
+          i++;
+          result += input[i];
+        }
+        i++;
+        continue;
+      }
+
+      if (chars.isQuote(char)) {
+        outerQuote = char;
+        result += input[i];
+        i++;
+        continue;
+      }
+
+      if (
+        char === chars.$SLASH &&
+        i + 1 < input.length &&
+        input.charCodeAt(i + 1) === chars.$STAR
+      ) {
+        // Found `/*`, skip until `*/`.
+        i += 2;
+        while (i < input.length - 1) {
+          if (input.charCodeAt(i) === chars.$STAR && input.charCodeAt(i + 1) === chars.$SLASH) {
+            i += 2;
+            break;
+          }
+          i++;
+        }
+        // Replace comment with a single space to preserve token boundaries.
+        result += ' ';
+        continue;
+      }
+
+      result += input[i];
+      i++;
+    }
+
+    return result;
   }
 
   private _commentStart(input: string): number | null {
@@ -821,10 +894,6 @@ class _ParseAST {
     const start = this.inputIndex;
     let result = this.parseExpression();
     if (this.consumeOptionalOperator('|')) {
-      if (this.parseFlags & ParseFlags.Action) {
-        this.error(`Cannot have a pipe in an action expression`);
-      }
-
       do {
         const nameStart = this.inputIndex;
         let nameId = this.expectIdentifierOrKeyword();
@@ -1164,6 +1233,10 @@ class _ParseAST {
       const value = this.next.toNumber();
       this.advance();
       return new LiteralPrimitive(this.span(start), this.sourceSpan(start), value);
+    } else if (this.next.isBigInt()) {
+      const value = BigInt(this.next.strValue);
+      this.advance();
+      return new LiteralPrimitive(this.span(start), this.sourceSpan(start), value);
     } else if (this.next.isTemplateLiteralEnd()) {
       return this.parseNoInterpolationTemplateLiteral();
     } else if (this.next.isTemplateLiteralPart()) {
@@ -1222,6 +1295,27 @@ class _ParseAST {
             span: this.span(keyStart),
             sourceSpan: this.sourceSpan(keyStart),
           } satisfies LiteralMapSpreadKey);
+          values.push(this.parsePipe());
+          continue;
+        }
+
+        // Computed property name: `{[expr]: value}`
+        if (this.next.isCharacter(chars.$LBRACKET)) {
+          this.advance(); // consume '['
+          const computedKey = this.parsePipe();
+          this.expectCharacter(chars.$RBRACKET);
+          const keySpan = this.span(keyStart);
+          const keySourceSpan = this.sourceSpan(keyStart);
+          keys.push({
+            kind: 'property',
+            key: '',
+            quoted: false,
+            isComputed: true,
+            computedKey,
+            span: keySpan,
+            sourceSpan: keySourceSpan,
+          } satisfies LiteralMapPropertyKey);
+          this.expectCharacter(chars.$COLON);
           values.push(this.parsePipe());
           continue;
         }
@@ -1744,7 +1838,47 @@ class _ParseAST {
 
     if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
       while (this.next !== EOF) {
-        if (this.next.isIdentifier()) {
+        if (this.next.isOperator('...')) {
+          const restStart = this.inputIndex;
+          this.advance();
+          if (this.next.isCharacter(chars.$LBRACE) || this.next.isCharacter(chars.$LBRACKET)) {
+            // Rest with destructuring: ...{a, b} or ...[a, b]
+            const param = this.parseDestructuringParameter(restStart, /* isRest */ true);
+            params.push(param);
+            if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
+              this.error('A rest parameter must be the last parameter in an arrow function');
+            }
+            break;
+          } else if (this.next.isIdentifier()) {
+            const token = this.next;
+            this.advance();
+            params.push(
+              new ArrowFunctionRestParameter(
+                token.strValue,
+                this.span(restStart),
+                this.sourceSpan(restStart),
+              ),
+            );
+
+            if (!this.consumeOptionalCharacter(chars.$RPAREN)) {
+              this.error('A rest parameter must be the last parameter in an arrow function');
+            }
+            break;
+          } else {
+            this.error(`Unexpected token ${this.next}`);
+            break;
+          }
+        } else if (this.next.isCharacter(chars.$LBRACE) || this.next.isCharacter(chars.$LBRACKET)) {
+          // Destructuring parameter: {a, b} or [a, b]
+          const param = this.parseDestructuringParameter(this.inputIndex, /* isRest */ false);
+          params.push(param);
+
+          if (this.consumeOptionalCharacter(chars.$RPAREN)) {
+            break;
+          } else {
+            this.expectCharacter(chars.$COMMA);
+          }
+        } else if (this.next.isIdentifier()) {
           const token = this.next;
           this.advance();
           params.push(this.getArrowFunctionIdentifierArg(token));
@@ -1762,6 +1896,48 @@ class _ParseAST {
     }
 
     return params;
+  }
+
+  /**
+   * Parse a destructuring pattern as an arrow function parameter.
+   * Consumes tokens from the current `{` or `[` through the matching `}` or `]`.
+   */
+  private parseDestructuringParameter(
+    start: number,
+    isRest: boolean,
+  ): ArrowFunctionDestructuringParameter {
+    const openChar = this.next.isCharacter(chars.$LBRACE) ? chars.$LBRACE : chars.$LBRACKET;
+    const closeChar = openChar === chars.$LBRACE ? chars.$RBRACE : chars.$RBRACKET;
+
+    // Capture the raw pattern text from the input.
+    const patternStart = this.next.index;
+    let depth = 0;
+
+    do {
+      if (this.next.isCharacter(chars.$LBRACE) || this.next.isCharacter(chars.$LBRACKET)) {
+        depth++;
+      } else if (this.next.isCharacter(chars.$RBRACE) || this.next.isCharacter(chars.$RBRACKET)) {
+        depth--;
+      }
+      if (depth > 0) {
+        this.advance();
+      }
+    } while (depth > 0 && this.next !== EOF);
+
+    // this.next is now at the closing bracket — get its end position
+    const patternEnd = this.next.end;
+    this.advance(); // consume the closing bracket
+
+    const pattern = this.input.substring(patternStart, patternEnd);
+    const boundNames = extractBoundNamesFromPattern(pattern);
+
+    return new ArrowFunctionDestructuringParameter(
+      pattern,
+      boundNames,
+      this.span(start),
+      this.sourceSpan(start),
+      isRest,
+    );
   }
 
   private getArrowFunctionIdentifierArg(token: Token): ArrowFunctionParameter {
@@ -1786,14 +1962,44 @@ class _ParseAST {
       return true;
     }
 
-    // Multiple parenthesized params.
+    // Multiple parenthesized params (may include destructuring patterns).
     if (tokens[start].isCharacter(chars.$LPAREN)) {
       let i = start + 1;
 
       for (i; i < tokens.length; i++) {
-        if (!tokens[i].isIdentifier() && !tokens[i].isCharacter(chars.$COMMA)) {
-          break;
+        if (
+          tokens[i].isIdentifier() ||
+          tokens[i].isCharacter(chars.$COMMA) ||
+          tokens[i].isOperator('...') ||
+          tokens[i].isCharacter(chars.$COLON) ||
+          tokens[i].isOperator('=')
+        ) {
+          continue;
         }
+
+        // Skip over destructuring patterns: {...} and [...]
+        if (tokens[i].isCharacter(chars.$LBRACE) || tokens[i].isCharacter(chars.$LBRACKET)) {
+          const closingChar = tokens[i].isCharacter(chars.$LBRACE)
+            ? chars.$RBRACE
+            : chars.$RBRACKET;
+          let depth = 1;
+          i++;
+          while (i < tokens.length && depth > 0) {
+            if (tokens[i].isCharacter(chars.$LBRACE) || tokens[i].isCharacter(chars.$LBRACKET)) {
+              depth++;
+            } else if (
+              tokens[i].isCharacter(chars.$RBRACE) ||
+              tokens[i].isCharacter(chars.$RBRACKET)
+            ) {
+              depth--;
+            }
+            if (depth > 0) i++;
+          }
+          // i now points at the closing bracket
+          continue;
+        }
+
+        break;
       }
 
       return (
@@ -1950,4 +2156,144 @@ function getIndexMapForOriginalTemplate(
     tokenIndex++;
   }
   return offsetMap;
+}
+
+/**
+ * Extracts all bound identifier names from a destructuring pattern string.
+ *
+ * Object destructuring examples:
+ *   `{ a, b }` → `['a', 'b']`
+ *   `{ a: x, b: y }` → `['x', 'y']`
+ *   `{ a = 1 }` → `['a']`
+ *   `{ a: x = 1 }` → `['x']`
+ *   `{ ...rest }` → `['rest']`
+ *   `{ a: { x, y } }` → `['x', 'y']` (nested)
+ *
+ * Array destructuring examples:
+ *   `[a, b]` → `['a', 'b']`
+ *   `[a, , b]` → `['a', 'b']`
+ *   `[a = 1]` → `['a']`
+ *   `[...rest]` → `['rest']`
+ *   `[{ a, b }, c]` → `['a', 'b', 'c']` (nested)
+ */
+export function extractBoundNamesFromPattern(pattern: string): string[] {
+  const names: string[] = [];
+  extractNamesRecursive(pattern.trim(), names);
+  return names;
+}
+
+function extractNamesRecursive(pattern: string, names: string[]): void {
+  if (pattern.startsWith('{') && pattern.endsWith('}')) {
+    extractObjectPatternNames(pattern.slice(1, -1).trim(), names);
+  } else if (pattern.startsWith('[') && pattern.endsWith(']')) {
+    extractArrayPatternNames(pattern.slice(1, -1).trim(), names);
+  }
+}
+
+function extractObjectPatternNames(inner: string, names: string[]): void {
+  if (inner.length === 0) return;
+  const elements = splitTopLevel(inner);
+
+  for (const elem of elements) {
+    const trimmed = elem.trim();
+    if (trimmed.length === 0) continue;
+
+    // Rest element: ...rest, ...{nested}, ...[nested]
+    if (trimmed.startsWith('...')) {
+      const rest = trimmed.slice(3).trim();
+      if (rest.startsWith('{') || rest.startsWith('[')) {
+        extractNamesRecursive(rest, names);
+      } else {
+        const name = rest.split('=')[0].trim();
+        if (name.length > 0) names.push(name);
+      }
+      continue;
+    }
+
+    // Find the colon (property renaming) at the top level
+    const colonIdx = findTopLevelChar(trimmed, ':');
+    if (colonIdx !== -1) {
+      // key: value or key: { nested } or key: [nested] or key: value = default
+      const value = trimmed.substring(colonIdx + 1).trim();
+      if (value.startsWith('{') || value.startsWith('[')) {
+        extractNamesRecursive(value, names);
+      } else {
+        // Could be `value = default`
+        const name = value.split('=')[0].trim();
+        if (name.length > 0) names.push(name);
+      }
+    } else {
+      // Simple property: `a` or `a = default`
+      const name = trimmed.split('=')[0].trim();
+      if (name.length > 0) names.push(name);
+    }
+  }
+}
+
+function extractArrayPatternNames(inner: string, names: string[]): void {
+  if (inner.length === 0) return;
+  const elements = splitTopLevel(inner);
+
+  for (const elem of elements) {
+    const trimmed = elem.trim();
+    if (trimmed.length === 0) continue; // hole
+
+    // Rest element
+    if (trimmed.startsWith('...')) {
+      const rest = trimmed.slice(3).trim();
+      if (rest.startsWith('{') || rest.startsWith('[')) {
+        extractNamesRecursive(rest, names);
+      } else {
+        const name = rest.split('=')[0].trim();
+        if (name.length > 0) names.push(name);
+      }
+      continue;
+    }
+
+    // Nested pattern
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      extractNamesRecursive(trimmed, names);
+      continue;
+    }
+
+    // Simple name or name = default
+    const name = trimmed.split('=')[0].trim();
+    if (name.length > 0) names.push(name);
+  }
+}
+
+/** Split a string by top-level commas, respecting nested brackets. */
+function splitTopLevel(str: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '{' || ch === '[' || ch === '(') {
+      depth++;
+      current += ch;
+    } else if (ch === '}' || ch === ']' || ch === ')') {
+      depth--;
+      current += ch;
+    } else if (ch === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
+/** Find the first occurrence of a character at depth 0. */
+function findTopLevelChar(str: string, char: string): number {
+  let depth = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '{' || ch === '[' || ch === '(') depth++;
+    else if (ch === '}' || ch === ']' || ch === ')') depth--;
+    else if (ch === char && depth === 0) return i;
+  }
+  return -1;
 }

@@ -64,7 +64,12 @@ function needsRestoreView(
   if (!result) {
     for (const innerOp of opList) {
       ir.visitExpressionsInOp(innerOp, (expr) => {
-        if (expr instanceof ir.ReferenceExpr || expr instanceof ir.ContextLetReferenceExpr) {
+        if (
+          expr instanceof ir.ReferenceExpr ||
+          expr instanceof ir.ContextLetReferenceExpr ||
+          expr instanceof ir.PipeBindingExpr ||
+          expr instanceof ir.PipeBindingVariadicExpr
+        ) {
           result = true;
         }
       });

@@ -343,7 +343,7 @@ export class ExpressionTranslatorVisitor<TFile, TStatement, TExpression>
 
   visitArrowFunctionExpr(ast: o.ArrowFunctionExpr, context: any) {
     return this.factory.createArrowFunctionExpression(
-      ast.params.map((param) => param.name),
+      ast.params.map((param) => (param.isRest ? `...${param.name}` : param.name)),
       Array.isArray(ast.body)
         ? this.factory.createBlock(this.visitStatements(ast.body, context))
         : ast.body.visitExpression(this, context),
@@ -393,17 +393,23 @@ export class ExpressionTranslatorVisitor<TFile, TStatement, TExpression>
 
   visitLiteralMapExpr(ast: o.LiteralMapExpr, context: Context): TExpression {
     const properties: ObjectLiteralProperty<TExpression>[] = ast.entries.map((entry) => {
-      return entry instanceof o.LiteralMapPropertyAssignment
-        ? ({
-            kind: 'property',
-            propertyName: entry.key,
-            quoted: entry.quoted,
-            value: entry.value.visitExpression(this, context),
-          } satisfies ObjectLiteralAssignment<TExpression>)
-        : ({
-            kind: 'spread',
-            expression: entry.expression.visitExpression(this, context),
-          } satisfies ObjectLiteralSpread<TExpression>);
+      if (entry instanceof o.LiteralMapPropertyAssignment) {
+        const prop: ObjectLiteralAssignment<TExpression> = {
+          kind: 'property',
+          propertyName: entry.key,
+          quoted: entry.quoted,
+          value: entry.value.visitExpression(this, context),
+        };
+        if (entry.isComputed && entry.computedKey) {
+          prop.isComputed = true;
+          prop.computedKey = entry.computedKey.visitExpression(this, context);
+        }
+        return prop;
+      }
+      return {
+        kind: 'spread',
+        expression: entry.expression.visitExpression(this, context),
+      } satisfies ObjectLiteralSpread<TExpression>;
     });
     return this.setSourceMapRange(this.factory.createObjectLiteral(properties), ast.sourceSpan);
   }

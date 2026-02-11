@@ -237,6 +237,8 @@ export class GenericKeyFn implements ExpressionKeyFn {
   keyOf(expr: o.Expression): string {
     if (expr instanceof o.LiteralExpr && typeof expr.value === 'string') {
       return `"${expr.value}"`;
+    } else if (expr instanceof o.LiteralExpr && typeof expr.value === 'bigint') {
+      return `${expr.value}n`;
     } else if (expr instanceof o.LiteralExpr) {
       return String(expr.value);
     } else if (expr instanceof o.RegularExpressionLiteralExpr) {
@@ -254,7 +256,9 @@ export class GenericKeyFn implements ExpressionKeyFn {
           entries.push('...' + this.keyOf(entry.expression));
         } else {
           let key = entry.key;
-          if (entry.quoted) {
+          if (entry.isComputed && entry.computedKey) {
+            key = `[${this.keyOf(entry.computedKey)}]`;
+          } else if (entry.quoted) {
             key = `"${key}"`;
           }
           entries.push(key + ':' + this.keyOf(entry.value));

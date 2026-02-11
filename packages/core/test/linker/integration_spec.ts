@@ -976,20 +976,31 @@ describe('integration tests', function () {
       expect(dir.receivedArgs).toEqual(['one', undefined]);
     });
 
-    it('should not allow pipes in hostListeners', () => {
+    it('should allow pipes in hostListeners', () => {
+      @Pipe({name: 'somePipe', standalone: false})
+      class SomePipe implements PipeTransform {
+        transform(value: any): any {
+          return value;
+        }
+      }
+
       @Directive({
         selector: '[host-listener]',
         host: {'(click)': 'doIt() | somePipe'},
         standalone: false,
       })
-      class DirectiveWithHostListener {}
+      class DirectiveWithHostListener {
+        doIt() {
+          return 'value';
+        }
+      }
 
-      TestBed.configureTestingModule({declarations: [MyComp, DirectiveWithHostListener]});
+      TestBed.configureTestingModule({
+        declarations: [MyComp, DirectiveWithHostListener, SomePipe],
+      });
       const template = '<div host-listener></div>';
       TestBed.overrideComponent(MyComp, {set: {template}});
-      expect(() => TestBed.createComponent(MyComp)).toThrowError(
-        /Cannot have a pipe in an action expression/,
-      );
+      expect(() => TestBed.createComponent(MyComp)).not.toThrow();
     });
 
     if (getDOM().supportsDOMEvents) {

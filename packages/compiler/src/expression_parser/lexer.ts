@@ -16,6 +16,7 @@ export enum TokenType {
   String,
   Operator,
   Number,
+  BigInt,
   RegExpBody,
   RegExpFlags,
   Error,
@@ -143,6 +144,10 @@ export class Token {
     return this.type === TokenType.RegExpFlags;
   }
 
+  isBigInt(): boolean {
+    return this.type === TokenType.BigInt;
+  }
+
   toNumber(): number {
     return this.type === TokenType.Number ? this.numValue : -1;
   }
@@ -175,6 +180,8 @@ export class Token {
         return this.strValue;
       case TokenType.Number:
         return this.numValue.toString();
+      case TokenType.BigInt:
+        return `${this.strValue}n`;
       default:
         return null;
     }
@@ -214,6 +221,10 @@ function newOperatorToken(index: number, end: number, text: string): Token {
 
 function newNumberToken(index: number, end: number, n: number): Token {
   return new Token(index, end, TokenType.Number, n, '');
+}
+
+function newBigIntToken(index: number, end: number, text: string): Token {
+  return new Token(index, end, TokenType.BigInt, 0, text);
 }
 
 function newErrorToken(index: number, end: number, message: string): Token {
@@ -467,6 +478,18 @@ class _Scanner {
     let simple = this.index === start;
     let hasSeparators = false;
     this.advance(); // Skip initial digit.
+
+    // Check for hex (0x/0X), octal (0o/0O), or binary (0b/0B) prefixes.
+    if (this.index === start + 1 && this.input.charCodeAt(start) === chars.$0) {
+      if (this.peek === chars.$x || this.peek === chars.$X) {
+        return this.scanRadixNumber(start, chars.isAsciiHexDigit, 16);
+      } else if (this.peek === chars.$o || this.peek === chars.$O) {
+        return this.scanRadixNumber(start, chars.isOctalDigit, 8);
+      } else if (this.peek === chars.$b || this.peek === chars.$B) {
+        return this.scanRadixNumber(start, chars.isBinaryDigit, 2);
+      }
+    }
+
     while (true) {
       if (chars.isDigit(this.peek)) {
         // Do nothing.
@@ -500,7 +523,67 @@ class _Scanner {
     if (hasSeparators) {
       str = str.replace(/_/g, '');
     }
+
+    // BigInt literals: integer followed by `n` suffix.
+    if (simple && this.peek === chars.$n) {
+      this.advance();
+      return newBigIntToken(start, this.index, str);
+    }
+
     const value = simple ? parseIntAutoRadix(str) : parseFloat(str);
+    return newNumberToken(start, this.index, value);
+  }
+
+  /**
+   * Scans a number literal with a specific radix prefix (0x, 0o, 0b).
+   * @param start The start index of the number literal.
+   * @param isValidDigit A function that checks if a character is a valid digit for the radix.
+   * @param radix The radix (16, 8, or 2).
+   */
+  private scanRadixNumber(
+    start: number,
+    isValidDigit: (code: number) => boolean,
+    radix: number,
+  ): Token {
+    this.advance(); // Skip the radix prefix letter (x, o, b).
+
+    if (!isValidDigit(this.peek)) {
+      return this.error('Expected a digit', 0);
+    }
+
+    let hasSeparators = false;
+    while (true) {
+      if (isValidDigit(this.peek)) {
+        // Do nothing.
+      } else if (this.peek === chars.$_) {
+        if (
+          !isValidDigit(this.input.charCodeAt(this.index - 1)) ||
+          !isValidDigit(this.input.charCodeAt(this.index + 1))
+        ) {
+          return this.error('Invalid numeric separator', 0);
+        }
+        hasSeparators = true;
+      } else {
+        break;
+      }
+      this.advance();
+    }
+
+    let str = this.input.substring(start, this.index);
+    if (hasSeparators) {
+      str = str.replace(/_/g, '');
+    }
+
+    // BigInt with radix prefix: 0xFFn, 0o77n, 0b1010n
+    if (this.peek === chars.$n) {
+      this.advance();
+      return newBigIntToken(start, this.index, str);
+    }
+
+    const value = Number(str);
+    if (isNaN(value)) {
+      return this.error('Invalid integer literal', 0);
+    }
     return newNumberToken(start, this.index, value);
   }
 
@@ -614,21 +697,50 @@ class _Scanner {
     let unescapedCode: number;
     this.advance();
     if (this.peek === chars.$u) {
-      // 4 character hex code for unicode character.
-      const hex: string = this.input.substring(this.index + 1, this.index + 5);
-      if (/^[0-9a-f]+$/i.test(hex)) {
-        unescapedCode = parseInt(hex, 16);
+      // Unicode escape: \uXXXX or \u{XXXX}
+      this.advance(); // skip 'u'
+      if (this.input.charCodeAt(this.index) === chars.$LBRACE) {
+        // Braced unicode escape: \u{XXXX} or \u{XXXXX}
+        this.advance(); // skip '{'
+        const hexStart = this.index;
+        while (
+          this.input.charCodeAt(this.index) !== chars.$RBRACE &&
+          this.input.charCodeAt(this.index) !== chars.$EOF &&
+          this.index < this.length
+        ) {
+          this.advance();
+        }
+        const hex = this.input.substring(hexStart, this.index);
+        if (this.input.charCodeAt(this.index) === chars.$RBRACE) {
+          this.advance(); // skip '}'
+        }
+        if (/^[0-9a-f]+$/i.test(hex)) {
+          unescapedCode = parseInt(hex, 16);
+        } else {
+          return this.error(`Invalid unicode escape [\\u{${hex}}]`, 0);
+        }
       } else {
-        return this.error(`Invalid unicode escape [\\u${hex}]`, 0);
-      }
-      for (let i = 0; i < 5; i++) {
-        this.advance();
+        // 4 character hex code for unicode character: \uXXXX
+        const hex: string = this.input.substring(this.index, this.index + 4);
+        if (/^[0-9a-f]+$/i.test(hex)) {
+          unescapedCode = parseInt(hex, 16);
+        } else {
+          return this.error(`Invalid unicode escape [\\u${hex}]`, 0);
+        }
+        for (let i = 0; i < 4; i++) {
+          this.advance();
+        }
       }
     } else {
       unescapedCode = unescape(this.peek);
       this.advance();
     }
-    buffer += String.fromCharCode(unescapedCode);
+    if (unescapedCode > 0xffff) {
+      // Encode as surrogate pair for code points above BMP.
+      buffer += String.fromCodePoint(unescapedCode);
+    } else {
+      buffer += String.fromCharCode(unescapedCode);
+    }
     return buffer;
   }
 

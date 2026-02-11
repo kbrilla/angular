@@ -77,16 +77,32 @@ function transformLiteralMap(expr: o.LiteralMapExpr): o.Expression {
       continue;
     }
 
-    if (entry.value.isConstant()) {
+    if (entry.value.isConstant() && (entry.computedKey == null || entry.computedKey.isConstant())) {
       derivedEntries.push(entry);
     } else {
-      const idx = nonConstantArgs.length;
-      nonConstantArgs.push(entry.value);
+      let valueExpr: o.Expression;
+      if (entry.value.isConstant()) {
+        valueExpr = entry.value;
+      } else {
+        const idx = nonConstantArgs.length;
+        nonConstantArgs.push(entry.value);
+        valueExpr = new ir.PureFunctionParameterExpr(idx);
+      }
+      let computedKeyExpr: o.Expression | undefined;
+      if (entry.computedKey && !entry.computedKey.isConstant()) {
+        const idx = nonConstantArgs.length;
+        nonConstantArgs.push(entry.computedKey);
+        computedKeyExpr = new ir.PureFunctionParameterExpr(idx);
+      } else {
+        computedKeyExpr = entry.computedKey;
+      }
       derivedEntries.push(
         new o.LiteralMapPropertyAssignment(
           entry.key,
-          new ir.PureFunctionParameterExpr(idx),
+          valueExpr,
           entry.quoted,
+          entry.isComputed,
+          computedKeyExpr,
         ),
       );
     }

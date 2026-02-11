@@ -6,7 +6,22 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {AST, ASTWithSource, EmptyExpr, RecursiveAstVisitor} from '../expression_parser/ast';
+import {
+  AST,
+  ASTWithSource,
+  EmptyExpr,
+  RecursiveAstVisitor,
+  LiteralMap,
+  LiteralArray,
+  PropertyRead,
+  ImplicitReceiver,
+  KeyedRead,
+  LiteralPrimitive,
+  ParseSpan,
+  AbsoluteSourceSpan,
+  Call,
+  SpreadElement,
+} from '../expression_parser/ast';
 import * as html from '../ml_parser/ast';
 import {ParseError, ParseSourceSpan} from '../parse_util';
 import {BindingParser} from '../template_parser/binding_parser';
@@ -14,7 +29,7 @@ import {BindingParser} from '../template_parser/binding_parser';
 import * as t from './r3_ast';
 
 /** Pattern for the expression in a for loop block. */
-const FOR_LOOP_EXPRESSION_PATTERN = /^\s*([0-9A-Za-z_$]*)\s+of\s+([\S\s]*)/;
+const FOR_LOOP_EXPRESSION_PATTERN = /^\s*(.*?)\s+of\s+([\S\s]*)/;
 
 /** Pattern for the tracking expression in a for loop block. */
 const FOR_LOOP_TRACK_PATTERN = /^track\s+([\S\s]*)/;
@@ -196,13 +211,19 @@ export function createForLoop(
         endSpan?.end ?? ast.sourceSpan.end,
       );
       validateTrackByExpression(params.trackBy.expression, params.trackBy.keywordSpan, errors);
+
+      const children = html.visitAll(visitor, ast.children, ast.children);
+      if (params.destructuredLets && params.destructuredLets.length > 0) {
+        children.unshift(...params.destructuredLets);
+      }
+
       node = new t.ForLoopBlock(
         params.itemName,
         params.expression,
         params.trackBy.expression,
         params.trackBy.keywordSpan,
         params.context,
-        html.visitAll(visitor, ast.children, ast.children),
+        children,
         empty,
         sourceSpan,
         ast.sourceSpan,
@@ -335,30 +356,74 @@ function parseForLoopParameters(
     return null;
   }
 
-  const [, itemName, rawExpression] = match;
-  if (ALLOWED_FOR_LOOP_LET_VARIABLES.has(itemName)) {
-    errors.push(
-      new ParseError(
-        expressionParam.sourceSpan,
-        `@for loop item name cannot be one of ${Array.from(ALLOWED_FOR_LOOP_LET_VARIABLES).join(
-          ', ',
-        )}.`,
-      ),
+  const [, itemNameMatch, rawExpression] = match;
+  const declarationStr = itemNameMatch.trim();
+  const isDestructuring = !IDENTIFIER_PATTERN.test(declarationStr);
+  let destructuredLets: t.LetDeclaration[] = [];
+  let loopVariableName = declarationStr;
+  let loopVariableSpan: ParseSourceSpan;
+
+  // Attempt to find the position of the variable/pattern in the original source
+  // to construct a span.
+  const declIndex = expressionParam.expression.indexOf(itemNameMatch);
+  // Adjust for leading trim in declarationStr if needed, but regex group 1 excludes leading space (due to \s* at start).
+  // Actually regex ^\s*(.*?)\s+of
+  // Group 1 `(.*?)` captures content. Leading whitespace is matched by `\s*`.
+  // So itemNameMatch should be trimmed-left already? No. `(.*?)` matches empty if \s* consumes everything?
+  // `   item` -> `\s*` = `   `. match[1] = `item`.
+  // So itemNameMatch is likely trimmed left.
+  // But might have trailing space? `item   ` -> `\s+` consumes it.
+  // So `itemNameMatch` should be clean `item` or `{ ... }`.
+
+  const spanStart = expressionParam.sourceSpan.start.moveBy(declIndex !== -1 ? declIndex : 0);
+  const spanEnd = spanStart.moveBy(declarationStr.length);
+  const declarationSpan = new ParseSourceSpan(spanStart, spanEnd);
+
+  if (isDestructuring) {
+    loopVariableName = '$implicit_ref'; // Synthetic variable
+    // The loop variable uses a synthetic span at the start of the pattern
+    loopVariableSpan = new ParseSourceSpan(spanStart, spanStart);
+
+    // Create the access expression for the synthetic variable
+    // We create a PropertyRead because the synthetic variable will be available in the context
+    // just like $index.
+    // Use a synthetic source span.
+    const accessOffsetSpan = new AbsoluteSourceSpan(
+      loopVariableSpan.start.offset,
+      loopVariableSpan.end.offset,
     );
+    const accessExpr = new PropertyRead(
+      new ParseSpan(0, 0),
+      accessOffsetSpan,
+      accessOffsetSpan,
+      new ImplicitReceiver(new ParseSpan(0, 0), accessOffsetSpan),
+      loopVariableName,
+    );
+
+    const patternAST = bindingParser.parseBinding(declarationStr, false, declarationSpan, 0);
+
+    extractDestructuringLets(patternAST.ast, accessExpr, destructuredLets, declarationSpan, errors);
+  } else {
+    if (ALLOWED_FOR_LOOP_LET_VARIABLES.has(declarationStr)) {
+      errors.push(
+        new ParseError(
+          expressionParam.sourceSpan,
+          `@for loop item name cannot be one of ${Array.from(ALLOWED_FOR_LOOP_LET_VARIABLES).join(
+            ', ',
+          )}.`,
+        ),
+      );
+    }
+    loopVariableName = declarationStr;
+    loopVariableSpan = declarationSpan;
   }
 
-  // `expressionParam.expression` contains the variable declaration and the expression of the
-  // for...of statement, i.e. 'user of users' The variable of a ForOfStatement is _only_ the "const
-  // user" part and does not include "of x".
-  const variableName = expressionParam.expression.split(' ')[0];
-  const variableSpan = new ParseSourceSpan(
-    expressionParam.sourceSpan.start,
-    expressionParam.sourceSpan.start.moveBy(variableName.length),
-  );
   const result = {
-    itemName: new t.Variable(itemName, '$implicit', variableSpan, variableSpan),
+    itemName: new t.Variable(loopVariableName, '$implicit', loopVariableSpan, loopVariableSpan),
     trackBy: null as {expression: ASTWithSource; keywordSpan: ParseSourceSpan} | null,
     expression: parseBlockParameterToBinding(expressionParam, bindingParser, rawExpression),
+    // Pass the destructured lets up
+    destructuredLets,
     context: Array.from(ALLOWED_FOR_LOOP_LET_VARIABLES, (variableName) => {
       // Give ambiently-available context variables empty spans at the end of
       // the start of the `for` block, since they are not explicitly defined.
@@ -387,7 +452,7 @@ function parseForLoopParameters(
         param.sourceSpan,
         letMatch[1],
         variablesSpan,
-        itemName,
+        loopVariableName,
         result.context,
         errors,
       );
@@ -743,5 +808,93 @@ class PipeVisitor extends RecursiveAstVisitor {
   hasPipe = false;
   override visitPipe(): any {
     this.hasPipe = true;
+  }
+}
+
+/**
+ * Validates and extracts declarations from a destructuring pattern.
+ */
+export function extractDestructuringLets(
+  pattern: AST,
+  accessExpr: AST,
+  lets: t.LetDeclaration[],
+  declSpan: ParseSourceSpan,
+  errors: ParseError[],
+): void {
+  if (pattern instanceof PropertyRead) {
+    if (!(pattern.receiver instanceof ImplicitReceiver)) {
+      errors.push(
+        new ParseError(
+          declSpan,
+          `Invalid destructuring pattern: expected identifier, got ${pattern.constructor.name}`,
+        ),
+      );
+      return;
+    }
+    const name = pattern.name;
+    lets.push(
+      new t.LetDeclaration(
+        name,
+        accessExpr,
+        declSpan,
+        declSpan,
+        declSpan, // Approximated
+      ),
+    );
+  } else if (pattern instanceof LiteralMap) {
+    pattern.keys.forEach((key, index) => {
+      const value = pattern.values[index];
+      if ((key as any).spread) {
+        errors.push(new ParseError(declSpan, 'Spread in destructuring is not supported'));
+        return;
+      }
+
+      const propName = (key as any).key;
+      const propAccess = new PropertyRead(
+        pattern.span,
+        pattern.sourceSpan,
+        pattern.sourceSpan,
+        accessExpr,
+        propName,
+      );
+      extractDestructuringLets(value, propAccess, lets, declSpan, errors);
+    });
+  } else if (pattern instanceof LiteralArray) {
+    pattern.expressions.forEach((value, index) => {
+      if (value instanceof SpreadElement) {
+        if (index !== pattern.expressions.length - 1) {
+          errors.push(
+            new ParseError(declSpan, 'Rest element must be last in a destructuring pattern.'),
+          );
+          return;
+        }
+        const target = value.expression;
+        const sliceCall = new Call(
+          pattern.span,
+          pattern.sourceSpan,
+          new PropertyRead(
+            pattern.span,
+            pattern.sourceSpan,
+            pattern.sourceSpan,
+            accessExpr,
+            'slice',
+          ),
+          [new LiteralPrimitive(pattern.span, pattern.sourceSpan, index)],
+          pattern.sourceSpan,
+        );
+        extractDestructuringLets(target, sliceCall, lets, declSpan, errors);
+        return;
+      }
+      const indexLit = new LiteralPrimitive(pattern.span, pattern.sourceSpan, index);
+      const arrayAccess = new KeyedRead(pattern.span, pattern.sourceSpan, accessExpr, indexLit);
+      extractDestructuringLets(value, arrayAccess, lets, declSpan, errors);
+    });
+  } else {
+    errors.push(
+      new ParseError(
+        declSpan,
+        `Unexpected node in destructuring pattern: ${pattern.constructor.name}`,
+      ),
+    );
   }
 }

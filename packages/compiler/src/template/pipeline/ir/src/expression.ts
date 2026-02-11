@@ -1345,6 +1345,9 @@ export function transformExpressionsInExpression(
         entry.expression = transformExpressionsInExpression(entry.expression, transform, flags);
       } else {
         entry.value = transformExpressionsInExpression(entry.value, transform, flags);
+        if (entry.computedKey) {
+          entry.computedKey = transformExpressionsInExpression(entry.computedKey, transform, flags);
+        }
       }
     }
   } else if (expr instanceof o.ConditionalExpr) {
