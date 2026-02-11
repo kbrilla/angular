@@ -1048,12 +1048,15 @@ describe('pipe', () => {
 
     it('should support a pure pipe in a click handler', () => {
       @Component({
-        template: `<button (click)="result = name | uppercase">Click</button>`,
+        template: `<button (click)="setResult(name | uppercase)">Click</button>`,
         imports: [TestUppercasePipe],
       })
       class App {
         name = 'hello';
         result = '';
+        setResult(value: string) {
+          this.result = value;
+        }
       }
 
       const fixture = TestBed.createComponent(App);
@@ -1065,12 +1068,15 @@ describe('pipe', () => {
 
     it('should support a pipe with arguments in a click handler', () => {
       @Component({
-        template: `<button (click)="result = name | append:'!'">Click</button>`,
+        template: `<button (click)="setResult(name | append:'!')">Click</button>`,
         imports: [TestAppendPipe],
       })
       class App {
         name = 'hello';
         result = '';
+        setResult(value: string) {
+          this.result = value;
+        }
       }
 
       const fixture = TestBed.createComponent(App);
@@ -1082,11 +1088,14 @@ describe('pipe', () => {
 
     it('should support a pipe in an event handler with $event', () => {
       @Component({
-        template: `<input (input)="result = $event.target.value | uppercase" />`,
+        template: `<input (input)="setResult($event.target.value | uppercase)" />`,
         imports: [TestUppercasePipe],
       })
       class App {
         result = '';
+        setResult(value: string) {
+          this.result = value;
+        }
       }
 
       const fixture = TestBed.createComponent(App);
@@ -1107,12 +1116,15 @@ describe('pipe', () => {
       }
 
       @Component({
-        template: `<button (click)="result = name | impureUpper">Click</button>`,
+        template: `<button (click)="setResult(name | impureUpper)">Click</button>`,
         imports: [ImpureUpperPipe],
       })
       class App {
         name = 'world';
         result = '';
+        setResult(value: string) {
+          this.result = value;
+        }
       }
 
       const fixture = TestBed.createComponent(App);
