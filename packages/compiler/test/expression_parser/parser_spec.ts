@@ -10,6 +10,9 @@ import {expect} from '@angular/private/testing/matchers';
 import {
   AbsoluteSourceSpan,
   ArrowFunction,
+  ArrowFunctionIdentifierParameter,
+  ArrowFunctionRestParameter,
+  ArrowFunctionDestructuringParameter,
   ASTWithSource,
   BindingPipe,
   BindingPipeType,
@@ -24,7 +27,11 @@ import {
   VariableBinding,
 } from '../../src/expression_parser/ast';
 import {Lexer} from '../../src/expression_parser/lexer';
-import {Parser, SplitInterpolation} from '../../src/expression_parser/parser';
+import {
+  Parser,
+  SplitInterpolation,
+  extractBoundNamesFromPattern,
+} from '../../src/expression_parser/parser';
 import {ParseError} from '../../src/parse_util';
 
 import {getFakeSpan} from './utils/span';
@@ -1014,6 +1021,123 @@ describe('parser', () => {
       expect((map.keys[0] as LiteralMapPropertyKey).isShorthandInitialized).toBe(true);
     });
 
+    describe('computed property names', () => {
+      it('should parse an object literal with a computed property name', () => {
+        checkBinding('{[key]: value}');
+      });
+
+      it('should parse computed property name with string key', () => {
+        checkBinding("{['name']: value}");
+      });
+
+      it('should parse mixed regular and computed properties', () => {
+        checkBinding('{a: 1, [key]: 2}');
+      });
+    });
+
+    describe('block comments', () => {
+      it('should strip block comments from expressions', () => {
+        checkBinding('a /* comment */ + b', 'a + b');
+      });
+
+      it('should strip block comments in function calls', () => {
+        checkBinding('foo(/* arg */ x)', 'foo(x)');
+      });
+
+      it('should strip block comments at start of expression', () => {
+        checkBinding('/* comment */ x', 'x');
+      });
+
+      it('should strip multiple block comments', () => {
+        checkBinding('a /* c1 */ + /* c2 */ b', 'a + b');
+      });
+
+      it('should not strip block comment markers inside strings', () => {
+        checkBinding("'a /* b */ c'");
+      });
+    });
+
+    describe('unicode braced escapes', () => {
+      it('should parse braced unicode escape in strings', () => {
+        checkBinding("'\\u{4f60}'", "'你'");
+      });
+
+      it('should parse braced unicode escape for emoji', () => {
+        checkBinding("'\\u{1F600}'", "'😀'");
+      });
+
+      it('should still parse 4-digit unicode escapes', () => {
+        checkBinding("'\\u4f60'", "'你'");
+      });
+    });
+
+    describe('hex, octal, and binary number literals', () => {
+      it('should parse hex number literals', () => {
+        checkBinding('0xFF', '255');
+      });
+
+      it('should parse hex number literals with uppercase prefix', () => {
+        checkBinding('0XFF', '255');
+      });
+
+      it('should parse octal number literals', () => {
+        checkBinding('0o77', '63');
+      });
+
+      it('should parse binary number literals', () => {
+        checkBinding('0b1010', '10');
+      });
+
+      it('should parse hex with numeric separators', () => {
+        checkBinding('0xFF_FF', '65535');
+      });
+
+      it('should parse hex in expressions', () => {
+        checkBinding('0xFF + 1', '255 + 1');
+      });
+
+      it('should treat legacy octal-style numbers as decimal', () => {
+        // `0777` is not a valid ES6+ octal (that would be `0o777`).
+        // The lexer scans `0` then continues with decimal digits, treating it as `777`.
+        checkBinding('0777', '777');
+      });
+
+      it('should parse numbers with leading zeros as decimal (not legacy octal)', () => {
+        // In strict mode JS, `09` is decimal 9, not an octal error.
+        // Angular templates follow strict mode semantics.
+        checkBinding('09', '9');
+      });
+    });
+
+    describe('BigInt literals', () => {
+      it('should parse a simple BigInt literal', () => {
+        checkBinding('1n');
+      });
+
+      it('should parse a zero BigInt literal', () => {
+        checkBinding('0n');
+      });
+
+      it('should parse a large BigInt literal', () => {
+        checkBinding('9007199254740991n');
+      });
+
+      it('should parse BigInt in expressions', () => {
+        checkBinding('1n + 2n');
+      });
+
+      it('should parse BigInt with numeric separators', () => {
+        checkBinding('1_000_000n', '1000000n');
+      });
+
+      it('should parse BigInt as LiteralPrimitive with bigint value', () => {
+        const ast = parseBinding('42n');
+        const lit = ast.ast as any;
+        expect(typeof lit.value).toBe('bigint');
+        expect(lit.value).toBe(BigInt(42));
+      });
+    });
+
     describe('arrow functions', () => {
       it('should parse a single-parameter arrow function', () => {
         checkBinding('a => a');
@@ -1055,6 +1179,46 @@ describe('parser', () => {
         checkBinding('(a, b) => [a, b, foo]');
       });
 
+      describe('rest parameters', () => {
+        it('should parse an arrow function with only a rest parameter', () => {
+          checkBinding('(...args) => args');
+        });
+
+        it('should parse an arrow function with regular and rest parameters', () => {
+          checkBinding('(a, b, ...rest) => a + b');
+        });
+
+        it('should parse an arrow function with one regular and a rest parameter', () => {
+          checkBinding('(a, ...rest) => a');
+        });
+
+        it('should parse a rest parameter as ArrowFunctionRestParameter', () => {
+          const ast = parseBinding('(a, ...rest) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(2);
+          expect(arrowFn.parameters[0] instanceof ArrowFunctionIdentifierParameter).toBe(true);
+          expect(arrowFn.parameters[1] instanceof ArrowFunctionRestParameter).toBe(true);
+          expect(arrowFn.parameters[0].name).toBe('a');
+          expect(arrowFn.parameters[1].name).toBe('rest');
+        });
+
+        it('should produce spans for rest parameters', () => {
+          const ast = parseBinding('(a, ...rest) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          const getSource = (span: ParseSpan) => ast.source?.substring(span.start, span.end);
+
+          expect(getSource(arrowFn.parameters[0].span)).toBe('a');
+          expect(getSource(arrowFn.parameters[1].span)).toBe('...rest');
+        });
+
+        it('should report an error when rest parameter is not last', () => {
+          expectBindingError(
+            '(...rest, a) => a',
+            'A rest parameter must be the last parameter in an arrow function',
+          );
+        });
+      });
+
       describe('arrow function spans', () => {
         it('should produce spans for the entire arrow function', () => {
           expect(unparseWithSpan(parseBinding('a => a'))).toEqual([
@@ -1091,11 +1255,8 @@ describe('parser', () => {
       });
 
       describe('arrow function validations', () => {
-        it('should not allow pipe to be used inside an arrow function', () => {
-          expectBindingError(
-            '(a, b) => (a + b | pipe)',
-            'Cannot have a pipe in an action expression',
-          );
+        it('should allow pipe to be used inside an arrow function', () => {
+          checkBinding('(a, b) => (a + b | pipe)', '(a, b) => ((a + b | pipe))');
         });
 
         it('should report an error for an arrow function with a body', () => {
@@ -1144,6 +1305,143 @@ describe('parser', () => {
           );
         });
       });
+
+      describe('destructuring parameters', () => {
+        it('should parse an arrow function with object destructuring', () => {
+          checkBinding('({a, b}) => a + b');
+        });
+
+        it('should parse an arrow function with array destructuring', () => {
+          checkBinding('([a, b]) => a + b');
+        });
+
+        it('should parse an arrow function with object destructuring and renaming', () => {
+          checkBinding('({a: x, b: y}) => x + y');
+        });
+
+        it('should parse an arrow function with object destructuring and defaults', () => {
+          checkBinding('({a = 1, b = 2}) => a + b');
+        });
+
+        it('should parse an arrow function with mixed params including destructuring', () => {
+          checkBinding('(x, {a, b}, y) => x + a + b + y');
+        });
+
+        it('should parse an arrow function with nested object destructuring', () => {
+          checkBinding('({a: {x, y}}) => x + y');
+        });
+
+        it('should parse an arrow function with nested array destructuring', () => {
+          checkBinding('([[a, b], c]) => a + b + c');
+        });
+
+        it('should parse an arrow function with array destructuring and rest', () => {
+          checkBinding('([a, ...rest]) => a');
+        });
+
+        it('should parse an arrow function with object destructuring and rest', () => {
+          checkBinding('({a, ...rest}) => a');
+        });
+
+        it('should parse an arrow function with array destructuring and holes', () => {
+          checkBinding('([a, , b]) => a + b');
+        });
+
+        it('should parse an arrow function with rest destructuring parameter', () => {
+          checkBinding('(...{length}) => length');
+        });
+
+        it('should parse an arrow function with rest array destructuring parameter', () => {
+          checkBinding('(...[first, second]) => first + second');
+        });
+
+        it('should parse a destructuring parameter as ArrowFunctionDestructuringParameter', () => {
+          const ast = parseBinding('({a, b: c}) => a + c');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(1);
+          expect(arrowFn.parameters[0] instanceof ArrowFunctionDestructuringParameter).toBe(true);
+          const param = arrowFn.parameters[0] as ArrowFunctionDestructuringParameter;
+          expect(param.pattern).toBe('{a, b: c}');
+          expect(param.boundNames).toEqual(['a', 'c']);
+          expect(param.isRest).toBe(false);
+        });
+
+        it('should parse array destructuring parameter with correct bound names', () => {
+          const ast = parseBinding('([a, , b, ...rest]) => a');
+          const arrowFn = ast.ast as ArrowFunction;
+          const param = arrowFn.parameters[0] as ArrowFunctionDestructuringParameter;
+          expect(param.pattern).toBe('[a, , b, ...rest]');
+          expect(param.boundNames).toEqual(['a', 'b', 'rest']);
+        });
+
+        it('should parse a rest destructuring parameter correctly', () => {
+          const ast = parseBinding('(...{length}) => length');
+          const arrowFn = ast.ast as ArrowFunction;
+          expect(arrowFn.parameters.length).toBe(1);
+          const param = arrowFn.parameters[0] as ArrowFunctionDestructuringParameter;
+          expect(param.isRest).toBe(true);
+          expect(param.pattern).toBe('{length}');
+          expect(param.boundNames).toEqual(['length']);
+        });
+      });
+    });
+  });
+
+  describe('extractBoundNamesFromPattern', () => {
+    it('should extract names from simple object pattern', () => {
+      expect(extractBoundNamesFromPattern('{ a, b }')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from object pattern with renaming', () => {
+      expect(extractBoundNamesFromPattern('{ a: x, b: y }')).toEqual(['x', 'y']);
+    });
+
+    it('should extract names from object pattern with defaults', () => {
+      expect(extractBoundNamesFromPattern('{ a = 1, b = 2 }')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from object pattern with renaming and defaults', () => {
+      expect(extractBoundNamesFromPattern('{ a: x = 1, b: y = 2 }')).toEqual(['x', 'y']);
+    });
+
+    it('should extract names from object pattern with rest', () => {
+      expect(extractBoundNamesFromPattern('{ a, ...rest }')).toEqual(['a', 'rest']);
+    });
+
+    it('should extract names from simple array pattern', () => {
+      expect(extractBoundNamesFromPattern('[a, b]')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from array pattern with holes', () => {
+      expect(extractBoundNamesFromPattern('[a, , b]')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from array pattern with rest', () => {
+      expect(extractBoundNamesFromPattern('[a, ...rest]')).toEqual(['a', 'rest']);
+    });
+
+    it('should extract names from array pattern with defaults', () => {
+      expect(extractBoundNamesFromPattern('[a = 1, b = 2]')).toEqual(['a', 'b']);
+    });
+
+    it('should extract names from nested object patterns', () => {
+      expect(extractBoundNamesFromPattern('{ a: { x, y } }')).toEqual(['x', 'y']);
+    });
+
+    it('should extract names from nested array patterns', () => {
+      expect(extractBoundNamesFromPattern('[[a, b], c]')).toEqual(['a', 'b', 'c']);
+    });
+
+    it('should extract names from nested mixed patterns', () => {
+      expect(extractBoundNamesFromPattern('{ a: [x, y], b }')).toEqual(['x', 'y', 'b']);
+    });
+
+    it('should extract names from deeply nested patterns', () => {
+      expect(extractBoundNamesFromPattern('{ a: { b: { c } } }')).toEqual(['c']);
+    });
+
+    it('should extract names from rest with nested destructuring', () => {
+      expect(extractBoundNamesFromPattern('{ ...{ x, y } }')).toEqual(['x', 'y']);
     });
   });
 

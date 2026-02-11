@@ -5520,54 +5520,35 @@ runInEachFileSystem((os: string) => {
       );
 
       const errors = env.driveDiagnostics();
-      expect(getDiagnosticSourceCode(errors[0])).toBe(`'act() | pipe'`);
-      expect(errors[0].messageText).toContain('/test.ts@7:17');
+      expect(getDiagnosticSourceCode(errors[0])).toBe('act');
     });
 
-    it('should throw in case pipes are used in host listeners', () => {
+    it('should allow pipes in host listeners arguments', () => {
       env.write(
         `test.ts`,
         `
-        import {Component} from '@angular/core';
+        import {Component, Pipe, PipeTransform} from '@angular/core';
+
+        @Pipe({name: 'myPipe'})
+        class MyPipe implements PipeTransform {
+          transform(value: any): any { return value; }
+        }
 
         @Component({
           selector: 'test',
           template: '...',
+          imports: [MyPipe],
           host: {
-            '(click)': 'doSmth() | myPipe'
+            '(click)': 'doSmth(1 | myPipe)'
           }
         })
-        class FooCmp {}
+        class FooCmp {
+          doSmth(val: any) { return 'value'; }
+        }
       `,
       );
       const errors = env.driveDiagnostics();
-      expect(trim(errors[0].messageText as string)).toContain(
-        'Cannot have a pipe in an action expression',
-      );
-    });
-
-    it('should throw in case pipes are used in host bindings (defined as `value | pipe`)', () => {
-      env.write(
-        `test.ts`,
-        `
-            import {Component} from '@angular/core';
-
-            @Component({
-              selector: 'test',
-              template: '...',
-              host: {
-                '[id]': 'id | myPipe'
-              }
-            })
-            class FooCmp {}
-         `,
-      );
-      const diags = env.driveDiagnostics();
-      expect(diags.length).toBe(1);
-      expect(trim(diags[0].messageText as string)).toContain(
-        'Host binding expression cannot contain pipes',
-      );
-      expect(getDiagnosticSourceCode(diags[0])).toBe(`'id | myPipe'`);
+      expect(errors.length).toBe(0);
     });
 
     it('should generate host bindings for directives', () => {

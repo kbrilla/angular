@@ -10,10 +10,11 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 
 | Literal type           | Example values                  |
 | ---------------------- | ------------------------------- |
-| String                 | `'Hello'`, `"World"`            |
-| Boolean                | `true`, `false`                 |
-| Number                 | `123`, `3.14`                   |
-| Object                 | `{name: 'Alice'}`               |
+| String                 | `'Hello'`, `"World"`, `'\u{1F600}'`               |
+| Boolean                | `true`, `false`                                   |
+| Number                 | `123`, `3.14`, `1_000`, `0xFF`, `0o77`, `0b1010`  |
+| BigInt                 | `1n`, `100n`, `0xFFn`                             |
+| Object                 | `{name: 'Alice'}`, `{[dynamicKey]: value}`        |
 | Array                  | `['Onion', 'Cheese', 'Garlic']` |
 | null                   | `null`                          |
 | RegExp                 | `/\d+/`                         |
@@ -22,9 +23,9 @@ Angular supports a subset of [literal values](https://developer.mozilla.org/en-U
 
 ### Unsupported value literals
 
-| Literal type | Example values |
-| ------------ | -------------- |
-| BigInt       | `1n`           |
+There are no unsupported value literal types.
+
+NOTE: RegExp literals are parsed and type-checked but cannot be used for runtime matching within template expressions. They are primarily useful when passed to component inputs that accept `RegExp` values.
 
 ## Globals
 
@@ -34,6 +35,18 @@ Angular expressions support the following [globals](https://developer.mozilla.or
 - [$any](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#any)
 
 No other JavaScript globals are supported. Common JavaScript globals include `Number`, `Boolean`, `NaN`, `Infinity`, `parseInt`, and more.
+
+## Comments in expressions
+
+Angular expressions support both line comments and block comments:
+
+```angular-html
+<!-- Line comments strip everything after // -->
+{{ value // this is ignored }}
+
+<!-- Block comments can appear inline -->
+{{ someFunction(/* param description */ value) }}
+```
 
 ## Local variables
 
@@ -65,6 +78,7 @@ Angular supports the following operators from standard JavaScript.
 | Unary Negation                | `-x`                                           |
 | Unary Plus                    | `+y`                                           |
 | Property Accessor             | `person['name']`                               |
+| Computed Property Names       | `{[dynamicKey]: value}`                        |
 | typeof                        | `typeof 42`                                    |
 | void                          | `void 1`                                       |
 | in                            | `'model' in car`                               |
@@ -82,6 +96,7 @@ Angular supports the following operators from standard JavaScript.
 | Spread in object literals     | `{...obj, foo: 'bar'}`                         |
 | Spread in array literals      | `[...arr, 1, 2, 3]`                            |
 | Rest in function calls        | `fn(...args)`                                  |
+| Rest in arrow function params | `(...args) => args`                            |
 
 Angular expressions additionally also support the following non-standard operators:
 
@@ -98,10 +113,24 @@ NOTE: Optional chaining behaves differently from the standard JavaScript version
 | Operator              | Example(s)                        |
 | --------------------- | --------------------------------- |
 | All bitwise operators | `&`, `&=`, `~`, `\|=`, `^=`, etc. |
-| Object destructuring  | `const { name } = person`         |
-| Array destructuring   | `const [firstItem] = items`       |
 | Comma operator        | `x = (x++, x)`                    |
 | new                   | `new Car()`                       |
+
+NOTE: Object and array destructuring are supported in `@let` declarations. See the [variables guide](/guide/templates/variables) for details.
+
+## String escape sequences
+
+Angular supports the following escape sequences in string literals:
+
+| Escape sequence | Description                                |
+| --------------- | ------------------------------------------ |
+| `\n`            | Newline                                    |
+| `\t`            | Tab                                        |
+| `\\`            | Backslash                                  |
+| `\'`            | Single quote                               |
+| `\"`            | Double quote                               |
+| `\uXXXX`       | 4-digit Unicode escape (`\u4f60` → `你`)   |
+| `\u{XXXXX}`    | Braced Unicode escape (`\u{1F600}` → `😀`) |
 
 ## Lexical context for expressions
 
@@ -122,7 +151,6 @@ Generally speaking, declarations are not supported in Angular expressions. This 
 
 # Event listener statements
 
-Event handlers are **statements** rather than expressions. While they support all of the same syntax as Angular expressions, there are two key differences:
+Event handlers are **statements** rather than expressions. While they support all of the same syntax as Angular expressions, there is one key difference:
 
 1. Statements **do support** assignment operators (but not destructing assignments)
-1. Statements **do not support** pipes

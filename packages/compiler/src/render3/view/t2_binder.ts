@@ -883,6 +883,11 @@ class TemplateBinder extends CombinedRecursiveAstVisitor {
     } else if (nodeOrNodes instanceof HostElement) {
       // Host elements are always at the top level.
       this.nestingLevel.set(nodeOrNodes, 0);
+      // Visit the bindings and listeners of the host element to ensure that any pipes
+      // used in them are recorded. This is necessary because host bindings/listeners
+      // are not visited by the default ingestion process.
+      nodeOrNodes.bindings.forEach(this.visitNode);
+      nodeOrNodes.listeners.forEach(this.visitNode);
     } else {
       // Visit each node from the top-level template.
       nodeOrNodes.forEach(this.visitNode);

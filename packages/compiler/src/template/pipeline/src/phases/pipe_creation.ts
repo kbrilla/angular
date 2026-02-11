@@ -11,7 +11,7 @@ import type {CompilationJob, CompilationUnit} from '../compilation';
 
 /**
  * This phase generates pipe creation instructions. We do this based on the pipe bindings found in
- * the update block, in the order we see them.
+ * the update block and listener handler ops, in the order we see them.
  *
  * When not in compatibility mode, we can simply group all these creation instructions together, to
  * maximize chaining opportunities.
@@ -23,6 +23,7 @@ export function createPipes(job: CompilationJob): void {
 }
 
 function processPipeBindingsInView(unit: CompilationUnit): void {
+  // Process pipe bindings in update ops (the normal case for property/text bindings).
   for (const updateOp of unit.update) {
     ir.visitExpressionsInOp(updateOp, (expr, flags) => {
       if (!ir.isIrExpression(expr)) {
@@ -51,6 +52,35 @@ function processPipeBindingsInView(unit: CompilationUnit): void {
         unit.create.push(ir.createPipeOp(expr.target, expr.targetSlot, expr.name));
       }
     });
+  }
+
+  // Process pipe bindings inside listener handler ops (event bindings like `(click)="x | pipe"`).
+  // Listener ops are create ops whose handlerOps may contain PipeBindingExpr.
+  for (const createOp of unit.create) {
+    if (
+      createOp.kind !== ir.OpKind.Listener &&
+      createOp.kind !== ir.OpKind.TwoWayListener &&
+      createOp.kind !== ir.OpKind.AnimationListener &&
+      createOp.kind !== ir.OpKind.Animation
+    ) {
+      continue;
+    }
+    for (const handlerOp of createOp.handlerOps) {
+      ir.visitExpressionsInOp(handlerOp, (expr) => {
+        if (!ir.isIrExpression(expr)) {
+          return;
+        }
+
+        if (
+          expr.kind !== ir.ExpressionKind.PipeBinding &&
+          expr.kind !== ir.ExpressionKind.PipeBindingVariadic
+        ) {
+          return;
+        }
+
+        unit.create.push(ir.createPipeOp(expr.target, expr.targetSlot, expr.name));
+      });
+    }
   }
 }
 

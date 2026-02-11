@@ -119,7 +119,11 @@ export class BabelAstFactory implements AstFactory<t.Statement, t.Expression | t
       assert(body, t.isBlockStatement, 'a block');
     }
     return t.arrowFunctionExpression(
-      parameters.map((param) => t.identifier(param)),
+      parameters.map((param) => {
+        const isRest = param.startsWith('...');
+        const name = isRest ? param.slice(3) : param;
+        return isRest ? t.restElement(t.identifier(name)) : t.identifier(name);
+      }),
       body,
     );
   }
@@ -150,11 +154,13 @@ export class BabelAstFactory implements AstFactory<t.Statement, t.Expression | t
     );
   }
 
-  createLiteral(value: string | number | boolean | null | undefined): t.Expression {
+  createLiteral(value: string | number | bigint | boolean | null | undefined): t.Expression {
     if (typeof value === 'string') {
       return t.stringLiteral(value);
     } else if (typeof value === 'number') {
       return t.numericLiteral(value);
+    } else if (typeof value === 'bigint') {
+      return t.bigIntLiteral(`${value}`);
     } else if (typeof value === 'boolean') {
       return t.booleanLiteral(value);
     } else if (value === undefined) {
@@ -177,10 +183,17 @@ export class BabelAstFactory implements AstFactory<t.Statement, t.Expression | t
           return t.spreadElement(prop.expression);
         }
 
-        const key = prop.quoted
-          ? t.stringLiteral(prop.propertyName)
-          : t.identifier(prop.propertyName);
-        return t.objectProperty(key, prop.value);
+        let key: t.Expression;
+        let computed = false;
+        if (prop.isComputed && prop.computedKey) {
+          key = prop.computedKey;
+          computed = true;
+        } else if (prop.quoted) {
+          key = t.stringLiteral(prop.propertyName);
+        } else {
+          key = t.identifier(prop.propertyName);
+        }
+        return t.objectProperty(key, prop.value, computed);
       }),
     );
   }

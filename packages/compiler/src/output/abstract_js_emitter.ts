@@ -161,6 +161,16 @@ export abstract class AbstractJsEmitterVisitor extends AbstractEmitterVisitor {
   }
 
   private _visitParams(params: o.FnParam[], ctx: EmitterVisitorContext): void {
-    this.visitAllObjects((param) => ctx.print(null, param.name), params, ctx, ',');
+    this.visitAllObjects(
+      (param) => {
+        if (param.isRest) {
+          ctx.print(null, '...');
+        }
+        ctx.print(null, param.name);
+      },
+      params,
+      ctx,
+      ',',
+    );
   }
 }

@@ -166,7 +166,7 @@ export interface AstFactory<TStatement, TExpression> {
    *
    * @param value the value of the literal.
    */
-  createLiteral(value: string | number | boolean | null | undefined): TExpression;
+  createLiteral(value: string | number | bigint | boolean | null | undefined): TExpression;
 
   /**
    * Create an expression that is instantiating the `expression` as a class.
@@ -380,6 +380,14 @@ export interface ObjectLiteralAssignment<TExpression> {
    * Whether the `propertyName` should be enclosed in quotes.
    */
   quoted: boolean;
+  /**
+   * Whether this is a computed property name (e.g. `{[key]: value}`).
+   */
+  isComputed?: boolean;
+  /**
+   * The expression for the computed property name.
+   */
+  computedKey?: TExpression;
 }
 
 /**
