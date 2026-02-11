@@ -12,6 +12,12 @@ import {
   ParsedEvent,
   ParsedProperty,
   ParsedVariable,
+  LiteralMap,
+  LiteralArray,
+  ImplicitReceiver,
+  PropertyRead,
+  ParseSpan,
+  AbsoluteSourceSpan,
 } from '../expression_parser/ast';
 import * as i18n from '../i18n/i18n_ast';
 import * as html from '../ml_parser/ast';
@@ -31,6 +37,7 @@ import {
   createSwitchBlock,
   isConnectedForLoopBlock,
   isConnectedIfLoopBlock,
+  extractDestructuringLets,
 } from './r3_control_flow';
 import {createDeferredBlock, isConnectedDeferLoopBlock} from './r3_deferred_blocks';
 import {I18N_ICU_VAR_PREFIX} from './view/i18n/util';
@@ -360,7 +367,322 @@ class HtmlAstToIvyAst implements html.Visitor {
       this.reportError('@let declaration value cannot be empty', decl.valueSpan);
     }
 
+    const nameAST = this.bindingParser.parseBinding(
+      decl.name,
+      false,
+      decl.nameSpan,
+      decl.nameSpan.start.offset,
+    );
+
+    if (nameAST.ast instanceof LiteralMap || nameAST.ast instanceof LiteralArray) {
+      const index = Array.isArray(context) ? context.indexOf(decl) : 0;
+      const tempName = `_let_${index}_${decl.nameSpan.start.offset}`;
+
+      // Use a span that ends before the destructuring pattern starts
+      // to avoid "usage before declaration" errors in type check.
+      // The tempSpan must end strictly before the access expression spans start,
+      // so the isValidLetDeclarationAccess check (astStart > targetEnd) passes.
+      const tempSpan = new ParseSourceSpan(decl.sourceSpan.start, decl.sourceSpan.start);
+
+      const tempLet = new t.LetDeclaration(tempName, value, tempSpan, tempSpan, decl.valueSpan);
+
+      const destructuredLets: t.LetDeclaration[] = [];
+      const accessSpan = new AbsoluteSourceSpan(
+        decl.nameSpan.start.offset,
+        decl.nameSpan.end.offset,
+      );
+      const accessExpr = new PropertyRead(
+        new ParseSpan(0, 0),
+        accessSpan,
+        accessSpan,
+        new ImplicitReceiver(new ParseSpan(0, 0), accessSpan),
+        tempName,
+      );
+
+      extractDestructuringLets(
+        nameAST.ast,
+        accessExpr,
+        destructuredLets,
+        decl.nameSpan,
+        this.bindingParser.errors,
+      );
+
+      return [tempLet, ...destructuredLets];
+    }
+
     return new t.LetDeclaration(decl.name, value, decl.sourceSpan, decl.nameSpan, decl.valueSpan);
+  }
+
+  /**
+   * Desugars a destructuring `@let` declaration into multiple simple `@let` declarations.
+   *
+   * Object destructuring:
+   *   `@let { a, b } = obj;`             → `@let a = obj.a; @let b = obj.b;`
+   *   `@let { a: a1, b: b1 } = obj;`     → `@let a1 = obj.a; @let b1 = obj.b;`
+   *   `@let { a = def } = obj;`           → `@let a = obj.a ?? def;`
+   *   `@let { a: a1 = def } = obj;`       → `@let a1 = obj.a ?? def;`
+   *   `@let { a, ...rest } = obj;`        → `@let a = obj.a; @let rest = obj;`
+   *
+   * Array destructuring:
+   *   `@let [a, b] = arr;`               → `@let a = arr[0]; @let b = arr[1];`
+   *   `@let [a, , b] = arr;`             → `@let a = arr[0]; @let b = arr[2];`
+   *   `@let [a = def] = arr;`            → `@let a = arr[0] ?? def;`
+   *   `@let [a, b, ...rest] = arr;`      → `@let a = arr[0]; @let b = arr[1]; @let rest = arr.slice(2);`
+   */
+  private _desugarLetDestructuring(decl: html.LetDeclaration): t.LetDeclaration[] {
+    const pattern = decl.name;
+    const valueExpr = decl.value.trim();
+    const results: t.LetDeclaration[] = [];
+
+    if (pattern.startsWith('{')) {
+      this._desugarObjectDestructuring(pattern, valueExpr, decl, results);
+    } else if (pattern.startsWith('[')) {
+      this._desugarArrayDestructuring(pattern, valueExpr, decl, results);
+    }
+
+    return results;
+  }
+
+  /**
+   * Splits a destructuring pattern's inner content by top-level commas,
+   * respecting nested brackets and braces.
+   */
+  private _splitDestructuringElements(inner: string): string[] {
+    const elements: string[] = [];
+    let depth = 0;
+    let current = '';
+
+    for (let i = 0; i < inner.length; i++) {
+      const ch = inner[i];
+      if (ch === '{' || ch === '[') {
+        depth++;
+        current += ch;
+      } else if (ch === '}' || ch === ']') {
+        depth--;
+        current += ch;
+      } else if (ch === ',' && depth === 0) {
+        elements.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    elements.push(current.trim());
+    return elements;
+  }
+
+  private _makeLetDecl(
+    localName: string,
+    valueExprStr: string,
+    decl: html.LetDeclaration,
+  ): t.LetDeclaration {
+    const value = this.bindingParser.parseBinding(
+      valueExprStr,
+      false,
+      decl.valueSpan,
+      decl.valueSpan.start.offset,
+    );
+    return new t.LetDeclaration(localName, value, decl.sourceSpan, decl.nameSpan, decl.valueSpan);
+  }
+
+  private _desugarObjectDestructuring(
+    pattern: string,
+    valueExpr: string,
+    decl: html.LetDeclaration,
+    results: t.LetDeclaration[],
+  ): void {
+    const inner = pattern.slice(1, -1).trim();
+    if (inner.length === 0) {
+      this.reportError('@let object destructuring pattern cannot be empty', decl.nameSpan);
+      return;
+    }
+
+    const props = this._splitDestructuringElements(inner);
+
+    for (const prop of props) {
+      if (prop.length === 0) continue;
+
+      // Rest element: `...rest` or `...{ nested }` or `...[nested]`
+      if (prop.startsWith('...')) {
+        const restTarget = prop.slice(3).trim();
+        if (restTarget.startsWith('{') || restTarget.startsWith('[')) {
+          // Nested destructuring in rest: `...{ pop, push }` → desugar recursively
+          const nestedResults = this._desugarNestedPattern(restTarget, valueExpr, decl);
+          results.push(...nestedResults);
+        } else {
+          // Simple rest: `...rest` → rest = valueExpr (the whole object)
+          results.push(this._makeLetDecl(restTarget, valueExpr, decl));
+        }
+        continue;
+      }
+
+      // Parse: `key`, `key: localName`, `key = default`, `key: localName = default`
+      // Also support computed keys: `[expr]: localName`
+      let key: string;
+      let remainder: string;
+
+      if (prop.startsWith('[')) {
+        // Computed key: `[expr]: localName` or `[expr]: localName = default`
+        const closeBracket = prop.indexOf(']');
+        if (closeBracket === -1) {
+          this.reportError('Invalid computed property key in destructuring', decl.nameSpan);
+          continue;
+        }
+        key = prop.substring(1, closeBracket).trim();
+        // After `]` there should be `: localName` or `: localName = default`
+        remainder = prop.substring(closeBracket + 1).trim();
+        if (remainder.startsWith(':')) {
+          remainder = remainder.substring(1).trim();
+        }
+        const accessExpr = `${valueExpr}[${key}]`;
+        this._parsePropertyBinding(remainder || key, accessExpr, decl, results);
+      } else {
+        // Standard property: split on first `:` that's not inside brackets
+        const colonIdx = this._findTopLevelColon(prop);
+        if (colonIdx !== -1) {
+          key = prop.substring(0, colonIdx).trim();
+          remainder = prop.substring(colonIdx + 1).trim();
+        } else {
+          key = prop;
+          remainder = '';
+        }
+
+        const accessExpr = `${valueExpr}.${key}`;
+
+        if (remainder.length > 0) {
+          this._parsePropertyBinding(remainder, accessExpr, decl, results);
+        } else {
+          // Check for default value: `key = default`
+          const eqIdx = this._findTopLevelChar(key, '=');
+          if (eqIdx !== -1) {
+            const actualKey = key.substring(0, eqIdx).trim();
+            const defaultVal = key.substring(eqIdx + 1).trim();
+            const expr = `${valueExpr}.${actualKey} ?? ${defaultVal}`;
+            results.push(this._makeLetDecl(actualKey, expr, decl));
+          } else {
+            results.push(this._makeLetDecl(key, accessExpr, decl));
+          }
+        }
+      }
+    }
+  }
+
+  /** Find the first `:` not inside brackets. */
+  private _findTopLevelColon(str: string): number {
+    return this._findTopLevelChar(str, ':');
+  }
+
+  /** Find the first occurrence of a character not inside brackets. */
+  private _findTopLevelChar(str: string, char: string): number {
+    let depth = 0;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (ch === '[' || ch === '{') depth++;
+      else if (ch === ']' || ch === '}') depth--;
+      else if (ch === char && depth === 0) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Parse a binding target that may have a default value or be a nested pattern.
+   * `localName`, `localName = default`, `{ nested }`, `[nested]`
+   */
+  private _parsePropertyBinding(
+    target: string,
+    accessExpr: string,
+    decl: html.LetDeclaration,
+    results: t.LetDeclaration[],
+  ): void {
+    if (target.startsWith('{') || target.startsWith('[')) {
+      // Nested destructuring: `{ a: { x, y } }` → desugar recursively
+      const nestedResults = this._desugarNestedPattern(target, accessExpr, decl);
+      results.push(...nestedResults);
+    } else {
+      // Check for default value: `localName = default`
+      const eqIdx = this._findTopLevelChar(target, '=');
+      if (eqIdx !== -1) {
+        const localName = target.substring(0, eqIdx).trim();
+        const defaultVal = target.substring(eqIdx + 1).trim();
+        const expr = `${accessExpr} ?? ${defaultVal}`;
+        results.push(this._makeLetDecl(localName, expr, decl));
+      } else {
+        results.push(this._makeLetDecl(target, accessExpr, decl));
+      }
+    }
+  }
+
+  /** Recursively desugar a nested destructuring pattern. */
+  private _desugarNestedPattern(
+    pattern: string,
+    valueExpr: string,
+    decl: html.LetDeclaration,
+  ): t.LetDeclaration[] {
+    const nestedResults: t.LetDeclaration[] = [];
+    if (pattern.startsWith('{')) {
+      this._desugarObjectDestructuring(pattern, valueExpr, decl, nestedResults);
+    } else if (pattern.startsWith('[')) {
+      this._desugarArrayDestructuring(pattern, valueExpr, decl, nestedResults);
+    }
+    return nestedResults;
+  }
+
+  private _desugarArrayDestructuring(
+    pattern: string,
+    valueExpr: string,
+    decl: html.LetDeclaration,
+    results: t.LetDeclaration[],
+  ): void {
+    const inner = pattern.slice(1, -1).trim();
+    if (inner.length === 0) {
+      this.reportError('@let array destructuring pattern cannot be empty', decl.nameSpan);
+      return;
+    }
+
+    const elements = this._splitDestructuringElements(inner);
+
+    for (let i = 0; i < elements.length; i++) {
+      const elem = elements[i];
+
+      // Skip empty slots (holes): `[a, , b]`
+      if (elem.length === 0) continue;
+
+      // Rest element: `...rest`, `...[c, d]`, `...{ pop, push }`
+      if (elem.startsWith('...')) {
+        const restTarget = elem.slice(3).trim();
+        const sliceExpr = `${valueExpr}.slice(${i})`;
+
+        if (restTarget.startsWith('{') || restTarget.startsWith('[')) {
+          // Nested destructuring in rest: `...[c, d]` → desugar arr.slice(i) recursively
+          const nestedResults = this._desugarNestedPattern(restTarget, sliceExpr, decl);
+          results.push(...nestedResults);
+        } else {
+          // Simple rest: `...rest` → rest = arr.slice(i)
+          results.push(this._makeLetDecl(restTarget, sliceExpr, decl));
+        }
+        break; // Rest must be last
+      }
+
+      const accessExpr = `${valueExpr}[${i}]`;
+
+      // Nested destructuring: `[{ a, b }, c]` or `[[a, b], c]`
+      if (elem.startsWith('{') || elem.startsWith('[')) {
+        const nestedResults = this._desugarNestedPattern(elem, accessExpr, decl);
+        results.push(...nestedResults);
+        continue;
+      }
+
+      // Check for default value: `a = defaultVal`
+      const eqIdx = this._findTopLevelChar(elem, '=');
+      if (eqIdx !== -1) {
+        const localName = elem.substring(0, eqIdx).trim();
+        const defaultVal = elem.substring(eqIdx + 1).trim();
+        const expr = `${accessExpr} ?? ${defaultVal}`;
+        results.push(this._makeLetDecl(localName, expr, decl));
+      } else {
+        results.push(this._makeLetDecl(elem, accessExpr, decl));
+      }
+    }
   }
 
   visitComponent(component: html.Component) {

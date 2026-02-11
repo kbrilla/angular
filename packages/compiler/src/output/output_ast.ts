@@ -569,7 +569,7 @@ export class RegularExpressionLiteralExpr extends Expression {
 
 export class LiteralExpr extends Expression {
   constructor(
-    public value: number | string | boolean | null | undefined,
+    public value: number | bigint | string | boolean | null | undefined,
     type?: Type | null,
     sourceSpan?: ParseSourceSpan | null,
   ) {
@@ -985,14 +985,17 @@ export class FnParam {
   constructor(
     public name: string,
     public type: Type | null = null,
+    public isRest: boolean = false,
+    /** For destructuring parameters, the list of identifier names bound by the pattern. */
+    public boundNames: string[] | null = null,
   ) {}
 
   isEquivalent(param: FnParam): boolean {
-    return this.name === param.name;
+    return this.name === param.name && this.isRest === param.isRest;
   }
 
   clone(): FnParam {
-    return new FnParam(this.name, this.type);
+    return new FnParam(this.name, this.type, this.isRest, this.boundNames);
   }
 }
 
@@ -1337,18 +1340,32 @@ export class LiteralMapPropertyAssignment {
     public key: string,
     public value: Expression,
     public quoted: boolean,
+    public isComputed?: boolean,
+    public computedKey?: Expression,
   ) {}
 
   isEquivalent(e: LiteralMapPropertyAssignment): boolean {
-    return this.key === e.key && this.value.isEquivalent(e.value);
+    return (
+      this.key === e.key &&
+      this.value.isEquivalent(e.value) &&
+      this.isComputed === e.isComputed &&
+      (this.computedKey == null) === (e.computedKey == null) &&
+      (this.computedKey == null || this.computedKey.isEquivalent(e.computedKey!))
+    );
   }
 
   clone(): LiteralMapPropertyAssignment {
-    return new LiteralMapPropertyAssignment(this.key, this.value.clone(), this.quoted);
+    return new LiteralMapPropertyAssignment(
+      this.key,
+      this.value.clone(),
+      this.quoted,
+      this.isComputed,
+      this.computedKey?.clone(),
+    );
   }
 
   isConstant() {
-    return this.value.isConstant();
+    return this.value.isConstant() && (this.computedKey == null || this.computedKey.isConstant());
   }
 }
 
@@ -1780,6 +1797,9 @@ export class RecursiveAstVisitor implements StatementVisitor, ExpressionVisitor 
         entry.expression.visitExpression(this, context);
       } else {
         entry.value.visitExpression(this, context);
+        if (entry.computedKey) {
+          entry.computedKey.visitExpression(this, context);
+        }
       }
     });
     return this.visitExpression(ast, context);

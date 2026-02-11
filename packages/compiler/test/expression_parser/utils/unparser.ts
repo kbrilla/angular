@@ -8,6 +8,9 @@
 
 import {
   ArrowFunction,
+  ArrowFunctionParameter,
+  ArrowFunctionRestParameter,
+  ArrowFunctionDestructuringParameter,
   AST,
   AstVisitor,
   ASTWithSource,
@@ -166,6 +169,10 @@ class Unparser implements AstVisitor {
 
       if (key.kind === 'spread') {
         this._expression += '...';
+      } else if (key.isComputed && key.computedKey) {
+        this._expression += '[';
+        this._visit(key.computedKey);
+        this._expression += ']: ';
       } else {
         this._expression += key.quoted ? JSON.stringify(key.key) : key.key;
         this._expression += ': ';
@@ -180,6 +187,8 @@ class Unparser implements AstVisitor {
   visitLiteralPrimitive(ast: LiteralPrimitive, context: any) {
     if (typeof ast.value === 'string') {
       this._expression += `"${ast.value.replace(Unparser._quoteRegExp, '"')}"`;
+    } else if (typeof ast.value === 'bigint') {
+      this._expression += `${ast.value}n`;
     } else {
       this._expression += `${ast.value}`;
     }
@@ -256,10 +265,21 @@ class Unparser implements AstVisitor {
   }
 
   visitArrowFunction(ast: ArrowFunction, context: any) {
-    if (ast.parameters.length === 1) {
+    const formatParam = (p: ArrowFunctionParameter) => {
+      if (p instanceof ArrowFunctionDestructuringParameter) {
+        return p.isRest ? `...${p.pattern}` : p.pattern;
+      }
+      return p instanceof ArrowFunctionRestParameter ? `...${p.name}` : p.name;
+    };
+
+    if (
+      ast.parameters.length === 1 &&
+      !(ast.parameters[0] instanceof ArrowFunctionRestParameter) &&
+      !(ast.parameters[0] instanceof ArrowFunctionDestructuringParameter)
+    ) {
       this._expression += ast.parameters[0].name;
     } else {
-      this._expression += `(${ast.parameters.map((e) => e.name).join(', ')})`;
+      this._expression += `(${ast.parameters.map(formatParam).join(', ')})`;
     }
     this._expression += ' => ';
     this._visit(ast.body);

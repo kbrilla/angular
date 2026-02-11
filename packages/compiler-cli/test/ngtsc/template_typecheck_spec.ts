@@ -7238,6 +7238,29 @@ suppress
         );
       });
 
+      it('should report an error for mixed BigInt and number arithmetic', () => {
+        // BigInt requires target ES2020+ and lib ES2020+.
+        env.tsconfig({strictTemplates: true}, {target: 'ES2020', lib: ['ES2020', 'dom']});
+        env.write(
+          'test.ts',
+          `
+          import {Component} from '@angular/core';
+
+          @Component({
+            template: \`
+              <div [title]="1n + 1">test</div>
+            \`,
+          })
+          export class Main {
+          }
+        `,
+        );
+
+        const diags = env.driveDiagnostics();
+        expect(diags.length).toBe(1);
+        expect(diags[0].messageText).toBe(`Operator '+' cannot be applied to types '1n' and '1'.`);
+      });
+
       it('should narrow the type of a let declaration used directly in the template', () => {
         env.write(
           'test.ts',

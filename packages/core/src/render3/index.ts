@@ -188,7 +188,19 @@ export {AttributeMarker} from './interfaces/attribute_marker';
 export {CssSelectorList, ProjectionSlots} from './interfaces/projection';
 export {setClassMetadata, setClassMetadataAsync} from './metadata';
 export {NgModuleFactory, NgModuleRef, createEnvironmentInjector} from './ng_module_ref';
-export {ɵɵpipe, ɵɵpipeBind1, ɵɵpipeBind2, ɵɵpipeBind3, ɵɵpipeBind4, ɵɵpipeBindV} from './pipe';
+export {
+  ɵɵpipe,
+  ɵɵpipeBind1,
+  ɵɵpipeBind2,
+  ɵɵpipeBind3,
+  ɵɵpipeBind4,
+  ɵɵpipeBindV,
+  ɵɵlistenerPipeBind1,
+  ɵɵlistenerPipeBind2,
+  ɵɵlistenerPipeBind3,
+  ɵɵlistenerPipeBind4,
+  ɵɵlistenerPipeBindV,
+} from './pipe';
 export {
   ɵɵpureFunction0,
   ɵɵpureFunction1,

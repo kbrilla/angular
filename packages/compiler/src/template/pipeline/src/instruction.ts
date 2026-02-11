@@ -819,6 +819,26 @@ export function pipeBindV(slot: number, varOffset: number, args: o.Expression): 
   return o.importExpr(Identifiers.pipeBindV).callFn([o.literal(slot), o.literal(varOffset), args]);
 }
 
+const LISTENER_PIPE_BINDINGS: o.ExternalReference[] = [
+  Identifiers.listenerPipeBind1,
+  Identifiers.listenerPipeBind2,
+  Identifiers.listenerPipeBind3,
+  Identifiers.listenerPipeBind4,
+];
+
+export function listenerPipeBind(slot: number, args: o.Expression[]): o.Expression {
+  if (args.length < 1 || args.length > LISTENER_PIPE_BINDINGS.length) {
+    throw new Error(`listenerPipeBind() argument count out of bounds`);
+  }
+
+  const instruction = LISTENER_PIPE_BINDINGS[args.length - 1];
+  return o.importExpr(instruction).callFn([o.literal(slot), ...args]);
+}
+
+export function listenerPipeBindV(slot: number, args: o.Expression): o.Expression {
+  return o.importExpr(Identifiers.listenerPipeBindV).callFn([o.literal(slot), args]);
+}
+
 export function textInterpolate(
   strings: string[],
   expressions: o.Expression[],
