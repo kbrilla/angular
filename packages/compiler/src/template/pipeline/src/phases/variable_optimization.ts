@@ -590,6 +590,19 @@ function optimizeSaveRestoreView(ops: ir.OpList<ir.UpdateOp>): void {
     tail.statement instanceof o.ReturnStatement &&
     tail.statement.value instanceof ir.ResetViewExpr
   ) {
+    // Do not remove restoreView/resetView if the handler body contains pipe bindings,
+    // because `listenerPipeBind` relies on `getContextLView()` which requires `restoreView`
+    // to have been called first.
+    let hasPipeBinding = false;
+    ir.visitExpressionsInOp(tail, (expr) => {
+      if (expr instanceof ir.PipeBindingExpr || expr instanceof ir.PipeBindingVariadicExpr) {
+        hasPipeBinding = true;
+      }
+    });
+    if (hasPipeBinding) {
+      return;
+    }
+
     ir.OpList.remove<ir.UpdateOp>(head);
     tail.statement.value = tail.statement.value.expr;
   }
