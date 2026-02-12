@@ -413,7 +413,7 @@ runInEachFileSystem(() => {
         expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
       });
 
-      it('should not report for optional viewChild targeting a non-existent template ref', () => {
+      it('should report a warning when an optional viewChild targets a non-existent template ref', () => {
         env.write(
           'test.ts',
           `
@@ -429,7 +429,9 @@ runInEachFileSystem(() => {
         `,
         );
         const diagnostics = env.driveDiagnostics();
-        expect(diagnostics.length).toBe(0);
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`'missing'`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
       });
 
       it('should not report when viewChild matches an existing template ref', () => {
@@ -508,7 +510,7 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(0);
       });
 
-      it('should not report for viewChildren with non-existent template ref', () => {
+      it('should report a warning when viewChildren targets a non-existent template ref', () => {
         env.write(
           'test.ts',
           `
@@ -524,7 +526,9 @@ runInEachFileSystem(() => {
         `,
         );
         const diagnostics = env.driveDiagnostics();
-        expect(diagnostics.length).toBe(0);
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`'missing'`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
       });
 
       // Phase 2: read:TemplateRef mismatch detection

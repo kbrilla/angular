@@ -280,7 +280,7 @@ export class TypeCheckContextImpl implements TypeCheckContext {
 
     // Validate view query targets against the bound template.
     // Required queries produce errors (NG8023) — they will throw NG0951 at runtime.
-    // Optional queries are not flagged here; they may legitimately resolve to undefined.
+    // Optional queries with string predicates produce warnings (NG8024) — they will always be undefined.
     // Skip validation for empty templates (no nodes) since they may be placeholders.
     if (
       viewQueries !== undefined &&
@@ -297,16 +297,14 @@ export class TypeCheckContextImpl implements TypeCheckContext {
           const refInfo = templateRefs.get(predicate);
 
           if (refInfo === undefined) {
-            // Target doesn't exist in the template — only error for required queries.
-            if (query.isRequired) {
-              shimData.oobRecorder.missingViewQueryTarget(
-                id,
-                ref.node,
-                query.propertyName,
-                predicate,
-                query.isRequired,
-              );
-            }
+            // Target doesn't exist in the template — error for required, warning for optional.
+            shimData.oobRecorder.missingViewQueryTarget(
+              id,
+              ref.node,
+              query.propertyName,
+              predicate,
+              query.isRequired,
+            );
           } else if (query.readIsTemplateRef && !refInfo.isTemplate) {
             // Query uses read:TemplateRef but target is not on an <ng-template>.
             shimData.oobRecorder.queryReadTemplateRefMismatch(
