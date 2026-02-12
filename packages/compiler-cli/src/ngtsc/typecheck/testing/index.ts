@@ -1072,6 +1072,7 @@ export class NoopOobRecorder implements OutOfBandDiagnosticRecorder {
       | TmplAstViewportDeferredTrigger,
   ): void {}
   missingViewQueryTarget(): void {}
+  queryReadTemplateRefMismatch(): void {}
 }
 
 export function createNgCompilerForFile(fileContent: string) {

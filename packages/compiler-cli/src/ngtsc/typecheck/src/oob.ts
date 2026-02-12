@@ -264,6 +264,18 @@ export interface OutOfBandDiagnosticRecorder {
     predicateName: string,
     isRequired: boolean,
   ): void;
+
+  /**
+   * Reports that a view query uses `read: TemplateRef` but targets a reference on a
+   * non-`<ng-template>` element. Reading TemplateRef from a regular element always
+   * returns undefined.
+   */
+  queryReadTemplateRefMismatch(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+  ): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -936,6 +948,25 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     this._diagnostics.push({
       ...makeDiagnostic(errorCode, componentNode, message),
       category,
+      sourceFile: componentNode.getSourceFile(),
+      typeCheckId: id,
+    });
+  }
+
+  queryReadTemplateRefMismatch(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+  ): void {
+    const message =
+      `View query '${queryPropertyName}' uses 'read: TemplateRef' but the target ` +
+      `'#${predicateName}' is on a regular element, not an <ng-template>. ` +
+      `Reading TemplateRef from a non-template element will always return undefined.`;
+
+    this._diagnostics.push({
+      ...makeDiagnostic(ErrorCode.QUERY_READ_TEMPLATEREF_MISMATCH, componentNode, message),
+      category: ts.DiagnosticCategory.Error,
       sourceFile: componentNode.getSourceFile(),
       typeCheckId: id,
     });

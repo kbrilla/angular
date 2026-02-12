@@ -12,10 +12,12 @@ import {
   ParseSourceFile,
   R3TargetBinder,
   SchemaMetadata,
+  TmplAstElement,
   TmplAstHostElement,
   TmplAstNode,
   TmplAstReference,
   TmplAstRecursiveVisitor,
+  TmplAstTemplate,
 } from '@angular/compiler';
 import MagicString from 'magic-string';
 import ts from 'typescript';
@@ -283,14 +285,17 @@ export class TypeCheckContextImpl implements TypeCheckContext {
       templateContext?.nodes != null &&
       templateContext.nodes.length > 0
     ) {
-      const requiredStringQueries = viewQueries.filter(
-        (q) => q.isRequired && q.stringPredicates !== null,
-      );
-      if (requiredStringQueries.length > 0) {
-        const templateRefs = collectTemplateReferenceNames(templateContext.nodes);
-        for (const query of requiredStringQueries) {
-          for (const predicate of query.stringPredicates!) {
-            if (!templateRefs.has(predicate)) {
+      const templateRefs = collectTemplateReferenceNames(templateContext.nodes);
+
+      for (const query of viewQueries) {
+        if (query.stringPredicates === null) continue;
+
+        for (const predicate of query.stringPredicates) {
+          const refInfo = templateRefs.get(predicate);
+
+          if (refInfo === undefined) {
+            // Target doesn't exist in the template — only error for required queries.
+            if (query.isRequired) {
               shimData.oobRecorder.missingViewQueryTarget(
                 id,
                 ref.node,
@@ -299,6 +304,14 @@ export class TypeCheckContextImpl implements TypeCheckContext {
                 query.isRequired,
               );
             }
+          } else if (query.readIsTemplateRef && !refInfo.isTemplate) {
+            // Query uses read:TemplateRef but target is not on an <ng-template>.
+            shimData.oobRecorder.queryReadTemplateRefMismatch(
+              id,
+              ref.node,
+              query.propertyName,
+              predicate,
+            );
           }
         }
       }
@@ -786,11 +799,24 @@ function splitStringAtPoints(str: string, points: number[]): string[] {
  * This walks into all child scopes including control flow blocks (`@if`, `@for`, etc.)
  * because view queries can match references in any part of the template.
  */
-function collectTemplateReferenceNames(nodes: TmplAstNode[]): Set<string> {
-  const refs = new Set<string>();
+interface TemplateRefInfo {
+  isTemplate: boolean;
+}
+
+function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, TemplateRefInfo> {
+  const refs = new Map<string, TemplateRefInfo>();
   const visitor = new (class extends TmplAstRecursiveVisitor {
-    override visitReference(reference: TmplAstReference): void {
-      refs.add(reference.name);
+    override visitElement(element: TmplAstElement): void {
+      for (const ref of element.references) {
+        refs.set(ref.name, {isTemplate: false});
+      }
+      super.visitElement(element);
+    }
+    override visitTemplate(template: TmplAstTemplate): void {
+      for (const ref of template.references) {
+        refs.set(ref.name, {isTemplate: true});
+      }
+      super.visitTemplate(template);
     }
   })();
   for (const node of nodes) {

@@ -67,6 +67,8 @@ export interface ViewQueryCheckMeta {
   isRequired: boolean;
   /** Whether this is a single query (viewChild/contentChild) or multi query (viewChildren/contentChildren). */
   first: boolean;
+  /** Whether the query has `read: TemplateRef` option. */
+  readIsTemplateRef: boolean;
 }
 
 /**

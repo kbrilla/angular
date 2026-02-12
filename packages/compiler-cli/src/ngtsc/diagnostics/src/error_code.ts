@@ -452,6 +452,13 @@ export enum ErrorCode {
   MISSING_VIEW_QUERY_TARGET = 8024,
 
   /**
+   * Raised when a view query uses `read: TemplateRef` but the target template reference
+   * is on a non-`<ng-template>` element. Reading `TemplateRef` from a regular element always
+   * results in `undefined` at runtime.
+   */
+  QUERY_READ_TEMPLATEREF_MISMATCH = 8025,
+
+  /**
    * A two way binding in a template has an incorrect syntax,
    * parentheses outside brackets. For example:
    *

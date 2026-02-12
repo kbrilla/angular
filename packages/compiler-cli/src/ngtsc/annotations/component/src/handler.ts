@@ -1196,6 +1196,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
         stringPredicates: Array.isArray(q.predicate) ? q.predicate : null,
         isRequired: q.isRequired,
         first: q.first,
+        readIsTemplateRef: isReadTemplateRef(q.read),
       })),
     );
   }
@@ -2644,4 +2645,22 @@ function validateStandaloneImports(
 /** Returns whether an ImportDeclaration is a default import. */
 function isDefaultImport(node: ts.ImportDeclaration): boolean {
   return node.importClause !== undefined && node.importClause.namedBindings === undefined;
+}
+
+/**
+ * Checks if a query's `read` option resolves to `TemplateRef`.
+ * Handles both direct identifier (`read: TemplateRef`) and property access
+ * (`read: core.TemplateRef`) patterns.
+ */
+function isReadTemplateRef(read: o.Expression | null): boolean {
+  if (read === null) return false;
+  if (!(read instanceof o.WrappedNodeExpr)) return false;
+  const node = read.node;
+  if (ts.isIdentifier(node)) {
+    return node.text === 'TemplateRef';
+  }
+  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.name)) {
+    return node.name.text === 'TemplateRef';
+  }
+  return false;
 }

@@ -527,6 +527,90 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(0);
       });
 
+      // Phase 2: read:TemplateRef mismatch detection
+      it('should report error for viewChild with read:TemplateRef on a non-template element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild, TemplateRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myDiv>hello</div>',
+          })
+          export class TestComp {
+            tpl = viewChild.required('myDiv', {read: TemplateRef});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`TemplateRef`);
+        expect(diagnostics[0].messageText).toContain(`#myDiv`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should not report for viewChild with read:TemplateRef on ng-template', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild, TemplateRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<ng-template #myTpl>content</ng-template>',
+          })
+          export class TestComp {
+            tpl = viewChild.required('myTpl', {read: TemplateRef});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not report for viewChild with read:ElementRef on a div', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild, ElementRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myDiv>hello</div>',
+          })
+          export class TestComp {
+            el = viewChild.required('myDiv', {read: ElementRef});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should report error for decorator @ViewChild with read:TemplateRef on non-template', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, ViewChild, TemplateRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            standalone: false,
+            template: '<div #myDiv>hello</div>',
+          })
+          export class TestComp {
+            @ViewChild('myDiv', {read: TemplateRef}) tpl: any;
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`TemplateRef`);
+        expect(diagnostics[0].messageText).toContain(`#myDiv`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
       it('should capture a viewChild query in the setClasMetadata call', () => {
         env.write(
           'test.ts',
