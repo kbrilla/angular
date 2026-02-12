@@ -1016,9 +1016,10 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
   ): void {
     const message =
       `Required view query '${queryPropertyName}' targets '#${predicateName}' which only ` +
-      `exists inside a conditional block (@if, @switch, @for, or @defer). ` +
-      `When the condition is not met, this query will throw a runtime error (NG0951). ` +
-      `Consider using an optional query or moving the target outside the conditional block.`;
+      `exists inside a conditional block (@if, @switch, @for, @defer, <ng-template>, or ` +
+      `structural directive like *ngIf). When the condition is not met, this query will ` +
+      `throw a runtime error (NG0951). Consider using an optional query or moving the ` +
+      `target outside the conditional block.`;
 
     this._diagnostics.push({
       ...makeDiagnostic(ErrorCode.QUERY_TARGET_ONLY_CONDITIONAL, componentNode, message),

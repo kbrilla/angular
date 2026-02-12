@@ -1110,7 +1110,7 @@ export class NgCompiler {
         missingOptionalViewQueryTarget:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         queryReadTemplateRefMismatch:
-          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Error,
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         queryReadDirectiveMismatch:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
@@ -1152,7 +1152,7 @@ export class NgCompiler {
         missingOptionalViewQueryTarget:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         queryReadTemplateRefMismatch:
-          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Error,
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         queryReadDirectiveMismatch:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,

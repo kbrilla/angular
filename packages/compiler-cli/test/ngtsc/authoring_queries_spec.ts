@@ -551,7 +551,7 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(1);
         expect(diagnostics[0].messageText).toContain(`TemplateRef`);
         expect(diagnostics[0].messageText).toContain(`#myDiv`);
-        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
       });
 
       it('should not report for viewChild with read:TemplateRef on ng-template', () => {
@@ -612,7 +612,7 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(1);
         expect(diagnostics[0].messageText).toContain(`TemplateRef`);
         expect(diagnostics[0].messageText).toContain(`#myDiv`);
-        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
       });
 
       // Phase 4: Conditional availability warnings for required queries
@@ -859,6 +859,205 @@ runInEachFileSystem(() => {
         );
         const diagnostics = env.driveDiagnostics();
         expect(diagnostics.length).toBe(0);
+      });
+
+      // === Structural directive / ng-template scope tests ===
+      // Structural directives (*ngIf, *ngFor, etc.) desugar into TmplAstTemplate wrappers.
+      // Children inside any TmplAstTemplate (explicit <ng-template> or structural directive
+      // wrapper) are in an embedded view that may not be instantiated — treat as conditional.
+
+      it('should warn when required viewChild targets a ref only inside a structural directive template', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, Directive, Input, TemplateRef, ViewContainerRef, viewChild} from '@angular/core';
+
+          @Directive({selector: '[myIf]', standalone: true})
+          export class MyIf {
+            @Input() myIf!: boolean;
+            constructor(templateRef: TemplateRef<any>, viewContainer: ViewContainerRef) {}
+          }
+
+          @Component({
+            selector: 'test',
+            template: '<div *myIf="cond" #myRef>hello</div>',
+            imports: [MyIf],
+          })
+          export class TestComp {
+            cond = true;
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain('conditional');
+        expect(diagnostics[0].messageText).toContain('#myRef');
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should not warn for optional viewChild targeting a ref inside structural directive', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, Directive, Input, TemplateRef, ViewContainerRef, viewChild} from '@angular/core';
+
+          @Directive({selector: '[myIf]', standalone: true})
+          export class MyIf {
+            @Input() myIf!: boolean;
+            constructor(templateRef: TemplateRef<any>, viewContainer: ViewContainerRef) {}
+          }
+
+          @Component({
+            selector: 'test',
+            template: '<div *myIf="cond" #myRef>hello</div>',
+            imports: [MyIf],
+          })
+          export class TestComp {
+            cond = true;
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not warn when ref exists both inside template and at top level', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>always</div><ng-template><div #myRef>conditional</div></ng-template>',
+          })
+          export class TestComp {
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      // === ng-template as conditional scope tests ===
+
+      it('should warn when required viewChild targets a ref inside an unrendered ng-template', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<ng-template><div #myRef>hello</div></ng-template>',
+          })
+          export class TestComp {
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain('conditional');
+        expect(diagnostics[0].messageText).toContain('#myRef');
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should NOT warn for ref ON the ng-template itself (always accessible)', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild, TemplateRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<ng-template #tpl>content</ng-template>',
+          })
+          export class TestComp {
+            tpl = viewChild.required('tpl');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not warn for optional viewChild targeting a ref inside ng-template', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<ng-template><div #myRef>hello</div></ng-template>',
+          })
+          export class TestComp {
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      // === Host directives in read option tests ===
+
+      it('should not warn for read:HostDir when host directive is on matched directive', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, Directive, viewChild} from '@angular/core';
+
+          @Directive({standalone: true})
+          export class HostDir {}
+
+          @Directive({selector: '[myDir]', standalone: true, hostDirectives: [HostDir]})
+          export class MyDir {}
+
+          @Component({
+            selector: 'test',
+            template: '<div myDir #myRef>hello</div>',
+            imports: [MyDir],
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: HostDir});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should warn for read:SomeDir when directive is not on element and not a host directive', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, Directive, viewChild} from '@angular/core';
+
+          @Directive({standalone: true})
+          export class UnrelatedDir {}
+
+          @Directive({selector: '[myDir]', standalone: true})
+          export class MyDir {}
+
+          @Component({
+            selector: 'test',
+            template: '<div myDir #myRef>hello</div>',
+            imports: [MyDir],
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: UnrelatedDir});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain('UnrelatedDir');
+        expect(diagnostics[0].messageText).toContain('#myRef');
       });
 
       it('should capture a viewChild query in the setClasMetadata call', () => {

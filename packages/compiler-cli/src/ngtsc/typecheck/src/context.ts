@@ -329,12 +329,21 @@ export class TypeCheckContextImpl implements TypeCheckContext {
               );
             }
           } else if (query.readType.kind === 'directive' && refInfo !== undefined) {
-            // Query uses read:SomeDirective — check if that directive is actually on the element.
+            // Query uses read:SomeDirective — check if that directive is actually on the element,
+            // including host directives.
             const readName = query.readType.name;
             const directivesOnNode = boundTarget.getDirectivesOfNode(refInfo.node);
             const hasDirective =
               directivesOnNode !== null &&
-              directivesOnNode.some((dir) => dir.ref.node.name?.text === readName);
+              directivesOnNode.some(
+                (dir) =>
+                  dir.ref.node.name?.text === readName ||
+                  dir.hostDirectives?.some(
+                    (hd) =>
+                      hd.directive instanceof Reference &&
+                      hd.directive.node.name?.text === readName,
+                  ),
+              );
             if (!hasDirective && this.config.queryReadDirectiveMismatch !== 'suppress') {
               shimData.oobRecorder.queryReadDirectiveMismatch(
                 id,
@@ -877,10 +886,15 @@ function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, Templa
       super.visitElement(element);
     }
     override visitTemplate(template: TmplAstTemplate): void {
+      // Refs ON the <ng-template> itself are in the parent scope (unconditional).
       for (const ref of template.references) {
         addRef(ref.name, true, template);
       }
+      // Children INSIDE the <ng-template> (or structural directive wrapper) are in an
+      // embedded view that may not be instantiated — treat as conditional scope.
+      conditionalDepth++;
       super.visitTemplate(template);
+      conditionalDepth--;
     }
     override visitIfBlock(block: TmplAstIfBlock): void {
       conditionalDepth++;
