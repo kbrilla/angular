@@ -1196,6 +1196,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
         propertyName: q.propertyName,
         stringPredicates: Array.isArray(q.predicate) ? q.predicate : null,
         isRequired: q.isRequired,
+        isStatic: q.static,
         first: q.first,
         readIsTemplateRef: isReadTemplateRef(q.read),
         readType: classifyReadOption(q.read),

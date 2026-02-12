@@ -288,6 +288,19 @@ export class TypeCheckContextImpl implements TypeCheckContext {
       templateContext?.nodes != null &&
       templateContext.nodes.length > 0
     ) {
+      const nonStaticViewQueryNames = new Set(
+        viewQueries.filter((query) => !query.isStatic).map((query) => query.propertyName),
+      );
+      const earlyAccesses = collectEarlyQueryAccesses(ref.node, nonStaticViewQueryNames);
+      for (const earlyAccess of earlyAccesses) {
+        shimData.oobRecorder.queryAccessedBeforeAvailable(
+          id,
+          earlyAccess.node,
+          earlyAccess.propertyName,
+          earlyAccess.hook,
+        );
+      }
+
       const templateRefs = collectTemplateReferenceNames(templateContext.nodes);
 
       for (const query of viewQueries) {
@@ -354,13 +367,14 @@ export class TypeCheckContextImpl implements TypeCheckContext {
                 this.config.queryReadDirectiveMismatch,
               );
             }
-          } else if (query.isRequired && refInfo.isOnlyConditional) {
-            // Required query targets a ref that only exists inside a conditional block.
+          } else if ((query.isRequired || query.isStatic) && refInfo.isOnlyConditional) {
+            // Required or static query targets a ref that only exists inside a conditional block.
             shimData.oobRecorder.queryTargetOnlyConditional(
               id,
               ref.node,
               query.propertyName,
               predicate,
+              query.isStatic,
             );
           }
 
@@ -874,6 +888,64 @@ interface TemplateRefInfo {
   node: TmplAstElement | TmplAstTemplate;
   /** How many elements/templates have this ref name at the SAME unconditional scope level. */
   unconditionalCount: number;
+}
+
+type EarlyLifecycleHook = 'constructor' | 'ngOnInit';
+
+interface EarlyQueryAccessInfo {
+  propertyName: string;
+  hook: EarlyLifecycleHook;
+  node: ts.Node;
+}
+
+function collectEarlyQueryAccesses(
+  classNode: ts.ClassDeclaration,
+  queryPropertyNames: Set<string>,
+): EarlyQueryAccessInfo[] {
+  if (queryPropertyNames.size === 0) {
+    return [];
+  }
+
+  const accesses: EarlyQueryAccessInfo[] = [];
+  const seen = new Set<string>();
+
+  const recordAccess = (hook: EarlyLifecycleHook, node: ts.Node, propertyName: string): void => {
+    const key = `${hook}:${propertyName}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    accesses.push({hook, node, propertyName});
+  };
+
+  const scanBody = (hook: EarlyLifecycleHook, body: ts.Block): void => {
+    const visitor = (node: ts.Node): void => {
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        node.expression.kind === ts.SyntaxKind.ThisKeyword &&
+        queryPropertyNames.has(node.name.text)
+      ) {
+        recordAccess(hook, node.name, node.name.text);
+      }
+      ts.forEachChild(node, visitor);
+    };
+    ts.forEachChild(body, visitor);
+  };
+
+  for (const member of classNode.members) {
+    if (ts.isConstructorDeclaration(member) && member.body !== undefined) {
+      scanBody('constructor', member.body);
+    } else if (
+      ts.isMethodDeclaration(member) &&
+      ts.isIdentifier(member.name) &&
+      member.name.text === 'ngOnInit' &&
+      member.body !== undefined
+    ) {
+      scanBody('ngOnInit', member.body);
+    }
+  }
+
+  return accesses;
 }
 
 function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, TemplateRefInfo> {

@@ -288,6 +288,18 @@ export interface OutOfBandDiagnosticRecorder {
     componentNode: ClassDeclaration,
     queryPropertyName: string,
     predicateName: string,
+    isStatic: boolean,
+  ): void;
+
+  /**
+   * Reports that a non-static view query is accessed in a lifecycle hook where the
+   * query has not been resolved yet.
+   */
+  queryAccessedBeforeAvailable(
+    id: TypeCheckId,
+    accessNode: ts.Node,
+    queryPropertyName: string,
+    hook: 'constructor' | 'ngOnInit',
   ): void;
 
   /**
@@ -1025,18 +1037,41 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     componentNode: ClassDeclaration,
     queryPropertyName: string,
     predicateName: string,
+    isStatic: boolean,
   ): void {
+    const queryKind = isStatic ? 'Static' : 'Required';
+    const consequence = isStatic
+      ? `Static queries resolve before control-flow blocks render, so this target can never be resolved at runtime.`
+      : `When the condition is not met, this query may throw a runtime error (NG0951).`;
     const message =
-      `Required view query '${queryPropertyName}' targets '#${predicateName}' which only ` +
+      `${queryKind} view query '${queryPropertyName}' targets '#${predicateName}' which only ` +
       `exists inside a conditional block (@if, @switch, @for, @defer, <ng-template>, or ` +
-      `structural directive like *ngIf). When the condition is not met, this query may ` +
-      `throw a runtime error (NG0951). Consider using an optional query or moving the ` +
-      `target outside the conditional block.`;
+      `structural directive like *ngIf). ${consequence} Consider moving the target outside ` +
+      `the conditional block or adjusting query options.`;
 
     this._diagnostics.push({
       ...makeDiagnostic(ErrorCode.QUERY_TARGET_ONLY_CONDITIONAL, componentNode, message),
       category: ts.DiagnosticCategory.Error,
       sourceFile: componentNode.getSourceFile(),
+      typeCheckId: id,
+    });
+  }
+
+  queryAccessedBeforeAvailable(
+    id: TypeCheckId,
+    accessNode: ts.Node,
+    queryPropertyName: string,
+    hook: 'constructor' | 'ngOnInit',
+  ): void {
+    const message =
+      `View query '${queryPropertyName}' is accessed in '${hook}' before non-static view ` +
+      `queries are resolved. Access this query in 'ngAfterViewInit' (or use static: true if ` +
+      `appropriate).`;
+
+    this._diagnostics.push({
+      ...makeDiagnostic(ErrorCode.QUERY_ACCESS_BEFORE_AVAILABLE, accessNode, message),
+      category: ts.DiagnosticCategory.Warning,
+      sourceFile: accessNode.getSourceFile(),
       typeCheckId: id,
     });
   }

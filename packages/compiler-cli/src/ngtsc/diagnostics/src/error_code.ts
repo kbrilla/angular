@@ -478,6 +478,12 @@ export enum ErrorCode {
   QUERY_MULTIPLE_TARGETS = 8030,
 
   /**
+   * Raised as a warning when a non-static view query is accessed in `constructor` or `ngOnInit`,
+   * before Angular resolves view queries.
+   */
+  QUERY_ACCESS_BEFORE_AVAILABLE = 8031,
+
+  /**
    * A two way binding in a template has an incorrect syntax,
    * parentheses outside brackets. For example:
    *

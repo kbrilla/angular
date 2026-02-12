@@ -1123,6 +1123,107 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(0);
       });
 
+      it('should treat @ViewChild({required: true}) as required and report NG8023 for missing target', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, ViewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div>no ref here</div>',
+          })
+          export class TestComp {
+            @ViewChild('missing', {required: true}) el!: unknown;
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        const missingRequired = diagnostics.filter(
+          (d) => d.code === ngErrorCode(ErrorCode.MISSING_REQUIRED_VIEW_QUERY_TARGET),
+        );
+        expect(missingRequired.length).toBe(1);
+      });
+
+      it('should report NG8028 when a static view query target is only in conditional blocks', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, ViewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@if (show) { <div #myRef>value</div> }',
+          })
+          export class TestComp {
+            show = true;
+            @ViewChild('myRef', {static: true}) el!: unknown;
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        const conditional = diagnostics.filter(
+          (d) => d.code === ngErrorCode(ErrorCode.QUERY_TARGET_ONLY_CONDITIONAL),
+        );
+        expect(conditional.length).toBe(1);
+      });
+
+      it('should warn when non-static view queries are accessed in constructor or ngOnInit', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>value</div>',
+          })
+          export class TestComp {
+            el = viewChild('myRef');
+
+            constructor() {
+              this.el();
+            }
+
+            ngOnInit() {
+              this.el();
+            }
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        const earlyAccess = diagnostics.filter(
+          (d) => d.code === ngErrorCode(ErrorCode.QUERY_ACCESS_BEFORE_AVAILABLE),
+        );
+        expect(earlyAccess.length).toBe(2);
+      });
+
+      it('should not warn for static queries accessed in ngOnInit', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>value</div>',
+          })
+          export class TestComp {
+            el = viewChild('myRef', {static: true});
+
+            ngOnInit() {
+              this.el();
+            }
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        const earlyAccess = diagnostics.filter(
+          (d) => d.code === ngErrorCode(ErrorCode.QUERY_ACCESS_BEFORE_AVAILABLE),
+        );
+        expect(earlyAccess.length).toBe(0);
+      });
+
       // === ng-expect-warning / ng-expect-error suppression tests ===
 
       it('should suppress a diagnostic with ng-expect-error comment', () => {

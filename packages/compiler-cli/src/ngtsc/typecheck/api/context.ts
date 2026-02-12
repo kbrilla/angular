@@ -82,6 +82,8 @@ export interface ViewQueryCheckMeta {
   stringPredicates: string[] | null;
   /** Whether the query was declared as required (e.g. `viewChild.required('foo')`). */
   isRequired: boolean;
+  /** Whether the query uses `static: true`. */
+  isStatic: boolean;
   /** Whether this is a single query (viewChild/contentChild) or multi query (viewChildren/contentChildren). */
   first: boolean;
   /** Whether the query has `read: TemplateRef` option. */
