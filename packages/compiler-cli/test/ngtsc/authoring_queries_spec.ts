@@ -8,6 +8,7 @@
 
 import ts from 'typescript';
 
+import {ErrorCode, ngErrorCode} from '../../src/ngtsc/diagnostics';
 import {runInEachFileSystem} from '../../src/ngtsc/file_system/testing';
 import {loadStandardTestFiles} from '../../src/ngtsc/testing';
 
@@ -1120,6 +1121,79 @@ runInEachFileSystem(() => {
         );
         const diagnostics = env.driveDiagnostics();
         expect(diagnostics.length).toBe(0);
+      });
+
+      // === ng-expect-warning / ng-expect-error suppression tests ===
+
+      it('should suppress a diagnostic with ng-expect-error comment', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          // ng-expect-error NG8023
+          @Component({
+            selector: 'test',
+            template: '<div>no ref here</div>',
+          })
+          export class TestComp {
+            el = viewChild.required('missing');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        // The required missing target error should be suppressed
+        const ng8023 = diagnostics.filter(
+          (d) => d.code === ngErrorCode(ErrorCode.MISSING_REQUIRED_VIEW_QUERY_TARGET),
+        );
+        expect(ng8023.length).toBe(0);
+      });
+
+      it('should suppress a warning with ng-expect-warning comment', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          // ng-expect-warning NG8024
+          @Component({
+            selector: 'test',
+            template: '<div>no ref here</div>',
+          })
+          export class TestComp {
+            el = viewChild('missing');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        const ng8024 = diagnostics.filter(
+          (d) => d.code === ngErrorCode(ErrorCode.MISSING_VIEW_QUERY_TARGET),
+        );
+        expect(ng8024.length).toBe(0);
+      });
+
+      it('should emit unused suppression diagnostic when no matching error found', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          // ng-expect-error NG8023
+          @Component({
+            selector: 'test',
+            template: '<div #existing></div>',
+          })
+          export class TestComp {
+            el = viewChild.required('existing');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        const unused = diagnostics.filter(
+          (d) => typeof d.messageText === 'string' && d.messageText.includes('Unused'),
+        );
+        expect(unused.length).toBe(1);
+        expect(unused[0].messageText).toContain('ng-expect-error');
       });
 
       it('should capture a viewChild query in the setClasMetadata call', () => {

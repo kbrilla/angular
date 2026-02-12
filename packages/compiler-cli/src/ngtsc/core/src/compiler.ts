@@ -126,6 +126,7 @@ import {DiagnosticCategoryLabel, NgCompilerAdapter, NgCompilerOptions} from '../
 
 import {coreVersionSupportsFeature} from './feature_detection';
 import {angularJitApplicationTransform} from '../../transform/jit';
+import {filterSuppressedDiagnostics} from './suppression';
 import {untagAllTsFiles} from '../../shims';
 import {DOC_PAGE_BASE_URL} from '../../diagnostics/src/error_details_base_url';
 
@@ -605,7 +606,9 @@ export class NgCompiler {
       diagnostics.push(err.toDiagnostic());
     }
 
-    return this.addMessageTextDetails(diagnostics);
+    return this.addMessageTextDetails(
+      filterSuppressedDiagnostics(diagnostics, this.inputProgram.getSourceFiles().slice()),
+    );
   }
 
   /**
@@ -635,7 +638,7 @@ export class NgCompiler {
       diagnostics.push(err.toDiagnostic());
     }
 
-    return this.addMessageTextDetails(diagnostics);
+    return this.addMessageTextDetails(filterSuppressedDiagnostics(diagnostics, [file]));
   }
 
   /**
@@ -668,7 +671,9 @@ export class NgCompiler {
       }
       diagnostics.push(err.toDiagnostic());
     }
-    return this.addMessageTextDetails(diagnostics);
+    return this.addMessageTextDetails(
+      filterSuppressedDiagnostics(diagnostics, [component.getSourceFile()]),
+    );
   }
 
   /**
