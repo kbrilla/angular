@@ -286,7 +286,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     private readonly typeCheckHostBindings: boolean,
     private readonly enableSelectorless: boolean,
     private readonly emitDeclarationOnly: boolean,
-    private readonly strictOptionalChainingSemantics: boolean = false,
+    private readonly nativeOptionalChainingSemantics: boolean = false,
   ) {
     this.extractTemplateOptions = {
       enableI18nLegacyMessageIdFormat: this.enableI18nLegacyMessageIdFormat,
@@ -547,7 +547,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
     }
 
     // Read per-component optionalChainingSemantics override from @Component metadata.
-    // Allows individual components to override the project-wide strictOptionalChainingSemantics.
+    // Allows individual components to override the project-wide nativeOptionalChainingSemantics.
     let componentOptionalChainingSemantics: OptionalChainingSemantics | null = null;
     if (component.has('optionalChainingSemantics')) {
       const expr = component.get('optionalChainingSemantics')!;
@@ -1002,14 +1002,14 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
           ...metadata,
           hostOptionalChainingSemantics:
             componentOptionalChainingSemantics ??
-            (this.strictOptionalChainingSemantics
+            (this.nativeOptionalChainingSemantics
               ? OptionalChainingSemantics.Native
               : OptionalChainingSemantics.Legacy),
           template: {
             ...template,
             optionalChainingSemantics:
               componentOptionalChainingSemantics ??
-              (this.strictOptionalChainingSemantics
+              (this.nativeOptionalChainingSemantics
                 ? OptionalChainingSemantics.Native
                 : OptionalChainingSemantics.Legacy),
           },

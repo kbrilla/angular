@@ -120,7 +120,7 @@ export interface CompilationUnitData {
  *
  * **Interactive:** Prompts for each template before applying. Use `--interactive` CLI flag.
  *
- * The project-wide `strictOptionalChainingSemantics: true` should only be enabled when
+ * The project-wide `nativeOptionalChainingSemantics: true` should only be enabled when
  * ALL templates were either fully migrated or have no `?.` usage.
  */
 export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<

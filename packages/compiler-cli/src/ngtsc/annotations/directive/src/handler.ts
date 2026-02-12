@@ -165,7 +165,7 @@ export class DirectiveDecoratorHandler implements DecoratorHandler<
     private readonly usePoisonedData: boolean,
     private readonly typeCheckHostBindings: boolean,
     private readonly emitDeclarationOnly: boolean,
-    private readonly strictOptionalChainingSemantics: boolean = false,
+    private readonly nativeOptionalChainingSemantics: boolean = false,
   ) {
     this.undecoratedMetadataExtractor = getDirectiveUndecoratedMetadataExtractor(
       reflector,
@@ -258,7 +258,7 @@ export class DirectiveDecoratorHandler implements DecoratorHandler<
 
     analysis.hostOptionalChainingSemantics =
       directiveOptionalChainingSemantics ??
-      (this.strictOptionalChainingSemantics
+      (this.nativeOptionalChainingSemantics
         ? OptionalChainingSemantics.Native
         : OptionalChainingSemantics.Legacy);
 

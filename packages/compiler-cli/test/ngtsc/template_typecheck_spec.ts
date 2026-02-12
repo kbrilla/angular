@@ -1027,7 +1027,7 @@ runInEachFileSystem(() => {
 
         const diags = env.driveDiagnostics();
         // The legacy safe navigation usage diagnostic (NG8119) fires since
-        // strictOptionalChainingSemantics is not explicitly enabled.
+        // nativeOptionalChainingSemantics is not explicitly enabled.
         expect(diags.length).toBe(3);
         expect((diags[0].messageText as ts.DiagnosticMessageChain).messageText).toEqual(
           `Type 'boolean | undefined' is not assignable to type 'boolean'.`,

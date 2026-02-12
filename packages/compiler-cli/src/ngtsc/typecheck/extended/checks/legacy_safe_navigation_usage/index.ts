@@ -19,7 +19,7 @@ import {TemplateCheckFactory, TemplateCheckWithVisitor, TemplateContext} from '.
  * semantics (returning `null` on short-circuit instead of `undefined`).
  *
  * This diagnostic helps developers identify `?.` usage that will behave differently
- * after enabling `strictOptionalChainingSemantics: true`. It is off by default and
+ * after enabling `nativeOptionalChainingSemantics: true`. It is off by default and
  * must be explicitly enabled via `extendedDiagnostics` configuration:
  *
  * ```json
@@ -35,7 +35,7 @@ import {TemplateCheckFactory, TemplateCheckWithVisitor, TemplateContext} from '.
  * ```
  *
  * Once all flagged expressions have been reviewed and the migration applied,
- * the developer can enable `strictOptionalChainingSemantics: true` and remove
+ * the developer can enable `nativeOptionalChainingSemantics: true` and remove
  * this diagnostic.
  */
 class LegacySafeNavigationUsageCheck extends TemplateCheckWithVisitor<ErrorCode.LEGACY_SAFE_NAVIGATION_USAGE> {
@@ -73,7 +73,7 @@ class LegacySafeNavigationUsageCheck extends TemplateCheckWithVisitor<ErrorCode.
     const diagnostic = ctx.makeTemplateDiagnostic(
       templateMapping.span,
       `This safe navigation expression uses legacy Angular semantics (returns 'null' on short-circuit). ` +
-        `With 'strictOptionalChainingSemantics' enabled, it would return 'undefined' instead, ` +
+        `With 'nativeOptionalChainingSemantics' enabled, it would return 'undefined' instead, ` +
         `matching native ECMAScript optional chaining behavior. ` +
         `Run the optional chaining migration to auto-convert simple property chains, ` +
         `or manually verify this expression before enabling native semantics.`,
@@ -90,8 +90,8 @@ export const factory: TemplateCheckFactory<
   name: ExtendedTemplateDiagnosticName.LEGACY_SAFE_NAVIGATION_USAGE,
   create: (options: NgCompilerOptions) => {
     // Only report when the project is NOT yet using native semantics.
-    // If strictOptionalChainingSemantics is already enabled, the diagnostic is not needed.
-    if (options.strictOptionalChainingSemantics) {
+    // If nativeOptionalChainingSemantics is already enabled, the diagnostic is not needed.
+    if (options.nativeOptionalChainingSemantics) {
       return null;
     }
     return new LegacySafeNavigationUsageCheck();

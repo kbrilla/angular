@@ -69,9 +69,10 @@ function makeDirectiveMetadata<TExpression>(
 /**
  * A `PartialLinker` that is designed to process `ɵɵngDeclareComponent()` call expressions.
  */
-export class PartialComponentLinkerVersion1<TStatement, TExpression>
-  implements PartialLinker<TExpression>
-{
+export class PartialComponentLinkerVersion1<
+  TStatement,
+  TExpression,
+> implements PartialLinker<TExpression> {
   constructor(
     private readonly getSourceFile: GetSourceFileFn,
     private sourceUrl: AbsoluteFsPath,
@@ -228,7 +229,7 @@ export class PartialComponentLinkerVersion1<TStatement, TExpression>
 
     // Read optionalChainingSemantics from metadata, defaulting to 'legacy' if not present.
     // This ensures libraries compiled before this feature retain legacy safe navigation behavior,
-    // regardless of the consuming app's strictOptionalChainingSemantics setting.
+    // regardless of the consuming app's nativeOptionalChainingSemantics setting.
     const optionalChainingSemantics: OptionalChainingSemantics =
       metaObj.has('optionalChainingSemantics') &&
       metaObj.getString('optionalChainingSemantics') === 'native'

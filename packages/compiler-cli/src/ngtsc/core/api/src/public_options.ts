@@ -483,5 +483,5 @@ export interface MiscOptions {
    *
    * Defaults to `false`.
    */
-  strictOptionalChainingSemantics?: boolean;
+  nativeOptionalChainingSemantics?: boolean;
 }

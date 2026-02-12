@@ -648,7 +648,7 @@ export enum ErrorCode {
    * (returning `null` on short-circuit instead of `undefined`).
    *
    * This diagnostic helps identify `?.` usage that may behave differently after
-   * enabling `strictOptionalChainingSemantics`. It is only active when the
+   * enabling `nativeOptionalChainingSemantics`. It is only active when the
    * `legacySafeNavigationUsage` extended diagnostic is enabled.
    *
    * ```html

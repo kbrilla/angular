@@ -122,7 +122,7 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
         // Resolve optional chaining semantics: component metadata → JIT options → default 'legacy'
         let optionalChainingSemantics: 'legacy' | 'native' =
           metadata.optionalChainingSemantics ??
-          (options !== null && options.strictOptionalChainingSemantics ? 'native' : 'legacy');
+          (options !== null && options.nativeOptionalChainingSemantics ? 'native' : 'legacy');
         let encapsulation = metadata.encapsulation;
         if (encapsulation === undefined) {
           if (options !== null && options.defaultEncapsulation !== undefined) {
@@ -336,7 +336,7 @@ function getDirectiveMetadata(type: Type<any>, metadata: Directive) {
     ...metadata,
     optionalChainingSemantics:
       metadata.optionalChainingSemantics ??
-      (options !== null && options.strictOptionalChainingSemantics ? 'native' : 'legacy'),
+      (options !== null && options.nativeOptionalChainingSemantics ? 'native' : 'legacy'),
   };
   const facade = directiveMetadata(type as ComponentType<any>, directiveMetadataWithSemantics);
   facade.typeSourceSpan = compiler.createParseSourceSpan('Directive', name, sourceMapUrl);
