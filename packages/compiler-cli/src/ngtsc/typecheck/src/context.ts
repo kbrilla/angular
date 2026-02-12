@@ -297,39 +297,52 @@ export class TypeCheckContextImpl implements TypeCheckContext {
           const refInfo = templateRefs.get(predicate);
 
           if (refInfo === undefined) {
-            // Target doesn't exist in the template — error for required, warning for optional.
-            shimData.oobRecorder.missingViewQueryTarget(
-              id,
-              ref.node,
-              query.propertyName,
-              predicate,
-              query.isRequired,
-            );
+            if (query.isRequired) {
+              // Required target doesn't exist — always an error (NG8023).
+              shimData.oobRecorder.missingViewQueryTarget(
+                id,
+                ref.node,
+                query.propertyName,
+                predicate,
+                true,
+              );
+            } else if (this.config.missingOptionalViewQueryTarget !== 'suppress') {
+              // Optional target doesn't exist — configurable warning (NG8024).
+              shimData.oobRecorder.missingViewQueryTarget(
+                id,
+                ref.node,
+                query.propertyName,
+                predicate,
+                false,
+                this.config.missingOptionalViewQueryTarget,
+              );
+            }
           } else if (query.readIsTemplateRef && !refInfo.isTemplate) {
-            // Query uses read:TemplateRef but target is not on an <ng-template>.
-            shimData.oobRecorder.queryReadTemplateRefMismatch(
-              id,
-              ref.node,
-              query.propertyName,
-              predicate,
-            );
-          } else if (
-            query.readType.kind === 'directive' &&
-            refInfo !== undefined
-          ) {
+            if (this.config.queryReadTemplateRefMismatch !== 'suppress') {
+              // Query uses read:TemplateRef but target is not on an <ng-template>.
+              shimData.oobRecorder.queryReadTemplateRefMismatch(
+                id,
+                ref.node,
+                query.propertyName,
+                predicate,
+                this.config.queryReadTemplateRefMismatch,
+              );
+            }
+          } else if (query.readType.kind === 'directive' && refInfo !== undefined) {
             // Query uses read:SomeDirective — check if that directive is actually on the element.
             const readName = query.readType.name;
             const directivesOnNode = boundTarget.getDirectivesOfNode(refInfo.node);
             const hasDirective =
               directivesOnNode !== null &&
               directivesOnNode.some((dir) => dir.ref.node.name?.text === readName);
-            if (!hasDirective) {
+            if (!hasDirective && this.config.queryReadDirectiveMismatch !== 'suppress') {
               shimData.oobRecorder.queryReadDirectiveMismatch(
                 id,
                 ref.node,
                 query.propertyName,
                 predicate,
                 readName,
+                this.config.queryReadDirectiveMismatch,
               );
             }
           } else if (query.isRequired && refInfo.isOnlyConditional) {
@@ -839,7 +852,11 @@ function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, Templa
   const refs = new Map<string, TemplateRefInfo>();
   let conditionalDepth = 0;
 
-  const addRef = (name: string, isTemplate: boolean, node: TmplAstElement | TmplAstTemplate): void => {
+  const addRef = (
+    name: string,
+    isTemplate: boolean,
+    node: TmplAstElement | TmplAstTemplate,
+  ): void => {
     const existing = refs.get(name);
     const isConditional = conditionalDepth > 0;
     if (existing) {

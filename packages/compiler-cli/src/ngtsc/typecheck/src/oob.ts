@@ -263,6 +263,7 @@ export interface OutOfBandDiagnosticRecorder {
     queryPropertyName: string,
     predicateName: string,
     isRequired: boolean,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
   ): void;
 
   /**
@@ -275,6 +276,7 @@ export interface OutOfBandDiagnosticRecorder {
     componentNode: ClassDeclaration,
     queryPropertyName: string,
     predicateName: string,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
   ): void;
 
   /**
@@ -298,6 +300,7 @@ export interface OutOfBandDiagnosticRecorder {
     queryPropertyName: string,
     predicateName: string,
     directiveName: string,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
   ): void;
 }
 
@@ -955,11 +958,16 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     queryPropertyName: string,
     predicateName: string,
     isRequired: boolean,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
   ): void {
     const errorCode = isRequired
       ? ErrorCode.MISSING_REQUIRED_VIEW_QUERY_TARGET
       : ErrorCode.MISSING_VIEW_QUERY_TARGET;
-    const category = isRequired ? ts.DiagnosticCategory.Error : ts.DiagnosticCategory.Warning;
+    const category = isRequired
+      ? ts.DiagnosticCategory.Error
+      : configuredSeverity === 'error'
+        ? ts.DiagnosticCategory.Error
+        : ts.DiagnosticCategory.Warning;
     const requiredOrOptional = isRequired ? 'Required' : 'Optional';
     const message =
       `${requiredOrOptional} view query '${queryPropertyName}' expects a target matching ` +
@@ -981,7 +989,12 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     componentNode: ClassDeclaration,
     queryPropertyName: string,
     predicateName: string,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
   ): void {
+    const category =
+      configuredSeverity === 'warning'
+        ? ts.DiagnosticCategory.Warning
+        : ts.DiagnosticCategory.Error;
     const message =
       `View query '${queryPropertyName}' uses 'read: TemplateRef' but the target ` +
       `'#${predicateName}' is on a regular element, not an <ng-template>. ` +
@@ -989,7 +1002,7 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
 
     this._diagnostics.push({
       ...makeDiagnostic(ErrorCode.QUERY_READ_TEMPLATEREF_MISMATCH, componentNode, message),
-      category: ts.DiagnosticCategory.Error,
+      category,
       sourceFile: componentNode.getSourceFile(),
       typeCheckId: id,
     });

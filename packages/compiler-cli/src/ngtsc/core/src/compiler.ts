@@ -1107,6 +1107,12 @@ export class NgCompiler {
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         unusedStandaloneImports:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
+        missingOptionalViewQueryTarget:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
+        queryReadTemplateRefMismatch:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Error,
+        queryReadDirectiveMismatch:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
         checkTwoWayBoundEvents,
         allowDomEventAssertion,
@@ -1142,6 +1148,12 @@ export class NgCompiler {
         controlFlowPreventingContentProjection:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         unusedStandaloneImports:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
+        missingOptionalViewQueryTarget:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
+        queryReadTemplateRefMismatch:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Error,
+        queryReadDirectiveMismatch:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
         checkTwoWayBoundEvents,
@@ -1193,6 +1205,18 @@ export class NgCompiler {
     if (this.options.extendedDiagnostics?.checks?.unusedStandaloneImports !== undefined) {
       typeCheckingConfig.unusedStandaloneImports =
         this.options.extendedDiagnostics.checks.unusedStandaloneImports;
+    }
+    if (this.options.extendedDiagnostics?.checks?.missingOptionalViewQueryTarget !== undefined) {
+      typeCheckingConfig.missingOptionalViewQueryTarget =
+        this.options.extendedDiagnostics.checks.missingOptionalViewQueryTarget;
+    }
+    if (this.options.extendedDiagnostics?.checks?.queryReadTemplateRefMismatch !== undefined) {
+      typeCheckingConfig.queryReadTemplateRefMismatch =
+        this.options.extendedDiagnostics.checks.queryReadTemplateRefMismatch;
+    }
+    if (this.options.extendedDiagnostics?.checks?.queryReadDirectiveMismatch !== undefined) {
+      typeCheckingConfig.queryReadDirectiveMismatch =
+        this.options.extendedDiagnostics.checks.queryReadDirectiveMismatch;
     }
 
     return typeCheckingConfig;
