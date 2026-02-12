@@ -724,6 +724,143 @@ runInEachFileSystem(() => {
         expect(diagnostics.length).toBe(0);
       });
 
+      // Phase 5: read: SomeDirective mismatch detection
+      it('should warn when viewChild uses read:SomeDirective but directive is not on the element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, Directive, viewChild} from '@angular/core';
+
+          @Directive({selector: '[myDir]', standalone: true})
+          export class MyDir {}
+
+          @Component({
+            selector: 'test',
+            template: '<span myDir></span><div #myRef>hello</div>',
+            imports: [MyDir],
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: MyDir});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`MyDir`);
+        expect(diagnostics[0].messageText).toContain(`#myRef`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
+      });
+
+      it('should not warn when viewChild uses read:SomeDirective and directive IS on the element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, Directive, viewChild} from '@angular/core';
+
+          @Directive({selector: '[myDir]', standalone: true})
+          export class MyDir {}
+
+          @Component({
+            selector: 'test',
+            template: '<div myDir #myRef>hello</div>',
+            imports: [MyDir],
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: MyDir});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should warn when viewChild uses read:SomeComponent but component is not on the element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({selector: 'child-cmp', template: 'child', standalone: true})
+          export class ChildCmp {}
+
+          @Component({
+            selector: 'test',
+            template: '<child-cmp></child-cmp><div #myRef>hello</div>',
+            imports: [ChildCmp],
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: ChildCmp});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`ChildCmp`);
+        expect(diagnostics[0].messageText).toContain(`#myRef`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
+      });
+
+      it('should not warn when viewChild uses read:SomeComponent and component IS the element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({selector: 'child-cmp', template: 'child', standalone: true})
+          export class ChildCmp {}
+
+          @Component({
+            selector: 'test',
+            template: '<child-cmp #myRef></child-cmp>',
+            imports: [ChildCmp],
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: ChildCmp});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not warn for read:ElementRef on any element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild, ElementRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>hello</div>',
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: ElementRef});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not warn for read:ViewContainerRef on any element', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild, ViewContainerRef} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>hello</div>',
+          })
+          export class TestComp {
+            el = viewChild('myRef', {read: ViewContainerRef});
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
       it('should capture a viewChild query in the setClasMetadata call', () => {
         env.write(
           'test.ts',

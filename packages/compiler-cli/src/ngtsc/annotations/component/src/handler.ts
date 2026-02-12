@@ -123,6 +123,7 @@ import {
   TypeCheckContext,
   TemplateContext,
   HostBindingsContext,
+  QueryReadType,
 } from '../../../typecheck/api';
 import {ExtendedTemplateChecker} from '../../../typecheck/extended/api';
 import {TemplateSemanticsChecker} from '../../../typecheck/template_semantics/api/api';
@@ -1197,6 +1198,7 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
         isRequired: q.isRequired,
         first: q.first,
         readIsTemplateRef: isReadTemplateRef(q.read),
+        readType: classifyReadOption(q.read),
       })),
     );
   }
@@ -2663,4 +2665,29 @@ function isReadTemplateRef(read: o.Expression | null): boolean {
     return node.name.text === 'TemplateRef';
   }
   return false;
+}
+
+/**
+ * Classify the `read` option of a query into a concrete type category.
+ */
+function classifyReadOption(read: o.Expression | null): QueryReadType {
+  if (read === null) return {kind: 'none'};
+  if (!(read instanceof o.WrappedNodeExpr)) return {kind: 'unknown'};
+  const node = read.node;
+  const name = ts.isIdentifier(node)
+    ? node.text
+    : ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.name)
+      ? node.name.text
+      : null;
+  if (name === null) return {kind: 'unknown'};
+  switch (name) {
+    case 'TemplateRef':
+      return {kind: 'templateRef'};
+    case 'ElementRef':
+      return {kind: 'elementRef'};
+    case 'ViewContainerRef':
+      return {kind: 'viewContainerRef'};
+    default:
+      return {kind: 'directive', name};
+  }
 }

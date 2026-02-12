@@ -313,6 +313,25 @@ export class TypeCheckContextImpl implements TypeCheckContext {
               query.propertyName,
               predicate,
             );
+          } else if (
+            query.readType.kind === 'directive' &&
+            refInfo !== undefined
+          ) {
+            // Query uses read:SomeDirective — check if that directive is actually on the element.
+            const readName = query.readType.name;
+            const directivesOnNode = boundTarget.getDirectivesOfNode(refInfo.node);
+            const hasDirective =
+              directivesOnNode !== null &&
+              directivesOnNode.some((dir) => dir.ref.node.name?.text === readName);
+            if (!hasDirective) {
+              shimData.oobRecorder.queryReadDirectiveMismatch(
+                id,
+                ref.node,
+                query.propertyName,
+                predicate,
+                readName,
+              );
+            }
           } else if (query.isRequired && refInfo.isOnlyConditional) {
             // Required query targets a ref that only exists inside a conditional block.
             shimData.oobRecorder.queryTargetOnlyConditional(
@@ -812,13 +831,15 @@ interface TemplateRefInfo {
   isTemplate: boolean;
   /** Whether the ref is only found inside a conditional block and never at unconditional scope. */
   isOnlyConditional: boolean;
+  /** The AST node (element or template) that this ref is on. */
+  node: TmplAstElement | TmplAstTemplate;
 }
 
 function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, TemplateRefInfo> {
   const refs = new Map<string, TemplateRefInfo>();
   let conditionalDepth = 0;
 
-  const addRef = (name: string, isTemplate: boolean): void => {
+  const addRef = (name: string, isTemplate: boolean, node: TmplAstElement | TmplAstTemplate): void => {
     const existing = refs.get(name);
     const isConditional = conditionalDepth > 0;
     if (existing) {
@@ -827,20 +848,20 @@ function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, Templa
         existing.isOnlyConditional = false;
       }
     } else {
-      refs.set(name, {isTemplate, isOnlyConditional: isConditional});
+      refs.set(name, {isTemplate, isOnlyConditional: isConditional, node});
     }
   };
 
   const visitor = new (class extends TmplAstRecursiveVisitor {
     override visitElement(element: TmplAstElement): void {
       for (const ref of element.references) {
-        addRef(ref.name, false);
+        addRef(ref.name, false, element);
       }
       super.visitElement(element);
     }
     override visitTemplate(template: TmplAstTemplate): void {
       for (const ref of template.references) {
-        addRef(ref.name, true);
+        addRef(ref.name, true, template);
       }
       super.visitTemplate(template);
     }

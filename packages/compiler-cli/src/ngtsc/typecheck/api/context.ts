@@ -56,6 +56,23 @@ export interface HostBindingsContext {
 }
 
 /**
+ * Describes the type of `read` option used in a view query.
+ * - `none`: No `read` option specified.
+ * - `templateRef`: `read: TemplateRef`
+ * - `elementRef`: `read: ElementRef`
+ * - `viewContainerRef`: `read: ViewContainerRef`
+ * - `directive`: `read: SomeDirective` or `read: SomeComponent`
+ * - `unknown`: `read` is set to something we can't statically analyze.
+ */
+export type QueryReadType =
+  | {kind: 'none'}
+  | {kind: 'templateRef'}
+  | {kind: 'elementRef'}
+  | {kind: 'viewContainerRef'}
+  | {kind: 'directive'; name: string}
+  | {kind: 'unknown'};
+
+/**
  * Metadata about a view query that should be validated against the component's template.
  */
 export interface ViewQueryCheckMeta {
@@ -69,6 +86,8 @@ export interface ViewQueryCheckMeta {
   first: boolean;
   /** Whether the query has `read: TemplateRef` option. */
   readIsTemplateRef: boolean;
+  /** Detailed type information about the `read` option. */
+  readType: QueryReadType;
 }
 
 /**

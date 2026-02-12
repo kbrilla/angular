@@ -466,6 +466,12 @@ export enum ErrorCode {
   QUERY_TARGET_ONLY_CONDITIONAL = 8028,
 
   /**
+   * Raised when a view query uses `read: SomeDirective` but the target element does not have
+   * that directive applied. The query will always return `undefined` at runtime.
+   */
+  QUERY_READ_DIRECTIVE_MISMATCH = 8029,
+
+  /**
    * A two way binding in a template has an incorrect syntax,
    * parentheses outside brackets. For example:
    *

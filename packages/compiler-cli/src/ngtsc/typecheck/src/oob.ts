@@ -287,6 +287,18 @@ export interface OutOfBandDiagnosticRecorder {
     queryPropertyName: string,
     predicateName: string,
   ): void;
+
+  /**
+   * Reports that a view query uses `read: SomeDirective` but the target element does
+   * not have that directive applied.
+   */
+  queryReadDirectiveMismatch(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+    directiveName: string,
+  ): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -998,6 +1010,26 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     this._diagnostics.push({
       ...makeDiagnostic(ErrorCode.QUERY_TARGET_ONLY_CONDITIONAL, componentNode, message),
       category: ts.DiagnosticCategory.Error,
+      sourceFile: componentNode.getSourceFile(),
+      typeCheckId: id,
+    });
+  }
+
+  queryReadDirectiveMismatch(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+    directiveName: string,
+  ): void {
+    const message =
+      `View query '${queryPropertyName}' uses 'read: ${directiveName}' but the target ` +
+      `'#${predicateName}' does not have '${directiveName}' applied. ` +
+      `The query will always return undefined at runtime.`;
+
+    this._diagnostics.push({
+      ...makeDiagnostic(ErrorCode.QUERY_READ_DIRECTIVE_MISMATCH, componentNode, message),
+      category: ts.DiagnosticCategory.Warning,
       sourceFile: componentNode.getSourceFile(),
       typeCheckId: id,
     });
