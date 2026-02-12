@@ -103,7 +103,7 @@
       "description": "should use undefined for safe navigation with native optional chaining semantics",
       "inputFiles": ["safe_access_native_semantics.ts"],
       "angularCompilerOptions": {
-        "strictOptionalChainingSemantics": true
+        "nativeOptionalChainingSemantics": true
       },
       "expectations": [
         {

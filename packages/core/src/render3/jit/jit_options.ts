@@ -15,7 +15,7 @@ export interface JitCompilerOptions {
    * short-circuit, matching JavaScript/TypeScript optional chaining semantics.
    * When disabled (default), safe navigation returns `null` (Angular's historical behavior).
    */
-  strictOptionalChainingSemantics?: boolean;
+  nativeOptionalChainingSemantics?: boolean;
 }
 
 let jitOptions: JitCompilerOptions | null = null;
@@ -36,10 +36,10 @@ export function setJitOptions(options: JitCompilerOptions): void {
         );
       return;
     }
-    if (options.strictOptionalChainingSemantics !== jitOptions.strictOptionalChainingSemantics) {
+    if (options.nativeOptionalChainingSemantics !== jitOptions.nativeOptionalChainingSemantics) {
       ngDevMode &&
         console.error(
-          'Provided value for `strictOptionalChainingSemantics` can not be changed once it has been set.',
+          'Provided value for `nativeOptionalChainingSemantics` can not be changed once it has been set.',
         );
       return;
     }

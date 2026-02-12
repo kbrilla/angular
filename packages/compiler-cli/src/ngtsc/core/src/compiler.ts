@@ -1541,7 +1541,7 @@ export class NgCompiler {
         typeCheckHostBindings,
         this.enableSelectorless,
         this.emitDeclarationOnly,
-        !!this.options.strictOptionalChainingSemantics,
+        !!this.options.nativeOptionalChainingSemantics,
       ),
 
       // TODO(alxhub): understand why the cast here is necessary (something to do with `null`
@@ -1571,7 +1571,7 @@ export class NgCompiler {
         this.usePoisonedData,
         typeCheckHostBindings,
         this.emitDeclarationOnly,
-        !!this.options.strictOptionalChainingSemantics,
+        !!this.options.nativeOptionalChainingSemantics,
       ) as Readonly<DecoratorHandler<unknown, unknown, SemanticSymbol | null, unknown>>,
       // Pipe handler must be before injectable handler in list so pipe factories are printed
       // before injectable factories (so injectable factories can delegate to them)

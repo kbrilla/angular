@@ -637,7 +637,7 @@ export interface Component extends Directive {
    * - `'native'`: `?.` returns `undefined` on short-circuit, matching JavaScript/TypeScript
    *   optional chaining semantics (TC39 spec).
    *
-   * This per-component setting overrides the project-wide `strictOptionalChainingSemantics`
+   * This per-component setting overrides the project-wide `nativeOptionalChainingSemantics`
    * compiler option. Use it to opt individual components into native semantics while keeping
    * the rest of the project on legacy, or vice versa.
    *

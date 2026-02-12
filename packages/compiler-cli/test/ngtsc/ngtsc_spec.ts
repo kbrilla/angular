@@ -5826,8 +5826,8 @@ runInEachFileSystem((os: string) => {
       expect(jsContents).not.toContain('== null ? undefined :');
     });
 
-    it('should use undefined for safe navigation when strictOptionalChainingSemantics is enabled', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+    it('should use undefined for safe navigation when nativeOptionalChainingSemantics is enabled', () => {
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -5874,7 +5874,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should respect @Component-level optionalChainingSemantics override to legacy', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true}); // project-wide is native
+      env.tsconfig({nativeOptionalChainingSemantics: true}); // project-wide is native
       env.write(
         'test.ts',
         `
@@ -5954,7 +5954,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should emit optionalChainingSemantics in partial declaration', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true, compilationMode: 'partial'});
+      env.tsconfig({nativeOptionalChainingSemantics: true, compilationMode: 'partial'});
       env.write(
         'test.ts',
         `
@@ -5996,7 +5996,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should handle deep safe navigation chains with native semantics', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -6019,7 +6019,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should handle safe keyed read with native semantics', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -6040,7 +6040,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should handle safe method call with native semantics', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -6061,7 +6061,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should handle safe navigation mixed with non-null assertion and native semantics', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true, strictNullChecks: true});
+      env.tsconfig({nativeOptionalChainingSemantics: true, strictNullChecks: true});
       env.write(
         'test.ts',
         `
@@ -6081,8 +6081,8 @@ runInEachFileSystem((os: string) => {
       expect(jsContents).toContain('== null ? undefined :');
     });
 
-    it('should use undefined for safe navigation in component host bindings when strictOptionalChainingSemantics is enabled', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+    it('should use undefined for safe navigation in component host bindings when nativeOptionalChainingSemantics is enabled', () => {
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -6162,8 +6162,8 @@ runInEachFileSystem((os: string) => {
       expect(jsContents).not.toContain('== null ? null :');
     });
 
-    it('should use undefined for safe navigation in directive host bindings when strictOptionalChainingSemantics is enabled', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+    it('should use undefined for safe navigation in directive host bindings when nativeOptionalChainingSemantics is enabled', () => {
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -6213,7 +6213,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should respect @Directive-level optionalChainingSemantics override to legacy for host bindings', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `
@@ -6238,7 +6238,7 @@ runInEachFileSystem((os: string) => {
     });
 
     it('should handle deep safe navigation in host bindings with native semantics', () => {
-      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.tsconfig({nativeOptionalChainingSemantics: true});
       env.write(
         'test.ts',
         `

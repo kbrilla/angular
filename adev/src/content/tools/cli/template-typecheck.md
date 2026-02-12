@@ -124,17 +124,18 @@ Unless otherwise commented, each following option is set to the value for `stric
 
 By default, Angular templates use legacy semantics for the safe navigation operator (`?.`), where `a?.b` evaluates to `null` when `a` is `null` or `undefined`. This differs from native ECMAScript optional chaining, which evaluates to `undefined`.
 
-To opt into native ECMAScript semantics, set `strictOptionalChainingSemantics` to `true` in `angularCompilerOptions`:
+To opt into native ECMAScript semantics, set `nativeOptionalChainingSemantics` to `true` in `angularCompilerOptions`:
 
 <docs-code language="json">
 {
   "angularCompilerOptions": {
-    "strictOptionalChainingSemantics": true
+    "nativeOptionalChainingSemantics": true
   }
 }
 </docs-code>
 
 When enabled:
+
 - `a?.b` evaluates to `undefined` (instead of `null`) at runtime when `a` is nullish
 - This aligns runtime behavior with TypeScript's type inference (which already uses `| undefined`)
 - The flag only affects components compiled in the current project — libraries from npm retain the semantics they were compiled with

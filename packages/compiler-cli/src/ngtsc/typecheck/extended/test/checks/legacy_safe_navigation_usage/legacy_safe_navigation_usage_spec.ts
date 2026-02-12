@@ -19,27 +19,25 @@ import {ExtendedTemplateCheckerImpl} from '../../../src/extended_template_checke
 runInEachFileSystem(() => {
   describe('LegacySafeNavigationUsageCheck', () => {
     it('binds the error code to its extended template diagnostic name', () => {
-      expect(legacySafeNavigationUsageFactory.code).toBe(
-        ErrorCode.LEGACY_SAFE_NAVIGATION_USAGE,
-      );
+      expect(legacySafeNavigationUsageFactory.code).toBe(ErrorCode.LEGACY_SAFE_NAVIGATION_USAGE);
       expect(legacySafeNavigationUsageFactory.name).toBe(
         ExtendedTemplateDiagnosticName.LEGACY_SAFE_NAVIGATION_USAGE,
       );
     });
 
-    it('should return a check when strictOptionalChainingSemantics is not enabled', () => {
+    it('should return a check when nativeOptionalChainingSemantics is not enabled', () => {
       expect(legacySafeNavigationUsageFactory.create({})).toBeDefined();
     });
 
-    it('should return a check when strictOptionalChainingSemantics is explicitly false', () => {
+    it('should return a check when nativeOptionalChainingSemantics is explicitly false', () => {
       expect(
-        legacySafeNavigationUsageFactory.create({strictOptionalChainingSemantics: false}),
+        legacySafeNavigationUsageFactory.create({nativeOptionalChainingSemantics: false}),
       ).toBeDefined();
     });
 
-    it('should NOT return a check when strictOptionalChainingSemantics is enabled', () => {
+    it('should NOT return a check when nativeOptionalChainingSemantics is enabled', () => {
       expect(
-        legacySafeNavigationUsageFactory.create({strictOptionalChainingSemantics: true}),
+        legacySafeNavigationUsageFactory.create({nativeOptionalChainingSemantics: true}),
       ).toBeNull();
     });
 
@@ -51,8 +49,7 @@ runInEachFileSystem(() => {
           templates: {
             'TestCmp': `{{ var1?.bar }}`,
           },
-          source:
-            'export class TestCmp { var1: { bar: string } | null = null; }',
+          source: 'export class TestCmp { var1: { bar: string } | null = null; }',
         },
       ]);
       const sf = getSourceFileOrError(program, fileName);
@@ -61,7 +58,7 @@ runInEachFileSystem(() => {
         templateTypeChecker,
         program.getTypeChecker(),
         [legacySafeNavigationUsageFactory],
-        {} /* options — no strictOptionalChainingSemantics */,
+        {} /* options — no nativeOptionalChainingSemantics */,
       );
       const diags = extendedTemplateChecker.getDiagnosticsForComponent(component);
       expect(diags.length).toBe(1);
@@ -78,8 +75,7 @@ runInEachFileSystem(() => {
           templates: {
             'TestCmp': `{{ var1?.['key'] }}`,
           },
-          source:
-            'export class TestCmp { var1: Record<string, string> | null = null; }',
+          source: 'export class TestCmp { var1: Record<string, string> | null = null; }',
         },
       ]);
       const sf = getSourceFileOrError(program, fileName);
@@ -103,8 +99,7 @@ runInEachFileSystem(() => {
           templates: {
             'TestCmp': `{{ var1?.method() }}`,
           },
-          source:
-            'export class TestCmp { var1: { method(): string } | null = null; }',
+          source: 'export class TestCmp { var1: { method(): string } | null = null; }',
         },
       ]);
       const sf = getSourceFileOrError(program, fileName);
