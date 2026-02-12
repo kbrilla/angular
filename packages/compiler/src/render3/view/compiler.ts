@@ -81,6 +81,7 @@ function baseDirectiveFields(
       meta.selector || '',
       meta.name,
       definitionMap,
+      meta.hostOptionalChainingSemantics,
     ),
   );
 
@@ -489,6 +490,7 @@ function createHostBindingsFunction(
   selector: string,
   name: string,
   definitionMap: DefinitionMap,
+  optionalChainingSemantics?: OptionalChainingSemantics,
 ): o.Expression | null {
   const bindings = bindingParser.createBoundHostProperties(
     hostBindingsMetadata.properties,
@@ -523,6 +525,7 @@ function createHostBindingsFunction(
       properties: bindings,
       events: eventBindings,
       attributes: hostBindingsMetadata.attributes,
+      optionalChainingSemantics,
     },
     bindingParser,
     constantPool,

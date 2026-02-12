@@ -271,6 +271,7 @@ export class HostBindingCompilationJob extends CompilationJob {
     pool: ConstantPool,
     compatibility: ir.CompatibilityMode,
     mode: TemplateCompilationMode,
+    readonly optionalChainingSemantics: OptionalChainingSemantics = OptionalChainingSemantics.Legacy,
   ) {
     super(componentName, pool, compatibility, mode);
     this.root = new HostBindingCompilationUnit(this);

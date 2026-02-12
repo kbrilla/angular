@@ -6100,6 +6100,188 @@ runInEachFileSystem((os: string) => {
       expect(jsContents).toContain('== null ? undefined :');
     });
 
+    it('should use undefined for safe navigation in component host bindings when strictOptionalChainingSemantics is enabled', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '',
+          host: {
+            '[attr.title]': 'data?.value',
+            '[class.active]': 'data?.isActive',
+            '[style.color]': 'data?.color',
+          },
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string; isActive: boolean; color: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Host bindings should also use undefined with native semantics
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should use null for safe navigation in component host bindings with legacy semantics', () => {
+      env.tsconfig(); // default is legacy
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '',
+          host: {
+            '[attr.title]': 'data?.value',
+          },
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Legacy semantics: host bindings use null
+      expect(jsContents).toContain('== null ? null :');
+      expect(jsContents).not.toContain('== null ? undefined :');
+    });
+
+    it('should respect @Component-level optionalChainingSemantics for host bindings', () => {
+      env.tsconfig(); // project-wide default is legacy
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '',
+          optionalChainingSemantics: 'native',
+          host: {
+            '[attr.title]': 'data?.value',
+          },
+          standalone: true,
+        })
+        export class TestCmp {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Component-level override should apply to host bindings too
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should use undefined for safe navigation in directive host bindings when strictOptionalChainingSemantics is enabled', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Directive} from '@angular/core';
+        @Directive({
+          selector: '[test-dir]',
+          host: {
+            '[attr.title]': 'data?.value',
+          },
+          standalone: true,
+        })
+        export class TestDir {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Directive host bindings should also use undefined with native semantics
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should respect @Directive-level optionalChainingSemantics override to native for host bindings', () => {
+      env.tsconfig();
+      env.write(
+        'test.ts',
+        `
+        import {Directive} from '@angular/core';
+        @Directive({
+          selector: '[test-dir]',
+          optionalChainingSemantics: 'native',
+          host: {
+            '[attr.title]': 'data?.value',
+          },
+          standalone: true,
+        })
+        export class TestDir {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
+    it('should respect @Directive-level optionalChainingSemantics override to legacy for host bindings', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Directive} from '@angular/core';
+        @Directive({
+          selector: '[test-dir]',
+          optionalChainingSemantics: 'legacy',
+          host: {
+            '[attr.title]': 'data?.value',
+          },
+          standalone: true,
+        })
+        export class TestDir {
+          data: {value: string} | null = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      expect(jsContents).toContain('== null ? null :');
+      expect(jsContents).not.toContain('== null ? undefined :');
+    });
+
+    it('should handle deep safe navigation in host bindings with native semantics', () => {
+      env.tsconfig({strictOptionalChainingSemantics: true});
+      env.write(
+        'test.ts',
+        `
+        import {Component} from '@angular/core';
+        @Component({
+          selector: 'test-cmp',
+          template: '',
+          host: {
+            '[attr.title]': 'a?.b?.c',
+          },
+          standalone: true,
+        })
+        export class TestCmp {
+          a: any = null;
+        }
+      `,
+      );
+      env.driveMain();
+      const jsContents = env.getContents('test.js');
+      // Deep chain in host bindings should use undefined
+      expect(jsContents).toContain('== null ? undefined :');
+      expect(jsContents).not.toContain('== null ? null :');
+    });
+
     it('should use proper default value for i18nUseExternalIds config param', () => {
       env.tsconfig(); // default is `true`
       env.write(

@@ -121,6 +121,13 @@ export interface R3DirectiveMetadata {
    * Additional directives applied to the directive host.
    */
   hostDirectives: R3HostDirectiveMetadata[] | null;
+
+  /**
+   * Optional chaining semantics for host binding expressions.
+   * When `Native`, safe navigation (`?.`) in host bindings evaluates to `undefined`.
+   * When `Legacy` (default), safe navigation evaluates to `null`.
+   */
+  hostOptionalChainingSemantics?: OptionalChainingSemantics;
 }
 
 /**

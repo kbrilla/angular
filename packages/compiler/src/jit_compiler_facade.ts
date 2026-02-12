@@ -537,6 +537,10 @@ function convertDirectiveFacadeToMetadata(facade: R3DirectiveMetadataFacade): R3
     queries: facade.queries.map(convertToR3QueryMetadata),
     providers: facade.providers != null ? new WrappedNodeExpr(facade.providers) : null,
     viewQueries: facade.viewQueries.map(convertToR3QueryMetadata),
+    hostOptionalChainingSemantics:
+      facade.optionalChainingSemantics === 'native'
+        ? OptionalChainingSemantics.Native
+        : OptionalChainingSemantics.Legacy,
     hostDirectives,
   };
 }
@@ -575,6 +579,10 @@ function convertDeclareDirectiveFacadeToMetadata(
     isStandalone:
       declaration.isStandalone ?? getJitStandaloneDefaultForVersion(declaration.version),
     isSignal: declaration.isSignal ?? false,
+    hostOptionalChainingSemantics:
+      declaration.hostOptionalChainingSemantics === 'native'
+        ? OptionalChainingSemantics.Native
+        : OptionalChainingSemantics.Legacy,
     hostDirectives,
   };
 }

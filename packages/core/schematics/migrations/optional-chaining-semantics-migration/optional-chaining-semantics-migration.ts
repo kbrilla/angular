@@ -17,7 +17,9 @@ import {
   TextUpdate,
   TsurgeFunnelMigration,
 } from '../../utils/tsurge';
+import {extractAngularClassMetadata} from '../../utils/extract_metadata';
 import {NgComponentTemplateVisitor} from '../../utils/ng_component_template';
+import {getPropertyNameText} from '../../utils/typescript/property_name';
 import {AbsoluteFsPath} from '../../../../compiler-cli';
 import {migrateTemplate, migrateTemplateBestEffort} from './add-null-coalescing';
 
@@ -79,6 +81,24 @@ export interface TemplateResult {
   replacements: Replacement[];
   /** Whether this template was approved in interactive mode. Null = not interactive. */
   approved: boolean | null;
+}
+
+function migrateHostExpression(expression: string, bestEffort: boolean) {
+  const prefix = `<div [x]="`;
+  const suffix = `"></div>`;
+  const escapedExpr = expression.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const wrapped = `${prefix}${escapedExpr}${suffix}`;
+
+  const result = bestEffort ? migrateTemplateBestEffort(wrapped) : migrateTemplate(wrapped);
+  const migratedEscaped = result.migrated.substring(
+    prefix.length,
+    result.migrated.length - suffix.length,
+  );
+  const migrated = migratedEscaped.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  return {
+    ...result,
+    migrated,
+  };
 }
 
 export interface CompilationUnitData {
@@ -156,9 +176,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
 
           templates.push({
             file,
-            templateFile: tpl.inline
-              ? file
-              : projectFile(tpl.filePath as AbsoluteFsPath, info),
+            templateFile: tpl.inline ? file : projectFile(tpl.filePath as AbsoluteFsPath, info),
             componentName: node.name?.text ?? '<anonymous>',
             fullyMigrated: canApply,
             migratedCount: result.migratedCount,
@@ -169,6 +187,62 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
             approved: null,
           });
         });
+
+        const classMetadata = extractAngularClassMetadata(typeChecker, node);
+        if (classMetadata !== null) {
+          for (const property of classMetadata.node.properties) {
+            if (!ts.isPropertyAssignment(property)) {
+              continue;
+            }
+            const propertyName = getPropertyNameText(property.name);
+            if (propertyName !== 'host' || !ts.isObjectLiteralExpression(property.initializer)) {
+              continue;
+            }
+
+            for (const hostProp of property.initializer.properties) {
+              if (
+                !ts.isPropertyAssignment(hostProp) ||
+                !ts.isStringLiteralLike(hostProp.initializer)
+              ) {
+                continue;
+              }
+
+              const expression = hostProp.initializer.getText().slice(1, -1);
+              const result = migrateHostExpression(expression, bestEffort);
+              if (!result.hasSafeNavigation) {
+                continue;
+              }
+
+              const canApply = result.fullyMigrated;
+              const replacements: Replacement[] = [];
+              if (canApply) {
+                replacements.push(
+                  new Replacement(
+                    file,
+                    new TextUpdate({
+                      position: hostProp.initializer.getStart() + 1,
+                      end: hostProp.initializer.getEnd() - 1,
+                      toInsert: result.migrated,
+                    }),
+                  ),
+                );
+              }
+
+              templates.push({
+                file,
+                templateFile: file,
+                componentName: node.name?.text ?? '<anonymous>',
+                fullyMigrated: canApply,
+                migratedCount: result.migratedCount,
+                skippedCount: result.skippedCount,
+                originalContent: expression,
+                migratedContent: result.migrated,
+                replacements,
+                approved: null,
+              });
+            }
+          }
+        }
       });
     }
 

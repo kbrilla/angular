@@ -146,6 +146,11 @@ export interface R3DeclareDirectiveMetadata extends R3PartialDeclaration {
   isSignal?: boolean;
 
   /**
+   * Optional chaining semantics for host binding expressions.
+   */
+  hostOptionalChainingSemantics?: 'legacy' | 'native';
+
+  /**
    * Additional directives applied to the directive host.
    */
   hostDirectives?: R3DeclareHostDirectiveMetadata[];

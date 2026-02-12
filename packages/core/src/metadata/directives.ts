@@ -344,6 +344,14 @@ export interface Directive {
   signals?: boolean;
 
   /**
+   * Controls optional chaining semantics for host binding expressions on this directive.
+   *
+   * - `'legacy'` (default): safe navigation returns `null` on short-circuit.
+   * - `'native'`: safe navigation returns `undefined`, matching JavaScript optional chaining.
+   */
+  optionalChainingSemantics?: 'legacy' | 'native';
+
+  /**
    * Standalone directives that should be applied to the host whenever the directive is matched.
    * By default, none of the inputs or outputs of the host directives will be available on the host,
    * unless they are specified in the `inputs` or `outputs` properties.
