@@ -9,7 +9,7 @@
 import * as o from '../../../../output/output_ast';
 import {OptionalChainingSemantics} from '../../../../render3/view/api';
 import * as ir from '../../ir';
-import {CompilationJob, ComponentCompilationJob} from '../compilation';
+import {CompilationJob, ComponentCompilationJob, HostBindingCompilationJob} from '../compilation';
 
 interface SafeTransformContext {
   job: CompilationJob;
@@ -29,11 +29,7 @@ export function expandSafeReads(job: CompilationJob): void {
   for (const unit of job.units) {
     for (const op of unit.ops()) {
       ir.transformExpressionsInOp(op, (e) => safeTransform(e, {job}), ir.VisitorContextFlag.None);
-      ir.transformExpressionsInOp(
-        op,
-        (e) => ternaryTransform(e, job),
-        ir.VisitorContextFlag.None,
-      );
+      ir.transformExpressionsInOp(op, (e) => ternaryTransform(e, job), ir.VisitorContextFlag.None);
     }
   }
 }
@@ -247,7 +243,7 @@ function ternaryTransform(e: o.Expression, job: CompilationJob): o.Expression {
   // Use `undefined` as the short-circuit value when JS optional chaining semantics are enabled,
   // otherwise use `null` for legacy Angular behavior.
   const useJsSemantics =
-    job instanceof ComponentCompilationJob &&
+    (job instanceof ComponentCompilationJob || job instanceof HostBindingCompilationJob) &&
     job.optionalChainingSemantics === OptionalChainingSemantics.Native;
   const shortCircuitValue = useJsSemantics ? o.UNDEFINED_EXPR : o.NULL_EXPR;
   return new o.ParenthesizedExpr(

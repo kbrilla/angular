@@ -205,6 +205,7 @@ export interface R3DirectiveMetadataFacade {
   isStandalone: boolean;
   hostDirectives: R3HostDirectiveMetadataFacade[] | null;
   isSignal: boolean;
+  optionalChainingSemantics?: 'legacy' | 'native';
 }
 
 export interface R3ComponentMetadataFacade extends R3DirectiveMetadataFacade {
@@ -259,6 +260,7 @@ export interface R3DeclareDirectiveFacade {
   isStandalone?: boolean;
   isSignal?: boolean;
   hostDirectives?: R3HostDirectiveMetadataFacade[] | null;
+  hostOptionalChainingSemantics?: 'legacy' | 'native';
 }
 
 export interface R3DeclareComponentFacade extends R3DeclareDirectiveFacade {

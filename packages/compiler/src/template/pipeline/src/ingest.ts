@@ -94,6 +94,7 @@ export interface HostBindingInput {
   properties: e.ParsedProperty[] | null;
   attributes: {[key: string]: o.Expression};
   events: e.ParsedEvent[] | null;
+  optionalChainingSemantics?: OptionalChainingSemantics;
 }
 
 /**
@@ -110,6 +111,7 @@ export function ingestHostBinding(
     constantPool,
     compatibilityMode,
     TemplateCompilationMode.DomOnly,
+    input.optionalChainingSemantics ?? OptionalChainingSemantics.Legacy,
   );
   for (const property of input.properties ?? []) {
     let bindingKind = ir.BindingKind.Property;

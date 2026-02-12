@@ -233,10 +233,12 @@ const isUsedPipe = (decl: AnyUsedType): decl is UsedPipe =>
 /**
  * `DecoratorHandler` which handles the `@Component` annotation.
  */
-export class ComponentDecoratorHandler
-  implements
-    DecoratorHandler<Decorator, ComponentAnalysisData, ComponentSymbol, ComponentResolutionData>
-{
+export class ComponentDecoratorHandler implements DecoratorHandler<
+  Decorator,
+  ComponentAnalysisData,
+  ComponentSymbol,
+  ComponentResolutionData
+> {
   constructor(
     private reflector: ReflectionHost,
     private evaluator: PartialEvaluator,
@@ -998,6 +1000,11 @@ export class ComponentDecoratorHandler
         localReferencedSymbols,
         meta: {
           ...metadata,
+          hostOptionalChainingSemantics:
+            componentOptionalChainingSemantics ??
+            (this.strictOptionalChainingSemantics
+              ? OptionalChainingSemantics.Native
+              : OptionalChainingSemantics.Legacy),
           template: {
             ...template,
             optionalChainingSemantics:
