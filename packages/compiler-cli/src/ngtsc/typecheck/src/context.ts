@@ -363,6 +363,23 @@ export class TypeCheckContextImpl implements TypeCheckContext {
               predicate,
             );
           }
+
+          // Check if viewChild (first=true) targets a ref that exists on multiple elements.
+          if (
+            refInfo !== undefined &&
+            query.first &&
+            refInfo.unconditionalCount > 1 &&
+            this.config.queryMultipleTargets !== 'suppress'
+          ) {
+            shimData.oobRecorder.queryMultipleTargets(
+              id,
+              ref.node,
+              query.propertyName,
+              predicate,
+              refInfo.unconditionalCount,
+              this.config.queryMultipleTargets,
+            );
+          }
         }
       }
     }
@@ -855,6 +872,8 @@ interface TemplateRefInfo {
   isOnlyConditional: boolean;
   /** The AST node (element or template) that this ref is on. */
   node: TmplAstElement | TmplAstTemplate;
+  /** How many elements/templates have this ref name at the SAME unconditional scope level. */
+  unconditionalCount: number;
 }
 
 function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, TemplateRefInfo> {
@@ -869,12 +888,17 @@ function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, Templa
     const existing = refs.get(name);
     const isConditional = conditionalDepth > 0;
     if (existing) {
-      // If ANY occurrence is unconditional, the ref is not only-conditional.
       if (!isConditional) {
+        existing.unconditionalCount++;
         existing.isOnlyConditional = false;
       }
     } else {
-      refs.set(name, {isTemplate, isOnlyConditional: isConditional, node});
+      refs.set(name, {
+        isTemplate,
+        isOnlyConditional: isConditional,
+        node,
+        unconditionalCount: isConditional ? 0 : 1,
+      });
     }
   };
 

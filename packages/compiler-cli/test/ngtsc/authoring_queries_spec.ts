@@ -1060,6 +1060,68 @@ runInEachFileSystem(() => {
         expect(diagnostics[0].messageText).toContain('#myRef');
       });
 
+      // === Multiple targets diagnostic tests ===
+
+      it('should warn when viewChild targets a ref that appears on multiple elements', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>first</div><span #myRef>second</span>',
+          })
+          export class TestComp {
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain('2 elements');
+        expect(diagnostics[0].messageText).toContain('#myRef');
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Warning);
+      });
+
+      it('should not warn for viewChildren targeting multiple refs (expected behavior)', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChildren} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>first</div><span #myRef>second</span>',
+          })
+          export class TestComp {
+            els = viewChildren('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not warn when viewChild targets a ref that appears only once', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef>only one</div>',
+          })
+          export class TestComp {
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
       it('should capture a viewChild query in the setClasMetadata call', () => {
         env.write(
           'test.ts',

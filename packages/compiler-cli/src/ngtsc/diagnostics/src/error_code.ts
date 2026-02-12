@@ -472,6 +472,12 @@ export enum ErrorCode {
   QUERY_READ_DIRECTIVE_MISMATCH = 8029,
 
   /**
+   * Raised when a `viewChild` query targets a template reference that appears on multiple elements.
+   * `viewChild` returns the first match in document order, which may not be the intended target.
+   */
+  QUERY_MULTIPLE_TARGETS = 8030,
+
+  /**
    * A two way binding in a template has an incorrect syntax,
    * parentheses outside brackets. For example:
    *

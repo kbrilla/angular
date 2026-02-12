@@ -37,4 +37,5 @@ export enum ExtendedTemplateDiagnosticName {
   MISSING_OPTIONAL_VIEW_QUERY_TARGET = 'missingOptionalViewQueryTarget',
   QUERY_READ_TEMPLATEREF_MISMATCH = 'queryReadTemplateRefMismatch',
   QUERY_READ_DIRECTIVE_MISMATCH = 'queryReadDirectiveMismatch',
+  QUERY_MULTIPLE_TARGETS = 'queryMultipleTargets',
 }

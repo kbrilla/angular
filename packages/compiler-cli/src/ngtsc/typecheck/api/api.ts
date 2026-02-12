@@ -320,6 +320,13 @@ export interface TypeCheckingConfig {
   queryReadDirectiveMismatch: 'error' | 'warning' | 'suppress';
 
   /**
+   * Whether to produce diagnostics when a `viewChild` query targets a template ref that appears
+   * on multiple elements. `viewChild` returns the first match, which may not be intended.
+   * When not 'suppress', produces NG8030.
+   */
+  queryMultipleTargets: 'error' | 'warning' | 'suppress';
+
+  /**
    * Whether to use any generic types of the context component.
    *
    * If this is `true`, then if the context component has generic types, those will be mirrored in

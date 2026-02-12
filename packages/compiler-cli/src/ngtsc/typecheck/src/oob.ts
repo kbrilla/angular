@@ -302,6 +302,18 @@ export interface OutOfBandDiagnosticRecorder {
     directiveName: string,
     configuredSeverity?: 'error' | 'warning' | 'suppress',
   ): void;
+
+  /**
+   * Reports that a viewChild query targets a template reference that appears on multiple elements.
+   */
+  queryMultipleTargets(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+    count: number,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
+  ): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -1017,7 +1029,7 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     const message =
       `Required view query '${queryPropertyName}' targets '#${predicateName}' which only ` +
       `exists inside a conditional block (@if, @switch, @for, @defer, <ng-template>, or ` +
-      `structural directive like *ngIf). When the condition is not met, this query will ` +
+      `structural directive like *ngIf). When the condition is not met, this query may ` +
       `throw a runtime error (NG0951). Consider using an optional query or moving the ` +
       `target outside the conditional block.`;
 
@@ -1044,6 +1056,29 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     this._diagnostics.push({
       ...makeDiagnostic(ErrorCode.QUERY_READ_DIRECTIVE_MISMATCH, componentNode, message),
       category: ts.DiagnosticCategory.Warning,
+      sourceFile: componentNode.getSourceFile(),
+      typeCheckId: id,
+    });
+  }
+
+  queryMultipleTargets(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+    count: number,
+    configuredSeverity?: 'error' | 'warning' | 'suppress',
+  ): void {
+    const category =
+      configuredSeverity === 'error' ? ts.DiagnosticCategory.Error : ts.DiagnosticCategory.Warning;
+    const message =
+      `viewChild query '${queryPropertyName}' targets '#${predicateName}' which appears on ` +
+      `${count} elements. viewChild returns the first match in document order, which may not ` +
+      `be the intended target. Consider using unique reference names or viewChildren.`;
+
+    this._diagnostics.push({
+      ...makeDiagnostic(ErrorCode.QUERY_MULTIPLE_TARGETS, componentNode, message),
+      category,
       sourceFile: componentNode.getSourceFile(),
       typeCheckId: id,
     });

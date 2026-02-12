@@ -1113,6 +1113,8 @@ export class NgCompiler {
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         queryReadDirectiveMismatch:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
+        queryMultipleTargets:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
         checkTwoWayBoundEvents,
         allowDomEventAssertion,
@@ -1154,6 +1156,8 @@ export class NgCompiler {
         queryReadTemplateRefMismatch:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         queryReadDirectiveMismatch:
+          this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
+        queryMultipleTargets:
           this.options.extendedDiagnostics?.defaultCategory || DiagnosticCategoryLabel.Warning,
         allowSignalsInTwoWayBindings,
         checkTwoWayBoundEvents,
@@ -1217,6 +1221,10 @@ export class NgCompiler {
     if (this.options.extendedDiagnostics?.checks?.queryReadDirectiveMismatch !== undefined) {
       typeCheckingConfig.queryReadDirectiveMismatch =
         this.options.extendedDiagnostics.checks.queryReadDirectiveMismatch;
+    }
+    if (this.options.extendedDiagnostics?.checks?.queryMultipleTargets !== undefined) {
+      typeCheckingConfig.queryMultipleTargets =
+        this.options.extendedDiagnostics.checks.queryMultipleTargets;
     }
 
     return typeCheckingConfig;
