@@ -459,6 +459,13 @@ export enum ErrorCode {
   QUERY_READ_TEMPLATEREF_MISMATCH = 8025,
 
   /**
+   * Raised when a required view query's target only exists inside a conditional block
+   * (`@if`, `@switch`, `@for`, `@defer`). The required query may throw NG0951 at runtime
+   * when the condition is not met and the target element is not in the DOM.
+   */
+  QUERY_TARGET_ONLY_CONDITIONAL = 8028,
+
+  /**
    * A two way binding in a template has an incorrect syntax,
    * parentheses outside brackets. For example:
    *

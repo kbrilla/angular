@@ -611,6 +611,115 @@ runInEachFileSystem(() => {
         expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
       });
 
+      // Phase 4: Conditional availability warnings for required queries
+      it('should warn when required viewChild targets a ref only inside @if block', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@if (cond) { <div #myRef></div> }',
+          })
+          export class TestComp {
+            cond = true;
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`#myRef`);
+        expect(diagnostics[0].messageText).toContain(`conditional`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should warn when required viewChild targets a ref only inside @switch/@case', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@switch (val) { @case ("a") { <div #myRef></div> } }',
+          })
+          export class TestComp {
+            val = 'a';
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`#myRef`);
+        expect(diagnostics[0].messageText).toContain(`conditional`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should warn when required viewChild targets a ref only inside @defer', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@defer { <div #myRef></div> }',
+          })
+          export class TestComp {
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(1);
+        expect(diagnostics[0].messageText).toContain(`#myRef`);
+        expect(diagnostics[0].messageText).toContain(`conditional`);
+        expect(diagnostics[0].category).toBe(ts.DiagnosticCategory.Error);
+      });
+
+      it('should not warn when ref exists both inside and outside @if block', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '<div #myRef></div> @if (cond) { <span #myRef></span> }',
+          })
+          export class TestComp {
+            cond = true;
+            el = viewChild.required('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
+      it('should not warn for optional viewChild targeting a conditional ref', () => {
+        env.write(
+          'test.ts',
+          `
+          import {Component, viewChild} from '@angular/core';
+
+          @Component({
+            selector: 'test',
+            template: '@if (cond) { <div #myRef></div> }',
+          })
+          export class TestComp {
+            cond = true;
+            el = viewChild('myRef');
+          }
+        `,
+        );
+        const diagnostics = env.driveDiagnostics();
+        expect(diagnostics.length).toBe(0);
+      });
+
       it('should capture a viewChild query in the setClasMetadata call', () => {
         env.write(
           'test.ts',

@@ -12,11 +12,14 @@ import {
   ParseSourceFile,
   R3TargetBinder,
   SchemaMetadata,
+  TmplAstDeferredBlock,
   TmplAstElement,
+  TmplAstForLoopBlock,
   TmplAstHostElement,
+  TmplAstIfBlock,
   TmplAstNode,
-  TmplAstReference,
   TmplAstRecursiveVisitor,
+  TmplAstSwitchBlock,
   TmplAstTemplate,
 } from '@angular/compiler';
 import MagicString from 'magic-string';
@@ -307,6 +310,14 @@ export class TypeCheckContextImpl implements TypeCheckContext {
           } else if (query.readIsTemplateRef && !refInfo.isTemplate) {
             // Query uses read:TemplateRef but target is not on an <ng-template>.
             shimData.oobRecorder.queryReadTemplateRefMismatch(
+              id,
+              ref.node,
+              query.propertyName,
+              predicate,
+            );
+          } else if (query.isRequired && refInfo.isOnlyConditional) {
+            // Required query targets a ref that only exists inside a conditional block.
+            shimData.oobRecorder.queryTargetOnlyConditional(
               id,
               ref.node,
               query.propertyName,
@@ -801,22 +812,59 @@ function splitStringAtPoints(str: string, points: number[]): string[] {
  */
 interface TemplateRefInfo {
   isTemplate: boolean;
+  /** Whether the ref is only found inside a conditional block and never at unconditional scope. */
+  isOnlyConditional: boolean;
 }
 
 function collectTemplateReferenceNames(nodes: TmplAstNode[]): Map<string, TemplateRefInfo> {
   const refs = new Map<string, TemplateRefInfo>();
+  let conditionalDepth = 0;
+
+  const addRef = (name: string, isTemplate: boolean): void => {
+    const existing = refs.get(name);
+    const isConditional = conditionalDepth > 0;
+    if (existing) {
+      // If ANY occurrence is unconditional, the ref is not only-conditional.
+      if (!isConditional) {
+        existing.isOnlyConditional = false;
+      }
+    } else {
+      refs.set(name, {isTemplate, isOnlyConditional: isConditional});
+    }
+  };
+
   const visitor = new (class extends TmplAstRecursiveVisitor {
     override visitElement(element: TmplAstElement): void {
       for (const ref of element.references) {
-        refs.set(ref.name, {isTemplate: false});
+        addRef(ref.name, false);
       }
       super.visitElement(element);
     }
     override visitTemplate(template: TmplAstTemplate): void {
       for (const ref of template.references) {
-        refs.set(ref.name, {isTemplate: true});
+        addRef(ref.name, true);
       }
       super.visitTemplate(template);
+    }
+    override visitIfBlock(block: TmplAstIfBlock): void {
+      conditionalDepth++;
+      super.visitIfBlock(block);
+      conditionalDepth--;
+    }
+    override visitSwitchBlock(block: TmplAstSwitchBlock): void {
+      conditionalDepth++;
+      super.visitSwitchBlock(block);
+      conditionalDepth--;
+    }
+    override visitForLoopBlock(block: TmplAstForLoopBlock): void {
+      conditionalDepth++;
+      super.visitForLoopBlock(block);
+      conditionalDepth--;
+    }
+    override visitDeferredBlock(block: TmplAstDeferredBlock): void {
+      conditionalDepth++;
+      super.visitDeferredBlock(block);
+      conditionalDepth--;
     }
   })();
   for (const node of nodes) {

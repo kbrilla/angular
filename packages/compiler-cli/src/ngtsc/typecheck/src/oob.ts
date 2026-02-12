@@ -276,6 +276,17 @@ export interface OutOfBandDiagnosticRecorder {
     queryPropertyName: string,
     predicateName: string,
   ): void;
+
+  /**
+   * Reports that a required view query's target only exists inside a conditional block
+   * (`@if`, `@switch`, `@for`, `@defer`) and may not be present when the query resolves.
+   */
+  queryTargetOnlyConditional(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+  ): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -966,6 +977,26 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
 
     this._diagnostics.push({
       ...makeDiagnostic(ErrorCode.QUERY_READ_TEMPLATEREF_MISMATCH, componentNode, message),
+      category: ts.DiagnosticCategory.Error,
+      sourceFile: componentNode.getSourceFile(),
+      typeCheckId: id,
+    });
+  }
+
+  queryTargetOnlyConditional(
+    id: TypeCheckId,
+    componentNode: ClassDeclaration,
+    queryPropertyName: string,
+    predicateName: string,
+  ): void {
+    const message =
+      `Required view query '${queryPropertyName}' targets '#${predicateName}' which only ` +
+      `exists inside a conditional block (@if, @switch, @for, or @defer). ` +
+      `When the condition is not met, this query will throw a runtime error (NG0951). ` +
+      `Consider using an optional query or moving the target outside the conditional block.`;
+
+    this._diagnostics.push({
+      ...makeDiagnostic(ErrorCode.QUERY_TARGET_ONLY_CONDITIONAL, componentNode, message),
       category: ts.DiagnosticCategory.Error,
       sourceFile: componentNode.getSourceFile(),
       typeCheckId: id,
