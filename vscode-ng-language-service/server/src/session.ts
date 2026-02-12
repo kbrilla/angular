@@ -256,8 +256,8 @@ export class Session {
     conn.onHover((p) => onHover(this, p));
     conn.onFoldingRanges((p) => onFoldingRanges(this, p));
     conn.languages.onLinkedEditingRange((p) => onLinkedEditingRange(this, p));
-    conn.onSelectionRanges((p) => onSelectionRange(this, p));
     conn.onDocumentSymbol(async (p) => await onDocumentSymbol(this, p));
+    conn.onSelectionRanges((p) => onSelectionRange(this, p));
     conn.onCompletion((p) => onCompletion(this, p));
     conn.onCompletionResolve((p) => onCompletionResolve(this, p));
     conn.onRequest(GetComponentsWithTemplateFile, (p) => getComponentsWithTemplateFile(this, p));

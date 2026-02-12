@@ -2167,3 +2167,18 @@ function getDomPropertyType(
 
   return null;
 }
+
+/**
+ * Gets Angular inlay hints in InlayHint[] (LSP-aligned) format.
+ * This bridges the older getInlayHints API with the newer getInlayHintsForTemplate implementation.
+ */
+export function getAngularInlayHints(
+  compiler: NgCompiler,
+  fileName: string,
+  span: ts.TextSpan,
+  config: Omit<import('../api').PluginConfig, 'angularOnly'> | undefined,
+): import('../api').InlayHint[] {
+  // TODO: Convert AngularInlayHint[] to InlayHint[] (LSP format with LineAndCharacter positions)
+  // For now return empty - the provideInlayHints API handles the full implementation
+  return [];
+}
