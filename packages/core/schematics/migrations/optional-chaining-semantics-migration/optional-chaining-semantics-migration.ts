@@ -83,7 +83,7 @@ export interface TemplateResult {
   approved: boolean | null;
 }
 
-function migrateHostExpression(expression: string, bestEffort: boolean) {
+export function migrateHostExpression(expression: string, bestEffort: boolean) {
   const prefix = `<div [x]="`;
   const suffix = `"></div>`;
   const escapedExpr = expression.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -99,6 +99,24 @@ function migrateHostExpression(expression: string, bestEffort: boolean) {
     ...result,
     migrated,
   };
+}
+
+export function escapeForHostStringLiteral(
+  content: string,
+  initializer: ts.StringLiteralLike,
+): string {
+  const text = initializer.getText();
+  const quote = text[0];
+
+  let escaped = content.replace(/\\/g, '\\\\');
+  if (quote === "'") {
+    escaped = escaped.replace(/'/g, "\\'");
+  } else if (quote === '"') {
+    escaped = escaped.replace(/"/g, '\\"');
+  } else if (quote === '`') {
+    escaped = escaped.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  }
+  return escaped;
 }
 
 export interface CompilationUnitData {
@@ -207,7 +225,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
                 continue;
               }
 
-              const expression = hostProp.initializer.getText().slice(1, -1);
+              const expression = hostProp.initializer.text;
               const result = migrateHostExpression(expression, bestEffort);
               if (!result.hasSafeNavigation) {
                 continue;
@@ -216,13 +234,17 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
               const canApply = result.fullyMigrated;
               const replacements: Replacement[] = [];
               if (canApply) {
+                const escapedMigrated = escapeForHostStringLiteral(
+                  result.migrated,
+                  hostProp.initializer,
+                );
                 replacements.push(
                   new Replacement(
                     file,
                     new TextUpdate({
                       position: hostProp.initializer.getStart() + 1,
                       end: hostProp.initializer.getEnd() - 1,
-                      toInsert: result.migrated,
+                      toInsert: escapedMigrated,
                     }),
                   ),
                 );
