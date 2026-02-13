@@ -7,6 +7,11 @@
  */
 
 import {migrateTemplate, migrateTemplateBestEffort} from './add-null-coalescing';
+import {
+  escapeForHostStringLiteral,
+  migrateHostExpression,
+} from './optional-chaining-semantics-migration';
+import ts from 'typescript';
 
 describe('migrateTemplate (AST-based)', () => {
   describe('no-op cases', () => {
@@ -116,9 +121,7 @@ describe('migrateTemplate (AST-based)', () => {
 
   describe('mixed templates', () => {
     it('template with multiple safe interpolations is fully safe', () => {
-      const r = migrateTemplate(
-        '<div>{{ a?.b }}</div><span>{{ c?.d }}</span>',
-      );
+      const r = migrateTemplate('<div>{{ a?.b }}</div><span>{{ c?.d }}</span>');
       expect(r.fullyMigrated).toBe(true);
       expect(r.safeAsIsCount).toBeGreaterThanOrEqual(2);
       expect(r.migratedCount).toBe(0);
@@ -186,5 +189,46 @@ describe('migrateTemplateBestEffort (AST-based)', () => {
     const r = migrateTemplateBestEffort('');
     expect(r.hasSafeNavigation).toBe(false);
     expect(r.fullyMigrated).toBe(true);
+  });
+});
+
+describe('migrateHostExpression', () => {
+  it('should migrate a simple host expression with safe navigation', () => {
+    const r = migrateHostExpression('user?.name', false);
+    expect(r.hasSafeNavigation).toBe(true);
+    expect(r.fullyMigrated).toBe(true);
+    expect(r.migrated).toContain('user != null ? user.name : null');
+  });
+
+  it('should use best-effort fallback for unsupported host expressions', () => {
+    const r = migrateHostExpression('user?.getName()', true);
+    expect(r.hasSafeNavigation).toBe(true);
+    expect(r.fullyMigrated).toBe(false);
+    expect(r.skippedCount).toBeGreaterThan(0);
+    expect(r.migrated).toContain('user?.getName()');
+  });
+
+  it('should preserve escaped single quotes for insertion into single-quoted TS host strings', () => {
+    const original = `'prefix ' + user?.name + ' suffix'`;
+    const r = migrateHostExpression(original, false);
+
+    const initializer = {getText: () => "''"} as unknown as ts.StringLiteralLike;
+    const escaped = escapeForHostStringLiteral(r.migrated, initializer);
+
+    const tsSource = `
+      import {Directive} from '@angular/core';
+      @Directive({
+        selector: '[x]',
+        host: {
+          '[attr.title]': '${escaped}'
+        }
+      })
+      class TestDir {}
+    `;
+    const transpileResult = ts.transpileModule(tsSource, {
+      compilerOptions: {target: ts.ScriptTarget.ES2022},
+      reportDiagnostics: true,
+    });
+    expect((transpileResult.diagnostics ?? []).length).toBe(0);
   });
 });

@@ -242,6 +242,10 @@ export function migrateTemplateBestEffort(template: string): TemplateMigrationRe
       migratedCount++;
       result = result.substring(0, occ.start) + ternary + result.substring(occ.end);
     } else {
+      if (isImmediatelyFollowedByCall(occ.node, template)) {
+        skippedCount++;
+        continue;
+      }
       // Best-effort: append ?? null to the original expression text
       const originalText = template.substring(occ.start, occ.end);
       migratedCount++;
@@ -350,7 +354,11 @@ class SafeNavExpressionFinder extends RecursiveAstVisitor {
    * Mark all receiver nodes in a safe navigation chain so they won't be recorded.
    */
   private markReceiverChain(node: AST): void {
-    if (node instanceof SafePropertyRead || node instanceof SafeKeyedRead || node instanceof SafeCall) {
+    if (
+      node instanceof SafePropertyRead ||
+      node instanceof SafeKeyedRead ||
+      node instanceof SafeCall
+    ) {
       this.receiverNodes.add(node);
       this.markReceiverChain(node.receiver);
     } else if (node instanceof PropertyRead) {
@@ -486,6 +494,13 @@ function tryBuildTernary(
   node: SafePropertyRead | SafeKeyedRead | SafeCall,
   template: string,
 ): string | null {
+  // If the safe-navigation node is immediately called (e.g. `user?.getName()` where
+  // the node span is `user?.getName` and the next token is `(`), replacing only the
+  // node span would produce invalid output. Leave these for manual review.
+  if (isImmediatelyFollowedByCall(node, template)) {
+    return null;
+  }
+
   // Only handle simple property chains for ternary conversion
   const chain = collectSafeChain(node);
   if (chain === null) {
@@ -518,10 +533,7 @@ function collectSafeChain(node: AST): ChainSegment[] | null {
     } else if (current instanceof NonNullAssert) {
       // a?.b!.c — skip the non-null assertion, take the inner expression
       current = current.expression;
-    } else if (
-      current instanceof SafeKeyedRead ||
-      current instanceof SafeCall
-    ) {
+    } else if (current instanceof SafeKeyedRead || current instanceof SafeCall) {
       // Can't convert keyed reads or calls to ternary
       return null;
     } else {
@@ -567,4 +579,15 @@ function buildTernaryFromChain(segments: ChainSegment[]): string {
   }
 
   return result;
+}
+
+function isImmediatelyFollowedByCall(
+  node: SafePropertyRead | SafeKeyedRead | SafeCall,
+  template: string,
+): boolean {
+  let idx = node.sourceSpan.end;
+  while (idx < template.length && /\s/.test(template[idx])) {
+    idx++;
+  }
+  return template[idx] === '(';
 }
