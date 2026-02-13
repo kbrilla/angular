@@ -8,6 +8,7 @@ ts_project(
     ),
     visibility = [
         "//packages/core/schematics:__subpackages__",
+        "//packages/language-service:__subpackages__",
     ],
     deps = [
         "//:node_modules/@types/node",

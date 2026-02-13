@@ -26,6 +26,10 @@ import {
   ConvertFullClassToSignalQueriesBestEffortRefactoring,
   ConvertFullClassToSignalQueriesRefactoring,
 } from './convert_to_signal_queries/full_class_query_refactoring';
+import {
+  ConvertFullClassOptionalChainingBestEffortRefactoring,
+  ConvertFullClassOptionalChainingRefactoring,
+} from './convert_optional_chaining_semantics/full_class_optional_chaining_refactoring';
 
 /**
  * Interface exposing static metadata for a {@link Refactoring},
@@ -86,4 +90,7 @@ export const allRefactorings: Refactoring[] = [
   ConvertFieldToSignalQueryBestEffortRefactoring,
   ConvertFullClassToSignalQueriesRefactoring,
   ConvertFullClassToSignalQueriesBestEffortRefactoring,
+  // Optional chaining semantics migration
+  ConvertFullClassOptionalChainingRefactoring,
+  ConvertFullClassOptionalChainingBestEffortRefactoring,
 ];

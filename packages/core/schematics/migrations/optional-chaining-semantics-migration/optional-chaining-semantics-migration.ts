@@ -23,6 +23,24 @@ import {getPropertyNameText} from '../../utils/typescript/property_name';
 import {AbsoluteFsPath} from '../../../../compiler-cli';
 import {migrateTemplate, migrateTemplateBestEffort} from './add-null-coalescing';
 
+function insertTodoBeforeNode(node: ts.Node, info: ProgramInfo, message: string): Replacement {
+  const sf = node.getSourceFile();
+  const lineStarts = sf.getLineStarts();
+  const position = node.getStart(sf);
+  const {line} = ts.getLineAndCharacterOfPosition(sf, position);
+  const lineStart = lineStarts[line];
+  const file = projectFile(sf, info);
+
+  return new Replacement(
+    file,
+    new TextUpdate({
+      position: lineStart,
+      end: lineStart,
+      toInsert: `${message}\n`,
+    }),
+  );
+}
+
 export interface MigrationConfig {
   /**
    * Whether to migrate this component template.
@@ -55,6 +73,18 @@ export interface MigrationConfig {
    * If not provided and `interactiveMode` is true, defaults to accepting all.
    */
   promptForTemplate?: (info: TemplatePromptInfo) => Promise<boolean>;
+
+  /**
+   * Whether to insert TODO comments for skipped expressions that need
+   * manual migration review.
+   */
+  insertTodosForSkippedExpressions?: boolean;
+
+  /**
+   * Optional progress callback. Useful for language service integration when
+   * running migrations against large repositories.
+   */
+  reportProgressFn?: (percentage: number, updateMessage: string) => void;
 }
 
 export interface TemplatePromptInfo {
@@ -79,6 +109,8 @@ export interface TemplateResult {
   /** Migrated template content (only valid when fullyMigrated or bestEffortMode). */
   migratedContent: string;
   replacements: Replacement[];
+  /** Optional TODO comments to insert for skipped migrations. */
+  todoReplacements: Replacement[];
   /** Whether this template was approved in interactive mode. Null = not interactive. */
   approved: boolean | null;
 }
@@ -149,11 +181,21 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
     super();
   }
 
+  private reportProgress(percentage: number, message: string): void {
+    this.config.reportProgressFn?.(percentage, message);
+  }
+
   override async analyze(info: ProgramInfo): Promise<Serializable<CompilationUnitData>> {
     const {sourceFiles, program} = info;
     const typeChecker = program.getTypeChecker();
     const templates: TemplateResult[] = [];
     const bestEffort = this.config.bestEffortMode ?? false;
+    this.reportProgress(
+      0,
+      'Analyzing templates and host expressions for optional chaining migration.',
+    );
+
+    let visitedSourceFiles = 0;
 
     for (const sf of sourceFiles) {
       ts.forEachChild(sf, (node: ts.Node) => {
@@ -175,6 +217,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
 
           const canApply = result.fullyMigrated;
           const replacements: Replacement[] = [];
+          const todoReplacements: Replacement[] = [];
 
           if (canApply) {
             const fileToMigrate = tpl.inline
@@ -190,6 +233,21 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
                 }),
               ),
             );
+          } else if (this.config.insertTodosForSkippedExpressions) {
+            const fileToAnnotate = tpl.inline
+              ? file
+              : projectFile(tpl.filePath as AbsoluteFsPath, info);
+            todoReplacements.push(
+              new Replacement(
+                fileToAnnotate,
+                new TextUpdate({
+                  position: tpl.start,
+                  end: tpl.start,
+                  toInsert:
+                    '<!-- TODO: Optional chaining migration skipped one or more expressions here. Manual review required before enabling nativeOptionalChainingSemantics. -->\n',
+                }),
+              ),
+            );
           }
 
           templates.push({
@@ -202,6 +260,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
             originalContent: tpl.content,
             migratedContent: result.migrated,
             replacements,
+            todoReplacements,
             approved: null,
           });
         });
@@ -233,6 +292,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
 
               const canApply = result.fullyMigrated;
               const replacements: Replacement[] = [];
+              const todoReplacements: Replacement[] = [];
               if (canApply) {
                 const escapedMigrated = escapeForHostStringLiteral(
                   result.migrated,
@@ -248,6 +308,14 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
                     }),
                   ),
                 );
+              } else if (this.config.insertTodosForSkippedExpressions) {
+                todoReplacements.push(
+                  insertTodoBeforeNode(
+                    hostProp,
+                    info,
+                    `// TODO: Optional chaining migration skipped host expression with ${result.skippedCount} unresolved segment(s). Manual review required.`,
+                  ),
+                );
               }
 
               templates.push({
@@ -260,12 +328,23 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
                 originalContent: expression,
                 migratedContent: result.migrated,
                 replacements,
+                todoReplacements,
                 approved: null,
               });
             }
           }
         }
       });
+
+      visitedSourceFiles++;
+      const pct = Math.min(
+        95,
+        Math.floor((visitedSourceFiles / Math.max(1, sourceFiles.length)) * 95),
+      );
+      this.reportProgress(
+        pct,
+        `Analyzed ${visitedSourceFiles}/${sourceFiles.length} source files.`,
+      );
     }
 
     // Interactive mode: prompt for each template
@@ -287,6 +366,7 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
       }
     }
 
+    this.reportProgress(100, 'Analysis complete.');
     return confirmAsSerializable({templates});
   }
 
@@ -328,8 +408,9 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
 
   override async migrate(globalData: CompilationUnitData) {
     const interactive = this.config.interactiveMode ?? false;
+    this.reportProgress(0, 'Computing migration edits.');
 
-    const replacements = globalData.templates
+    const migrationReplacements = globalData.templates
       .filter((t) => {
         if (!t.fullyMigrated) return false;
         // In interactive mode, only apply approved templates
@@ -338,6 +419,12 @@ export class OptionalChainingSemanticsMigration extends TsurgeFunnelMigration<
       })
       .flatMap((t) => t.replacements);
 
-    return {replacements};
+    const todoReplacements = this.config.insertTodosForSkippedExpressions
+      ? globalData.templates.filter((t) => !t.fullyMigrated).flatMap((t) => t.todoReplacements)
+      : [];
+
+    this.reportProgress(100, 'Migration edits computed.');
+
+    return {replacements: [...migrationReplacements, ...todoReplacements]};
   }
 }

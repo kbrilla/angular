@@ -190,6 +190,14 @@ describe('migrateTemplateBestEffort (AST-based)', () => {
     expect(r.hasSafeNavigation).toBe(false);
     expect(r.fullyMigrated).toBe(true);
   });
+
+  it('should skip call-receiver pattern in sensitive context', () => {
+    const r = migrateTemplateBestEffort(`{{ 'prefix-' + user?.getName() }}`);
+    expect(r.hasSafeNavigation).toBe(true);
+    expect(r.fullyMigrated).toBe(false);
+    expect(r.skippedCount).toBeGreaterThan(0);
+    expect(r.migrated).toContain(`{{ 'prefix-' + user?.getName() }}`);
+  });
 });
 
 describe('migrateHostExpression', () => {
@@ -230,5 +238,19 @@ describe('migrateHostExpression', () => {
       reportDiagnostics: true,
     });
     expect((transpileResult.diagnostics ?? []).length).toBe(0);
+  });
+
+  it('should escape double quotes for double-quoted TS host strings', () => {
+    const escaped = escapeForHostStringLiteral(`user != null ? user["a"] : null`, {
+      getText: () => '""',
+    } as unknown as ts.StringLiteralLike);
+    expect(escaped).toContain('\\"a\\"');
+  });
+
+  it('should escape template markers for backtick TS host strings', () => {
+    const escaped = escapeForHostStringLiteral('`${user}`', {
+      getText: () => '``',
+    } as unknown as ts.StringLiteralLike);
+    expect(escaped).toContain('\\${user}');
   });
 });
