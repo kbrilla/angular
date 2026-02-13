@@ -448,6 +448,7 @@ function convertToR3QueryMetadata(facade: R3QueryMetadataFacade): R3QueryMetadat
     read: facade.read ? new WrappedNodeExpr(facade.read) : null,
     static: facade.static,
     emitDistinctChangesOnly: facade.emitDistinctChangesOnly,
+    isRequired: facade.isRequired,
   };
 }
 
@@ -463,6 +464,7 @@ function convertQueryDeclarationToMetadata(
     static: declaration.static ?? false,
     emitDistinctChangesOnly: declaration.emitDistinctChangesOnly ?? true,
     isSignal: !!declaration.isSignal,
+    isRequired: !!declaration.isRequired,
   };
 }
 

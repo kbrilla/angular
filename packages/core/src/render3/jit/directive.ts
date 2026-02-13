@@ -448,6 +448,7 @@ export function convertToR3QueryMetadata(propertyName: string, ann: Query): R3Qu
     static: !!ann.static,
     emitDistinctChangesOnly: !!ann.emitDistinctChangesOnly,
     isSignal: !!ann.isSignal,
+    isRequired: false,
   };
 }
 function extractQueriesMetadata(

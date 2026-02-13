@@ -124,6 +124,7 @@ import {
   TypeCheckContext,
   TemplateContext,
   HostBindingsContext,
+  QueryReadType,
 } from '../../../typecheck/api';
 import {ExtendedTemplateChecker} from '../../../typecheck/extended/api';
 import {TemplateSemanticsChecker} from '../../../typecheck/template_semantics/api/api';
@@ -1223,6 +1224,15 @@ export class ComponentDecoratorHandler implements DecoratorHandler<
       templateContext,
       hostBindingsContext,
       meta.meta.isStandalone,
+      meta.meta.viewQueries.map((q) => ({
+        propertyName: q.propertyName,
+        stringPredicates: Array.isArray(q.predicate) ? q.predicate : null,
+        isRequired: q.isRequired,
+        isStatic: q.static,
+        first: q.first,
+        readIsTemplateRef: isReadTemplateRef(q.read),
+        readType: classifyReadOption(q.read),
+      })),
     );
   }
 
@@ -2670,4 +2680,47 @@ function validateStandaloneImports(
 /** Returns whether an ImportDeclaration is a default import. */
 function isDefaultImport(node: ts.ImportDeclaration): boolean {
   return node.importClause !== undefined && node.importClause.namedBindings === undefined;
+}
+
+/**
+ * Checks if a query's `read` option resolves to `TemplateRef`.
+ * Handles both direct identifier (`read: TemplateRef`) and property access
+ * (`read: core.TemplateRef`) patterns.
+ */
+function isReadTemplateRef(read: o.Expression | null): boolean {
+  if (read === null) return false;
+  if (!(read instanceof o.WrappedNodeExpr)) return false;
+  const node = read.node;
+  if (ts.isIdentifier(node)) {
+    return node.text === 'TemplateRef';
+  }
+  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.name)) {
+    return node.name.text === 'TemplateRef';
+  }
+  return false;
+}
+
+/**
+ * Classify the `read` option of a query into a concrete type category.
+ */
+function classifyReadOption(read: o.Expression | null): QueryReadType {
+  if (read === null) return {kind: 'none'};
+  if (!(read instanceof o.WrappedNodeExpr)) return {kind: 'unknown'};
+  const node = read.node;
+  const name = ts.isIdentifier(node)
+    ? node.text
+    : ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.name)
+      ? node.name.text
+      : null;
+  if (name === null) return {kind: 'unknown'};
+  switch (name) {
+    case 'TemplateRef':
+      return {kind: 'templateRef'};
+    case 'ElementRef':
+      return {kind: 'elementRef'};
+    case 'ViewContainerRef':
+      return {kind: 'viewContainerRef'};
+    default:
+      return {kind: 'directive', name};
+  }
 }

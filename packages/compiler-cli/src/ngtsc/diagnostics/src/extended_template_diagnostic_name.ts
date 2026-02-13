@@ -35,4 +35,8 @@ export enum ExtendedTemplateDiagnosticName {
   UNINVOKED_FUNCTION_IN_TEXT_INTERPOLATION = 'uninvokedFunctionInTextInterpolation',
   DEFER_TRIGGER_MISCONFIGURATION = 'deferTriggerMisconfiguration',
   LEGACY_SAFE_NAVIGATION_USAGE = 'legacySafeNavigationUsage',
+  MISSING_OPTIONAL_VIEW_QUERY_TARGET = 'missingOptionalViewQueryTarget',
+  QUERY_READ_TEMPLATEREF_MISMATCH = 'queryReadTemplateRefMismatch',
+  QUERY_READ_DIRECTIVE_MISMATCH = 'queryReadDirectiveMismatch',
+  QUERY_MULTIPLE_TARGETS = 'queryMultipleTargets',
 }
