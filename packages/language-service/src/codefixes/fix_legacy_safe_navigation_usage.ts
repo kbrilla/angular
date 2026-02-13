@@ -8,19 +8,39 @@
 
 import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import type ts from 'typescript';
+import {migrateHostExpression} from '../../../core/schematics/migrations/optional-chaining-semantics-migration/optional-chaining-semantics-migration';
 
 import {CodeActionMeta, FixIdForCodeFixesAll} from './utils';
 
-function createChange(file: ts.SourceFile, start: number, length: number): ts.TextChange | null {
+function computeReplacement(original: string, bestEffort: boolean): string | null {
+  const migrationResult = migrateHostExpression(original, bestEffort);
+  if (migrationResult.migrated !== original) {
+    return migrationResult.migrated;
+  }
+
+  if (bestEffort && !original.includes('?? null')) {
+    return `(${original}) ?? null`;
+  }
+
+  return null;
+}
+
+function createChange(
+  file: ts.SourceFile,
+  start: number,
+  length: number,
+  bestEffort: boolean,
+): ts.TextChange | null {
   const original = file.text.slice(start, start + length);
 
-  if (original.includes('?? null')) {
+  const replacement = computeReplacement(original, bestEffort);
+  if (replacement === null) {
     return null;
   }
 
   return {
     span: {start, length},
-    newText: `(${original}) ?? null`,
+    newText: replacement,
   };
 }
 
@@ -46,28 +66,51 @@ export const fixLegacySafeNavigationUsageMeta: CodeActionMeta = {
       return [];
     }
 
-    const change = createChange(fileDiag.file, fileDiag.start, fileDiag.length);
-    if (change === null) {
-      return [];
-    }
+    const safeChange = createChange(fileDiag.file, fileDiag.start, fileDiag.length, false);
+    const bestEffortChange = createChange(fileDiag.file, fileDiag.start, fileDiag.length, true);
 
-    return [
-      {
-        fixName: FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE,
-        fixId: FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE,
-        fixAllDescription: 'Convert all legacy safe navigation usages to preserve null semantics',
-        description: 'Convert this safe navigation expression to `?? null` form',
+    const actions: ts.CodeFixAction[] = [];
+    if (safeChange !== null) {
+      actions.push({
+        fixName: FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_SAFE,
+        fixId: FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_SAFE,
+        fixAllDescription:
+          'Migrate all legacy safe navigation usages in this file (safe conversion only)',
+        description: 'Migrate this safe navigation expression (safe)',
         changes: [
           {
             fileName,
-            textChanges: [change],
+            textChanges: [safeChange],
           },
         ],
-      },
-    ];
+      });
+    }
+
+    if (bestEffortChange !== null && bestEffortChange.newText !== safeChange?.newText) {
+      actions.push({
+        fixName: FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_BEST_EFFORT,
+        fixId: FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_BEST_EFFORT,
+        fixAllDescription:
+          'Migrate all legacy safe navigation usages in this file (best effort, may require review)',
+        description: 'Migrate this safe navigation expression (best effort)',
+        changes: [
+          {
+            fileName,
+            textChanges: [bestEffortChange],
+          },
+        ],
+      });
+    }
+
+    return actions;
   },
-  fixIds: [FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE],
-  getAllCodeActions({diagnostics}) {
+  fixIds: [
+    FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_SAFE,
+    FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_BEST_EFFORT,
+  ],
+  getAllCodeActions({diagnostics, fixId}) {
+    const bestEffort = fixId === FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_BEST_EFFORT;
+
     const byFile = new Map<string, ts.TextChange[]>();
 
     for (const diag of diagnostics) {
@@ -80,7 +123,7 @@ export const fixLegacySafeNavigationUsageMeta: CodeActionMeta = {
         continue;
       }
 
-      const change = createChange(diag.file, diag.start, diag.length);
+      const change = createChange(diag.file, diag.start, diag.length, bestEffort);
       if (change === null) {
         continue;
       }

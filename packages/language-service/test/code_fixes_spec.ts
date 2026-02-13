@@ -270,7 +270,9 @@ describe('code fixes', () => {
     ]);
 
     expect(
-      codeActions.some((a) => a.fixName === FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE),
+      codeActions.some(
+        (a) => a.fixName === FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_SAFE,
+      ),
     ).toBeTrue();
     expect(codeActions.some((a) => a.changes.some((c) => c.textChanges.length > 0))).toBeTrue();
   });
@@ -300,7 +302,7 @@ describe('code fixes', () => {
     const appFile = project.openFile('app.ts');
     const fixesAll = project.getCombinedCodeFix(
       'app.ts',
-      FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE,
+      FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE_SAFE,
     );
 
     expect(fixesAll.changes.length).toBeGreaterThan(0);
