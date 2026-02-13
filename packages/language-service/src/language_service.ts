@@ -232,6 +232,16 @@ export class LanguageService {
                     );
                   }
 
+                  // Attribute host binding diagnostics also apply to directives/components without templates.
+                  if (meta && !template) {
+                    const attrDiags = this.getAttrDiagnosticsForComponent(node, compiler);
+                    diagnostics.push(...attrDiags);
+                    // @ts-ignore DEBUG
+                    console.log(
+                      `[LS_DIAG] Attr host binding diagnostics for ${className}: ${attrDiags.length}`,
+                    );
+                  }
+
                   // Output definition diagnostics apply to ANY directive (with or without template)
                   // This detects @Output() that shadow DOM events at the class definition level
                   if (eventConfig.enabled && meta) {
@@ -532,10 +542,7 @@ export class LanguageService {
     templateFileName?: string,
   ): ts.Diagnostic[] {
     const templateTypeChecker = compiler.getTemplateTypeChecker();
-    const templateData = templateTypeChecker.getTemplate(component);
-    if (templateData === null) {
-      return [];
-    }
+    const templateData = templateTypeChecker.getTemplate(component) ?? [];
 
     // For external templates, create a synthetic source file so diagnostics point to the correct location
     let templateSourceFile: ts.SourceFile | undefined;
