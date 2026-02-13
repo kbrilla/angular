@@ -144,6 +144,7 @@ export enum FixIdForCodeFixesAll {
   FIX_CSS_PROPERTY = 'fixCssProperty',
   FIX_CSS_SHORTHAND_CONFLICT = 'fixCssShorthandConflict',
   FIX_CSS_UNIT_VALUE = 'fixCssUnitValue',
+  FIX_LEGACY_SAFE_NAVIGATION_USAGE = 'fixLegacySafeNavigationUsage',
   FIX_NGCLASS_TO_CLASS = 'fixNgClassToClass',
   FIX_STYLE_OBJECT_TO_INDIVIDUAL = 'fixStyleObjectToIndividual',
   FIX_INDIVIDUAL_TO_STYLE_OBJECT = 'fixIndividualToStyleObject',

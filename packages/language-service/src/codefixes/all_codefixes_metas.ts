@@ -17,6 +17,7 @@ import {fixCssUnitValueMeta} from './fix_css_unit_value';
 import {fixNgClassToClassMeta} from './fix_ngclass_to_class';
 import {fixStyleObjectToIndividualMeta} from './fix_style_object_to_individual';
 import {fixIndividualToStyleObjectMeta} from './fix_individual_to_style_object';
+import {fixLegacySafeNavigationUsageMeta} from './fix_legacy_safe_navigation_usage';
 import {CodeActionMeta} from './utils';
 
 export const ALL_CODE_FIXES_METAS: CodeActionMeta[] = [
@@ -28,6 +29,7 @@ export const ALL_CODE_FIXES_METAS: CodeActionMeta[] = [
   fixCssPropertyMeta,
   fixCssShorthandConflictMeta,
   fixCssUnitValueMeta,
+  fixLegacySafeNavigationUsageMeta,
   fixNgClassToClassMeta,
   fixStyleObjectToIndividualMeta,
   fixIndividualToStyleObjectMeta,

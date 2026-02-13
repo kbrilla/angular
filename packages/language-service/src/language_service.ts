@@ -266,6 +266,9 @@ export class LanguageService {
                       `[LS_DIAG] Event output definition diagnostics for ${className}: ${outputDefDiags.length}`,
                     );
                   }
+
+                  const hostLegacySafeNavDiags = this.getLegacySafeNavigationHostDiagnostics(node);
+                  diagnostics.push(...hostLegacySafeNavDiags);
                 } catch {
                   // Not a component/directive or error, skip
                 }
@@ -1396,6 +1399,77 @@ export class LanguageService {
         }
       },
     );
+  }
+
+  private getLegacySafeNavigationHostDiagnostics(node: ts.ClassDeclaration): ts.Diagnostic[] {
+    const checkLevel =
+      this.options.extendedDiagnostics?.checks?.legacySafeNavigationUsage ?? 'warning';
+    if (checkLevel === 'suppress' || this.options.nativeOptionalChainingSemantics) {
+      return [];
+    }
+
+    const diagnostics: ts.Diagnostic[] = [];
+    const sourceFile = node.getSourceFile();
+
+    for (const decorator of ts.getDecorators(node) ?? []) {
+      const expr = decorator.expression;
+      if (!ts.isCallExpression(expr)) {
+        continue;
+      }
+
+      const decoName =
+        ts.isIdentifier(expr.expression) || ts.isPropertyAccessExpression(expr.expression)
+          ? expr.expression.getText(sourceFile)
+          : null;
+      if (decoName !== 'Component' && decoName !== 'Directive') {
+        continue;
+      }
+
+      const arg = expr.arguments[0];
+      if (!arg || !ts.isObjectLiteralExpression(arg)) {
+        continue;
+      }
+
+      const hostProp = arg.properties.find(
+        (prop): prop is ts.PropertyAssignment =>
+          ts.isPropertyAssignment(prop) &&
+          ((ts.isIdentifier(prop.name) && prop.name.text === 'host') ||
+            (ts.isStringLiteralLike(prop.name) && prop.name.text === 'host')),
+      );
+      if (!hostProp || !ts.isObjectLiteralExpression(hostProp.initializer)) {
+        continue;
+      }
+
+      for (const hostBinding of hostProp.initializer.properties) {
+        if (
+          !ts.isPropertyAssignment(hostBinding) ||
+          !ts.isStringLiteralLike(hostBinding.initializer)
+        ) {
+          continue;
+        }
+
+        if (!hostBinding.initializer.text.includes('?.')) {
+          continue;
+        }
+
+        diagnostics.push({
+          file: sourceFile,
+          start: hostBinding.initializer.getStart(sourceFile) + 1,
+          length: hostBinding.initializer.text.length,
+          category:
+            checkLevel === 'error' ? ts.DiagnosticCategory.Error : ts.DiagnosticCategory.Warning,
+          code: ngErrorCode(ErrorCode.LEGACY_SAFE_NAVIGATION_USAGE),
+          messageText:
+            `This safe navigation expression uses legacy Angular semantics (returns 'null' on short-circuit). ` +
+            `With 'nativeOptionalChainingSemantics' enabled, it would return 'undefined' instead, ` +
+            `matching native ECMAScript optional chaining behavior. ` +
+            `Run the optional chaining migration to auto-convert simple property chains, ` +
+            `or manually verify this expression before enabling native semantics.`,
+        });
+      }
+    }
+
+    return diagnostics;
   }
 }
 

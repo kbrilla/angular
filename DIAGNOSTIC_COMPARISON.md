@@ -1,5 +1,22 @@
 # Complete Diagnostic Feature Comparison: STYLE vs ATTR vs CLASS
 
+## Optional Chaining Diagnostics (NG8119) - Current Status
+
+| Area                                           | Compiler Diagnostic                           | Language Service Diagnostic | Per-usage Quick Fix        | Fix All | Migration Refactoring              |
+| ---------------------------------------------- | --------------------------------------------- | --------------------------- | -------------------------- | ------- | ---------------------------------- |
+| Template expressions (`{{ a?.b }}` / bindings) | ✅ `legacySafeNavigationUsage`                | ✅                          | ✅ (`(expr) ?? null`)      | ✅      | ✅ (safe + best-effort full-class) |
+| Component `host: { ... }` expressions          | ⚠️ Not yet in compiler extended check visitor | ✅ Host-string scan in LS   | ✅ (same NG8119 quick fix) | ✅      | ✅ (migration handles host)        |
+| Directive `host: { ... }` expressions          | ⚠️ Not yet in compiler extended check visitor | ✅ Host-string scan in LS   | ✅ (same NG8119 quick fix) | ✅      | ✅ (migration handles host)        |
+
+### Notes
+
+- `NG8119` template warnings come from compiler extended template checks.
+- Host warnings are now surfaced in language service diagnostics and reuse the same diagnostic code, so code actions work in-place for host strings.
+- Optional chaining migration now supports:
+  - TODO insertion for skipped expressions (`insertTodosForSkippedExpressions`),
+  - progress callbacks (`reportProgressFn`),
+  - safe/best-effort refactoring actions from language service.
+
 ## Executive Summary
 
 | Feature Area         | Diagnostic Codes | Template Detection | Host Detection | Directive Host Detection | Tests      |

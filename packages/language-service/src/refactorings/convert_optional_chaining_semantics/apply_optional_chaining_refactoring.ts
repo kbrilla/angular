@@ -15,7 +15,7 @@ import {ApplyRefactoringProgressFn, ApplyRefactoringResult} from '../../../api';
 import {
   MigrationConfig,
   OptionalChainingSemanticsMigration,
-} from '@angular/core/schematics/migrations/optional-chaining-semantics-migration/optional-chaining-semantics-migration';
+} from '../../../../core/schematics/migrations/optional-chaining-semantics-migration/optional-chaining-semantics-migration';
 import {getProgramInfoFromBaseInfo} from '../../../../core/schematics/utils/tsurge';
 
 export async function applyOptionalChainingSemanticsRefactoring(

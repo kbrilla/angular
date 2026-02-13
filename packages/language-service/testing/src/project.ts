@@ -54,6 +54,11 @@ function writeTsconfig(
         files: entryFiles,
         angularCompilerOptions: {
           strictTemplates: true,
+          extendedDiagnostics: {
+            checks: {
+              legacySafeNavigationUsage: 'suppress',
+            },
+          },
           ...angularCompilerOptions,
         },
       },
@@ -68,7 +73,7 @@ export type TestableOptions = TypeCheckingOptions &
   Pick<LegacyNgcOptions, 'fullTemplateTypeCheck'> & {
     // This already exists in `InternalOptions`, but it's `internal` so it's stripped away.
     _enableSelectorless?: boolean;
-  };
+  } & Record<string, unknown>;
 
 export class Project {
   private tsProject: ts.server.Project;

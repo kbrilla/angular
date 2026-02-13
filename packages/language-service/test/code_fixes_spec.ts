@@ -237,6 +237,80 @@ describe('code fixes', () => {
     });
   });
 
+  it('should offer per-usage quick fix for legacy safe navigation warning', () => {
+    const files = {
+      'app.ts': `
+       import {Component, NgModule} from '@angular/core';
+
+       @Component({
+         template: '{{ user?.name }}',
+       })
+       export class AppComponent {
+         user: {name: string} | null = null;
+       }
+     `,
+    };
+
+    const project = createModuleAndProjectWithDeclarations(env, 'test', files, {
+      extendedDiagnostics: {
+        checks: {
+          legacySafeNavigationUsage: 'warning',
+        },
+      },
+    });
+
+    const appFile = project.openFile('app.ts');
+    const diags = project.getDiagnosticsForFile('app.ts');
+    const diag = diags.find((d) => `${d.messageText}`.includes('legacy Angular semantics'));
+    expect(diag).toBeDefined();
+
+    appFile.moveCursorToText('user?.name¦');
+    const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+      diag!.code,
+    ]);
+
+    expect(
+      codeActions.some((a) => a.fixName === FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE),
+    ).toBeTrue();
+    expect(codeActions.some((a) => a.changes.some((c) => c.textChanges.length > 0))).toBeTrue();
+  });
+
+  it('should provide fix-all for legacy safe navigation warnings', () => {
+    const files = {
+      'app.ts': `
+       import {Component, NgModule} from '@angular/core';
+
+       @Component({
+         template: '{{ user?.name }} {{ user?.email }}',
+       })
+       export class AppComponent {
+         user: {name: string; email: string} | null = null;
+       }
+     `,
+    };
+
+    const project = createModuleAndProjectWithDeclarations(env, 'test', files, {
+      extendedDiagnostics: {
+        checks: {
+          legacySafeNavigationUsage: 'warning',
+        },
+      },
+    });
+
+    const appFile = project.openFile('app.ts');
+    const fixesAll = project.getCombinedCodeFix(
+      'app.ts',
+      FixIdForCodeFixesAll.FIX_LEGACY_SAFE_NAVIGATION_USAGE,
+    );
+
+    expect(fixesAll.changes.length).toBeGreaterThan(0);
+    expect(
+      fixesAll.changes.some((change) =>
+        change.textChanges.some((t) => t.newText.includes('?? null')),
+      ),
+    ).toBeTrue();
+  });
+
   describe('should fix missing required input', () => {
     it('for different type', () => {
       const files = {
