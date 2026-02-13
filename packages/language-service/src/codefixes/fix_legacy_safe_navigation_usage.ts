@@ -8,39 +8,91 @@
 
 import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import type ts from 'typescript';
-import {migrateHostExpression} from '../../../core/schematics/migrations/optional-chaining-semantics-migration/optional-chaining-semantics-migration';
 
 import {CodeActionMeta, FixIdForCodeFixesAll} from './utils';
 
-function computeReplacement(original: string, bestEffort: boolean): string | null {
-  const migrationResult = migrateHostExpression(original, bestEffort);
-  if (migrationResult.migrated !== original) {
-    return migrationResult.migrated;
+/**
+ * Expands the diagnostic span (which may cover just the property name)
+ * backwards to include the full safe-navigation expression chain.
+ *
+ * For example, if the diagnostic highlights `name` in `user?.name`,
+ * this expands start backwards past `?.` and the receiver to get `user?.name`.
+ */
+function expandToFullSafeNavExpression(
+  text: string,
+  diagStart: number,
+  diagLength: number,
+): {start: number; length: number} {
+  let start = diagStart;
+
+  // Walk backwards: skip `?.` then the receiver identifier chain
+  while (start > 0) {
+    // Check for `?.` immediately before current start
+    if (start >= 2 && text[start - 2] === '?' && text[start - 1] === '.') {
+      start -= 2;
+      // Now skip receiver identifier backwards (letters, digits, $, _, and dots for chains)
+      while (start > 0 && /[\w$.]/.test(text[start - 1])) {
+        start--;
+      }
+    } else {
+      break;
+    }
   }
 
-  if (bestEffort && !original.includes('?? null')) {
-    return `(${original}) ?? null`;
+  const end = diagStart + diagLength;
+  return {start, length: end - start};
+}
+
+/**
+ * Converts a safe navigation expression like `a?.b` into a ternary that
+ * preserves the legacy `null` return: `a != null ? a.b : null`.
+ *
+ * Only handles simple property chains (dotted access). Returns `null` for
+ * expressions that can't be safely converted (e.g. method calls, keyed access).
+ */
+function safeConvert(expr: string): string | null {
+  // Match chains like `a?.b`, `a?.b?.c`, `a.b?.c?.d`
+  if (!/^[a-zA-Z_$][\w$]*([.?][.][a-zA-Z_$][\w$]*)*$/.test(expr)) {
+    return null;
   }
 
-  return null;
+  const parts = expr.split('?.');
+  if (parts.length < 2) {
+    return null;
+  }
+
+  let result = parts.join('.');
+  for (let i = parts.length - 1; i >= 1; i--) {
+    const guard = parts.slice(0, i).join('.');
+    result = `${guard} != null ? ${result} : null`;
+  }
+  return result;
 }
 
 function createChange(
   file: ts.SourceFile,
-  start: number,
-  length: number,
+  diagStart: number,
+  diagLength: number,
   bestEffort: boolean,
 ): ts.TextChange | null {
+  const {start, length} = expandToFullSafeNavExpression(file.text, diagStart, diagLength);
   const original = file.text.slice(start, start + length);
 
-  const replacement = computeReplacement(original, bestEffort);
-  if (replacement === null) {
+  if (bestEffort) {
+    return {
+      span: {start, length},
+      newText: `${original} ?? null`,
+    };
+  }
+
+  const safeResult = safeConvert(original);
+  if (safeResult === null) {
     return null;
   }
 
   return {
     span: {start, length},
-    newText: replacement,
+    newText: safeResult,
   };
 }
 

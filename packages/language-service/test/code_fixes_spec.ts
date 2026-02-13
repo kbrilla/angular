@@ -243,7 +243,7 @@ describe('code fixes', () => {
        import {Component, NgModule} from '@angular/core';
 
        @Component({
-         template: '{{ user?.name }}',
+         template: '{{ user?.name === null }}',
        })
        export class AppComponent {
          user: {name: string} | null = null;
@@ -283,7 +283,7 @@ describe('code fixes', () => {
        import {Component, NgModule} from '@angular/core';
 
        @Component({
-         template: '{{ user?.name }} {{ user?.email }}',
+         template: '{{ user?.name === null }} {{ user?.email === null }}',
        })
        export class AppComponent {
          user: {name: string; email: string} | null = null;
@@ -306,9 +306,10 @@ describe('code fixes', () => {
     );
 
     expect(fixesAll.changes.length).toBeGreaterThan(0);
+    // Safe mode produces ternary guards like `user != null ? user.name : null`
     expect(
       fixesAll.changes.some((change) =>
-        change.textChanges.some((t) => t.newText.includes('?? null')),
+        change.textChanges.some((t) => t.newText.includes('!= null')),
       ),
     ).toBeTrue();
   });
