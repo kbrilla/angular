@@ -4,7 +4,7 @@ IMPORTANT: This document is a forward-looking architecture research note. It doe
 
 ## Problem statement
 
-Angular has `HttpClient`, `FetchBackend`, and `httpResource`, but browser networking APIs are moving toward richer streaming and transport primitives (streaming request/response bodies, incremental JSON delivery, Navigation API, WebTransport, etc.).
+Angular has `HttpClient`, `FetchBackend`, and `httpResource`, but browser and platform APIs are moving toward richer networking and UX primitives (streaming request/response bodies, incremental JSON delivery, Navigation API, View Transitions, WebTransport/WebRTC, scoped custom element registries, etc.).
 
 The goal is to define a direction that:
 
@@ -112,6 +112,16 @@ Model transport as a capability layer so Fetch is not the final boundary:
 
 High-level APIs (`resource`/router/data APIs) should depend on capability contracts, not a single transport type.
 
+### Layer F: transition-aware navigation UX
+
+To align with Interop 2026 direction, router and data-loading integration should treat transitions as a first-class concern:
+
+- same-document view transitions for in-app state and route outlet changes,
+- cross-document view transitions for full-document navigations where supported,
+- explicit hooks to coordinate data readiness with transition start/commit.
+
+This should integrate with ongoing router Navigation API work and degrade gracefully on unsupported browsers.
+
 ## Router, SSR, and signals integration direction
 
 ### Router data + navigation state
@@ -137,6 +147,14 @@ Borrow lessons from typed-router ecosystems:
 
 This aligns with long-standing community demand in <https://github.com/angular/angular/issues/38559>.
 
+### Web components and scoped registries
+
+For microfrontends and mixed component ecosystems, Angular should account for scoped custom element registries in rendering/integration stories:
+
+- ensure Angular-hosted Web Components interoperate in scoped registries,
+- avoid assumptions that the global `customElements` registry is the only registry,
+- document testing patterns for component libraries embedded in shadow roots with scoped registries.
+
 ## Backward compatibility and migration
 
 - No breaking changes to `HttpClient`/`httpResource` defaults.
@@ -149,6 +167,21 @@ This aligns with long-standing community demand in <https://github.com/angular/a
 - Transport adapters split by feature.
 - No stream parser or transport polyfill included unless imported.
 - Keep existing `HttpClient` bundle footprint unchanged when advanced APIs are unused.
+- Keep view-transition, WebRTC, and scoped-registry helpers in optional entrypoints so baseline apps do not pay for unused capabilities.
+
+## Implementation plan (phased, additive)
+
+1. **Phase 1: Experimental fetch core + stream helpers**
+   - Add low-level fetch primitive and chunk/event helpers.
+   - Add explicit `Range` request/resume helper utilities.
+2. **Phase 2: Resource adapters + UX transitions**
+   - Add adapters to `ResourceSnapshot`.
+   - Add optional router hooks for same-document view transitions.
+3. **Phase 3: Navigation + cross-document transitions**
+   - Integrate with Navigation API efforts and cross-document transition hooks where supported.
+4. **Phase 4: Advanced transport + component interop**
+   - Add optional WebRTC/WebTransport-oriented adapters for real-time and bidirectional use cases.
+   - Add guidance/utilities for scoped custom element registries in microfrontend/shadow-root scenarios.
 
 ## Testing strategy (for future implementation)
 
@@ -160,6 +193,8 @@ This aligns with long-standing community demand in <https://github.com/angular/a
    - with interceptors
    - with `resource` snapshots and debounce behavior
    - with router transitions and pending UI
+   - with same-document and cross-document view transition hooks
+   - with `Range` requests and resume/partial-content flows
 3. **SSR tests**
    - transfer cache opt-in/out
    - hydration + cancellation
@@ -173,6 +208,10 @@ This aligns with long-standing community demand in <https://github.com/angular/a
 - How should router loaders expose partially available data in templates?
 - What is the minimal typed-router surface that provides high value without large breakage risk?
 - Which parts of Navigation API should degrade gracefully on unsupported browsers?
+- What should the default Angular ergonomics be for same-document vs cross-document view transitions?
+- Should Angular provide a first-class abstraction for `Range` and resumable transfers, or just lower-level request helpers?
+- Where should WebRTC data/media integration live relative to HTTP/resource/router APIs?
+- How should scoped custom element registry support interact with hydration and router outlet composition?
 
 ## External research notes
 
@@ -183,6 +222,13 @@ This environment could not fetch MDN/Vue/TanStack pages directly at runtime, but
 - typed route/data contracts,
 - composable caching and invalidation,
 - transport-agnostic data orchestration.
+
+Additional reference topics requested for this research:
+
+- View Transition API: <https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API>
+- WebRTC API: <https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API>
+- Cross-document transitions article: <https://webkit.org/blog/16967/two-lines-of-cross-document-view-transitions-code-you-can-use-on-every-website-today/>
+- HTTP `Range` header: <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Range>
 
 ## Conclusion
 
