@@ -18,7 +18,7 @@ The goal is to define a direction that:
 ### `HttpClient`
 
 - Stable, interceptor-driven API with strong testing support.
-- Can use `FetchBackend` via `withFetch` (and there is active work to make fetch the default in <https://github.com/angular/angular/pull/58212>).
+- Can use `FetchBackend` via `withFetch` (and there is active work to make Fetch the default in <https://github.com/angular/angular/pull/58212>).
 - Upload streaming (`ReadableStream` request body + `duplex`) is not exposed through `HttpClient`.
 - `FetchBackend` currently reads response streams to completion and emits buffered responses.
 
@@ -36,8 +36,8 @@ The goal is to define a direction that:
 
 ### Related active design work
 
-- `resource` composition via snapshots was added in <https://github.com/angular/angular/pull/66328>.
-- Experimental debounce resource work exists in <https://github.com/angular/angular/pull/67044>.
+- `resource` composition via snapshots was added in <https://github.com/angular/angular/pull/66328> (merged).
+- Experimental debounce resource work exists in <https://github.com/angular/angular/pull/67044> (open draft).
 - Open issue for chunk-level Fetch streaming in Angular HTTP: <https://github.com/angular/angular/issues/52494>.
 - Open issue for Navigation API support in router: <https://github.com/angular/angular/issues/53321>.
 - Ongoing router typing demand: <https://github.com/angular/angular/issues/38559>.
@@ -99,8 +99,8 @@ Each helper can expose both:
 Provide adapters from stream helpers to `ResourceSnapshot` + `resourceFromSnapshots`:
 
 - Enables `httpResource`-style UI state handling.
-- Leverages recent composition primitives (PR #66328).
-- Integrates with debounce strategies (`debounceResource` direction from PR #67044) for UX smoothing.
+- Leverages recent composition primitives from <https://github.com/angular/angular/pull/66328>.
+- Integrates with debounce strategies (`debounceResource` direction from <https://github.com/angular/angular/pull/67044>) for UX smoothing.
 
 ### Layer E: transport-extensible future
 
@@ -117,7 +117,7 @@ High-level APIs (`resource`/router/data APIs) should depend on capability contra
 ### Router data + navigation state
 
 - Align route data fetching with resource snapshots/signals.
-- Add first-class pending states for route transitions (integrates naturally with Navigation API work in #53321).
+- Add first-class pending states for route transitions (integrates naturally with Navigation API work in <https://github.com/angular/angular/issues/53321>).
 - Keep blocking/non-blocking SSR hydration strategies explicit.
 
 ### SSR and transfer cache
@@ -135,7 +135,7 @@ Borrow lessons from typed-router ecosystems:
 - typed injection of route state into components,
 - compile-time-safe navigation commands.
 
-This aligns with long-standing community demand in #38559.
+This aligns with long-standing community demand in <https://github.com/angular/angular/issues/38559>.
 
 ## Backward compatibility and migration
 
