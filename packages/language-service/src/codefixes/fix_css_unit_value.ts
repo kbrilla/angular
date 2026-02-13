@@ -34,7 +34,7 @@ export const fixCssUnitValueMeta: CodeActionMeta = {
 
     // Find the diagnostic that matches our error code and is near the cursor position
     // The cursor might be inside or at the end of the diagnostic span
-    const matchingDiag = diagnostics.find(
+    const matchingDiag = (diagnostics ?? []).find(
       (d) =>
         d.code === errorCode &&
         d.file?.fileName === fileName &&

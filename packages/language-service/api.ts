@@ -693,37 +693,6 @@ export interface InlayHintsConfig {
 }
 
 /**
- * Angular-specific LSP SymbolKind values for template symbols.
- */
-export enum AngularSymbolKind {
-  Namespace = 3,
-  Array = 18,
-  Object = 19,
-  Struct = 23,
-  Event = 24,
-}
-
-/**
- * A document symbol representing an Angular template element.
- */
-export interface TemplateDocumentSymbol {
-  text: string;
-  kind: ts.ScriptElementKind;
-  lspKind?: AngularSymbolKind;
-  spans: ts.TextSpan[];
-  nameSpan?: ts.TextSpan;
-  childItems?: TemplateDocumentSymbol[];
-  className?: string;
-}
-
-/**
- * Options for customizing document symbols behavior.
- */
-export interface DocumentSymbolsOptions {
-  showImplicitForVariables?: boolean;
-}
-
-/**
  * `NgLanguageService` describes an instance of an Angular language service,
  * whose API surface is a strict superset of TypeScript's language service.
  */
@@ -792,6 +761,21 @@ export interface NgLanguageService extends ts.LanguageService {
   getInlayHints(fileName: string, span: ts.TextSpan): InlayHint[];
 
   getSelectionRangeAtPosition(fileName: string, position: number): ts.SelectionRange | undefined;
+
+  /**
+   * Prepares type hierarchy information at the given position.
+   */
+  prepareTypeHierarchy(fileName: string, position: number): TypeHierarchyItem[] | undefined;
+
+  /**
+   * Returns supertypes for a type hierarchy item.
+   */
+  getTypeHierarchySupertypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
+
+  /**
+   * Returns subtypes for a type hierarchy item.
+   */
+  getTypeHierarchySubtypes(item: TypeHierarchyItem): TypeHierarchyItem[] | undefined;
 }
 
 export function isNgLanguageService(

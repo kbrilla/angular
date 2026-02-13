@@ -27,7 +27,7 @@ export const fixStyleObjectToIndividualMeta: CodeActionMeta = {
     }
 
     // Find the diagnostic that matches our error code and contains the cursor position
-    const matchingDiag = diagnostics.find(
+    const matchingDiag = (diagnostics ?? []).find(
       (d) =>
         d.code === errorCode &&
         d.file?.fileName === fileName &&
