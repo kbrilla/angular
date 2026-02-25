@@ -9,7 +9,7 @@
 import {ErrorCode, ngErrorCode} from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import type ts from 'typescript';
 
-import {CodeActionMeta} from './utils';
+import {CodeActionMeta, FixIdForCodeFixesAll} from './utils';
 
 const REGEXP_LITERAL_RE = /\/((?:\\.|[^/\\\n])+?)\/([a-z]*)/g;
 
@@ -21,24 +21,67 @@ export const fixTemplateParseErrorsMeta: CodeActionMeta = {
       return [];
     }
 
-    const fixes: ts.CodeFixAction[] = [];
-    const duplicateFlagFix = createDuplicateRegexFlagFix(source, fileName, start);
-    if (duplicateFlagFix !== null) {
-      fixes.push(duplicateFlagFix);
-    }
-
-    const missingBraceFix = createMissingUnicodeBraceFix(source, fileName, start);
-    if (missingBraceFix !== null) {
-      fixes.push(missingBraceFix);
-    }
-
-    return fixes;
+    return getTemplateParseFixes(source, fileName, start);
   },
-  fixIds: [],
-  getAllCodeActions() {
-    return {changes: []};
+  fixIds: [FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS],
+  getAllCodeActions({diagnostics}) {
+    const fileNameToChanges = new Map<string, ts.TextChange[]>();
+    const fileNameToSeenChange = new Map<string, Set<string>>();
+    const filesHandledForGlobalRegexFix = new Set<string>();
+
+    for (const diagnostic of diagnostics) {
+      const fileName = diagnostic.file?.fileName;
+      const source = diagnostic.file?.text;
+      const start = diagnostic.start;
+      if (fileName === undefined || source === undefined || start === undefined) {
+        continue;
+      }
+
+      if (
+        !filesHandledForGlobalRegexFix.has(fileName) &&
+        getDiagnosticText(diagnostic).includes('Duplicate regular expression flag')
+      ) {
+        filesHandledForGlobalRegexFix.add(fileName);
+        const globalRegexFixes = createDuplicateRegexFlagFixesForWholeSource(source, fileName);
+        for (const fix of globalRegexFixes) {
+          for (const fileChange of fix.changes) {
+            appendFileTextChanges(fileNameToChanges, fileNameToSeenChange, fileChange);
+          }
+        }
+      }
+
+      const fixes = getTemplateParseFixes(source, fileName, start);
+      for (const fix of fixes) {
+        for (const fileChange of fix.changes) {
+          appendFileTextChanges(fileNameToChanges, fileNameToSeenChange, fileChange);
+        }
+      }
+    }
+
+    return {
+      changes: Array.from(fileNameToChanges.entries()).map(([fileName, textChanges]) => ({
+        fileName,
+        textChanges,
+      })),
+    };
   },
 };
+
+function getTemplateParseFixes(source: string, fileName: string, start: number): ts.CodeFixAction[] {
+  const fixes: ts.CodeFixAction[] = [];
+
+  const duplicateFlagFix = createDuplicateRegexFlagFix(source, fileName, start);
+  if (duplicateFlagFix !== null) {
+    fixes.push(duplicateFlagFix);
+  }
+
+  const missingBraceFix = createMissingUnicodeBraceFix(source, fileName, start);
+  if (missingBraceFix !== null) {
+    fixes.push(missingBraceFix);
+  }
+
+  return fixes;
+}
 
 function createDuplicateRegexFlagFix(
   source: string,
@@ -48,38 +91,71 @@ function createDuplicateRegexFlagFix(
   REGEXP_LITERAL_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = REGEXP_LITERAL_RE.exec(source)) !== null) {
-    const flags = match[2] ?? '';
-    const duplicate = findFirstDuplicateFlag(flags);
-    if (duplicate === null) {
+    const flagsLength = match[2]?.length ?? 0;
+    const duplicates = getDuplicateRegexFlagsForMatch(match);
+    if (duplicates.length === 0) {
       continue;
     }
 
-    const flagsStart = match.index + match[0].length - flags.length;
-    const duplicateFlagOffset = flagsStart + duplicate.index;
+    const flagsStart = match.index + match[0].length - flagsLength;
 
     // Only offer this fix when the selected diagnostic position overlaps the flags.
-    if (start < flagsStart || start > flagsStart + flags.length) {
+    if (start < flagsStart || start > flagsStart + flagsLength) {
       continue;
     }
 
     return {
-      fixName: 'fixDuplicateRegexFlag',
-      description: `Remove duplicate regular expression flag '${duplicate.flag}'`,
+      fixName: FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+      fixId: FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+      fixAllDescription: 'Fix all parser/lexer syntax quick fixes',
+      description: 'Remove duplicate regular expression flag(s)',
       changes: [
         {
           fileName,
-          textChanges: [
-            {
-              span: {start: duplicateFlagOffset, length: 1},
-              newText: '',
-            },
-          ],
+          textChanges: duplicates.map((duplicate) => ({
+            span: {start: flagsStart + duplicate.index, length: 1},
+            newText: '',
+          })),
         },
       ],
     };
   }
 
   return null;
+}
+
+function createDuplicateRegexFlagFixesForWholeSource(
+  source: string,
+  fileName: string,
+): ts.CodeFixAction[] {
+  const fixes: ts.CodeFixAction[] = [];
+  REGEXP_LITERAL_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = REGEXP_LITERAL_RE.exec(source)) !== null) {
+    const duplicates = getDuplicateRegexFlagsForMatch(match);
+    if (duplicates.length === 0) {
+      continue;
+    }
+
+    const flagsStart = match.index + match[0].length - (match[2]?.length ?? 0);
+    fixes.push({
+      fixName: FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+      fixId: FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+      fixAllDescription: 'Fix all parser/lexer syntax quick fixes',
+      description: 'Remove duplicate regular expression flag(s)',
+      changes: [
+        {
+          fileName,
+          textChanges: duplicates.map((duplicate) => ({
+            span: {start: flagsStart + duplicate.index, length: 1},
+            newText: '',
+          })),
+        },
+      ],
+    });
+  }
+
+  return fixes;
 }
 
 function createMissingUnicodeBraceFix(
@@ -104,7 +180,9 @@ function createMissingUnicodeBraceFix(
   }
 
   return {
-    fixName: 'fixMissingUnicodeBrace',
+    fixName: FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+    fixId: FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+    fixAllDescription: 'Fix all parser/lexer syntax quick fixes',
     description: 'Insert missing } in Unicode escape',
     changes: [
       {
@@ -120,14 +198,47 @@ function createMissingUnicodeBraceFix(
   };
 }
 
-function findFirstDuplicateFlag(flags: string): {flag: string; index: number} | null {
+function findDuplicateFlags(flags: string): Array<{flag: string; index: number}> {
   const seen = new Set<string>();
+  const duplicates: Array<{flag: string; index: number}> = [];
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
     if (seen.has(flag)) {
-      return {flag, index: i};
+      duplicates.push({flag, index: i});
+      continue;
     }
     seen.add(flag);
   }
-  return null;
+  return duplicates;
+}
+
+function getDuplicateRegexFlagsForMatch(match: RegExpExecArray): Array<{flag: string; index: number}> {
+  return findDuplicateFlags(match[2] ?? '');
+}
+
+function getDiagnosticText(diagnostic: ts.Diagnostic): string {
+  return typeof diagnostic.messageText === 'string'
+    ? diagnostic.messageText
+    : diagnostic.messageText.messageText;
+}
+
+function appendFileTextChanges(
+  fileNameToChanges: Map<string, ts.TextChange[]>,
+  fileNameToSeenChange: Map<string, Set<string>>,
+  fileChange: ts.FileTextChanges,
+): void {
+  if (!fileNameToChanges.has(fileChange.fileName)) {
+    fileNameToChanges.set(fileChange.fileName, []);
+    fileNameToSeenChange.set(fileChange.fileName, new Set<string>());
+  }
+  const changes = fileNameToChanges.get(fileChange.fileName)!;
+  const seen = fileNameToSeenChange.get(fileChange.fileName)!;
+  for (const textChange of fileChange.textChanges) {
+    const key = `${textChange.span.start}:${textChange.span.length}:${textChange.newText}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    changes.push(textChange);
+  }
 }

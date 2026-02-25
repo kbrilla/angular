@@ -268,7 +268,44 @@ describe('code fixes', () => {
       text: 'g',
       newText: '',
       fileName: 'app.ts',
-      description: `Remove duplicate regular expression flag 'g'`,
+      description: `Remove duplicate regular expression flag(s)`,
+    });
+  });
+
+  it('should fix all duplicate regular expression flag errors', () => {
+    const files = {
+      'app.ts': `
+       import {Component} from '@angular/core';
+
+       @Component({
+         template: '{{ "foo".match(/abc/gig) }} {{ "bar".match(/def/mmm) }}',
+         standalone: false,
+       })
+       export class AppComponent {}
+     `,
+    };
+
+    const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+    const appFile = project.openFile('app.ts');
+
+    const fixesAllActions = project.getCombinedCodeFix(
+      'app.ts',
+      FixIdForCodeFixesAll.FIX_TEMPLATE_PARSE_ERRORS,
+    );
+
+    expectIncludeReplacementTextForFileTextChange({
+      fileTextChanges: fixesAllActions.changes,
+      content: appFile.contents,
+      text: 'g',
+      newText: '',
+      fileName: 'app.ts',
+    });
+    expectIncludeReplacementTextForFileTextChange({
+      fileTextChanges: fixesAllActions.changes,
+      content: appFile.contents,
+      text: 'm',
+      newText: '',
+      fileName: 'app.ts',
     });
   });
 

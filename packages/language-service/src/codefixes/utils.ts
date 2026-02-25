@@ -139,4 +139,5 @@ export enum FixIdForCodeFixesAll {
   FIX_MISSING_IMPORT = 'fixMissingImport',
   FIX_UNUSED_STANDALONE_IMPORTS = 'fixUnusedStandaloneImports',
   FIX_MISSING_REQUIRED_INPUTS = 'fixMissingRequiredInputs',
+  FIX_TEMPLATE_PARSE_ERRORS = 'fixTemplateParseErrors',
 }
