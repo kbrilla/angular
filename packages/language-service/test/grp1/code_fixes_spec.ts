@@ -237,6 +237,75 @@ describe('code fixes', () => {
     });
   });
 
+  it('should offer a quick fix for duplicate regular expression flags', () => {
+    const files = {
+      'app.ts': `
+       import {Component} from '@angular/core';
+
+       @Component({
+         template: '{{ "foo".match(/abc/gig) }}',
+         standalone: false,
+       })
+       export class AppComponent {}
+     `,
+    };
+
+    const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+    const appFile = project.openFile('app.ts');
+    const diags = project
+      .getDiagnosticsForFile('app.ts')
+      .filter((d) => d.messageText.toString().includes('Duplicate regular expression flag'));
+    expect(diags.length).toBeGreaterThan(0);
+
+    appFile.moveCursorToText('/abc/gi¦g');
+    const codeActions = project.getCodeFixesAtPosition('app.ts', appFile.cursor, appFile.cursor, [
+      diags[0].code,
+    ]);
+
+    expectIncludeReplacementText({
+      codeActions,
+      content: appFile.contents,
+      text: 'g',
+      newText: '',
+      fileName: 'app.ts',
+      description: `Remove duplicate regular expression flag 'g'`,
+    });
+  });
+
+  it('should offer a quick fix for missing closing brace in unicode escapes', () => {
+    const files = {
+      'app.ts': `
+       import {Component} from '@angular/core';
+
+       @Component({
+         templateUrl: './app.html',
+         standalone: false,
+       })
+       export class AppComponent {}
+     `,
+      'app.html': `{{ "\\u{1F600" }}`,
+    };
+
+    const project = createModuleAndProjectWithDeclarations(env, 'test', files);
+    const appFile = project.openFile('app.html');
+    const diags = project
+      .getDiagnosticsForFile('app.html')
+      .filter((d) => d.messageText.toString().includes('Invalid unicode escape'));
+    expect(diags.length).toBeGreaterThan(0);
+
+    appFile.moveCursorToText('1F600¦"');
+    const codeActions = project.getCodeFixesAtPosition('app.html', appFile.cursor, appFile.cursor, [
+      diags[0].code,
+    ]);
+
+    expectIncludeAddText({
+      codeActions,
+      position: appFile.cursor,
+      text: '}',
+      fileName: 'app.html',
+    });
+  });
+
   describe('should fix missing required input', () => {
     it('for different type', () => {
       const files = {
