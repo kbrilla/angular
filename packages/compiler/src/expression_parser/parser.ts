@@ -62,6 +62,16 @@ import {
   type AssignmentOperation,
 } from './ast';
 import {EOF, Lexer, StringTokenKind, Token, TokenType} from './lexer';
+
+export const enum ExpressionParserErrorSubcode {
+  DUPLICATE_REGEX_FLAG = 'duplicate_regex_flag',
+  MISSING_UNICODE_ESCAPE_BRACE = 'missing_unicode_escape_brace',
+}
+
+export interface ExpressionParserErrorMetadata {
+  subcode: ExpressionParserErrorSubcode;
+  payload?: {flag?: string};
+}
 export interface InterpolationPiece {
   text: string;
   start: number;
@@ -1902,7 +1912,36 @@ function getParseError(
   }
   const location = getLocation(parseSourceSpan);
   const error = `Parser Error: ${message}${locationText}[${input}] in ${location}`;
-  return new ParseError(parseSourceSpan, error);
+  return new ParseError(
+    parseSourceSpan,
+    error,
+    undefined,
+    getExpressionParserErrorMetadata(message),
+  );
+}
+
+function getExpressionParserErrorMetadata(
+  message: string,
+): ExpressionParserErrorMetadata | undefined {
+  const duplicateRegexFlagMatch = /Duplicate regular expression flag "([a-z])"/.exec(message);
+  if (duplicateRegexFlagMatch !== null) {
+    return {
+      subcode: ExpressionParserErrorSubcode.DUPLICATE_REGEX_FLAG,
+      payload: {flag: duplicateRegexFlagMatch[1]},
+    };
+  }
+
+  if (
+    message.includes('Lexer Error: Invalid unicode escape [\\u{') &&
+    // Unterminated braced unicode escapes do not contain a closing "}" inside the escaped token.
+    !message.includes('}]')
+  ) {
+    return {
+      subcode: ExpressionParserErrorSubcode.MISSING_UNICODE_ESCAPE_BRACE,
+    };
+  }
+
+  return undefined;
 }
 
 class SimpleExpressionChecker extends RecursiveAstVisitor {

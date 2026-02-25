@@ -29,6 +29,7 @@ export interface CodeActionContext {
   formatOptions: ts.FormatCodeSettings;
   preferences: ts.UserPreferences;
   tsLs: ts.LanguageService;
+  diagnostics: ts.Diagnostic[];
 }
 
 /**

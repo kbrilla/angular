@@ -46,6 +46,13 @@ export interface TypeCheckableDirectiveMeta extends DirectiveMeta, DirectiveType
 
 export type TypeCheckId = string & {__brand: 'TypeCheckId'};
 
+export interface TemplateParseDiagnosticMetadata {
+  subcode: string;
+  payload?: {
+    flag?: string;
+  };
+}
+
 /**
  * A `ts.Diagnostic` with additional information about the diagnostic related to template
  * type-checking.
@@ -60,6 +67,11 @@ export interface TemplateDiagnostic extends ts.DiagnosticWithLocation {
    * The type check ID of the directive that resulted in this diagnostic.
    */
   typeCheckId: TypeCheckId;
+
+  /**
+   * Optional parser/lexer metadata emitted for template parse diagnostics.
+   */
+  templateParseMetadata?: TemplateParseDiagnosticMetadata;
 }
 
 /**

@@ -28,6 +28,7 @@ import {ImportManager} from '../../translator';
 import {
   HostBindingsContext,
   TemplateDiagnostic,
+  TemplateParseDiagnosticMetadata,
   TypeCheckId,
   SourceMapping,
   TypeCheckableDirectiveMeta,
@@ -614,7 +615,7 @@ export function getTemplateDiagnostics(
       span.end.offset++;
     }
 
-    return makeTemplateDiagnostic(
+    const diagnostic = makeTemplateDiagnostic(
       templateId,
       sourceMapping,
       span,
@@ -622,7 +623,38 @@ export function getTemplateDiagnostics(
       ngErrorCode(ErrorCode.TEMPLATE_PARSE_ERROR),
       error.msg,
     );
+
+    const metadata = extractTemplateParseMetadata(error);
+    if (metadata !== undefined) {
+      diagnostic.templateParseMetadata = metadata;
+    }
+
+    return diagnostic;
   });
+}
+
+function extractTemplateParseMetadata(
+  error: ParseError,
+): TemplateParseDiagnosticMetadata | undefined {
+  const related = error.relatedError as
+    | {
+        subcode?: unknown;
+        payload?: unknown;
+      }
+    | undefined;
+
+  if (related === undefined || typeof related.subcode !== 'string') {
+    return undefined;
+  }
+
+  const metadata: TemplateParseDiagnosticMetadata = {
+    subcode: related.subcode,
+  };
+  if (related.payload !== undefined && typeof related.payload === 'object') {
+    metadata.payload = related.payload as TemplateParseDiagnosticMetadata['payload'];
+  }
+
+  return metadata;
 }
 
 /**
