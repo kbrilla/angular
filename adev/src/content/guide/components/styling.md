@@ -40,7 +40,7 @@ and [stylus](https://stylus-lang.com).
 ## Style scoping
 
 Every component has a **view encapsulation** setting that determines how the framework scopes a
-component's styles. There are four view encapsulation modes: `Emulated`, `ShadowDom`, `ExperimentalIsolatedShadowDom`, and `None`.
+component's styles. There are six view encapsulation modes: `Emulated`, `ShadowDom`, `ExperimentalIsolatedShadowDom`, `Scoped`, `IsolatedScoped`, and `None`.
 You can specify the mode in the `@Component` decorator:
 
 ```angular-ts {highlight:[3]}
@@ -119,13 +119,35 @@ Behaves as above, except this mode strictly guarantees that _only_ that componen
 component's template. Global styles cannot affect elements in a shadow tree and styles inside the
 shadow tree cannot affect elements outside of that shadow tree.
 
+### ViewEncapsulation.Scoped
+
+This mode scopes component styles in light DOM using CSS `@scope`-based boundaries.
+
+In this mode:
+
+- component styles are constrained to the component subtree,
+- styles are emitted with a scope boundary tied to the component host,
+- and selector matching uses scoped cascade rules.
+
+This provides component-level style scoping without creating a native shadow root.
+
+### ViewEncapsulation.IsolatedScoped
+
+This mode builds on `Scoped` and adds stronger isolation semantics for incoming styles in light DOM.
+
+In this mode, Angular still scopes styles to the component subtree, and also emits additional
+isolation scaffolding to reduce style leakage from surrounding content.
+
+Use this mode when you want `Scoped` ergonomics with stricter style isolation behavior.
+
 ### ViewEncapsulation.None
 
 This mode disables all style encapsulation for the component. Any styles associated with the
 component behave as global styles.
 
-NOTE: In `Emulated` and `ShadowDom` modes, Angular doesn't 100% guarantee that your component's styles will always override styles coming from outside it.
-It is assumed that these styles have the same specificity as your component's styles in case of collision.
+NOTE: Angular does not guarantee that component styles always override styles from outside the component in any mode.
+CSS cascade rules still apply (for example origin, layer order, selector specificity, source order, and `!important`).
+`Scoped` and `IsolatedScoped` provide stronger style boundaries in light DOM than `Emulated`, but they are still subject to CSS cascade rules.
 
 ## Defining styles in templates
 
