@@ -1,0 +1,14 @@
+<section
+  class="demo"
+  [class.active]="items.some(item => item.selected)"
+  (click)="select(item)">
+  <h1>{{ title }}</h1>
+  <p>{{ items.find(item => item.id === selectedId)?.name ?? 'n/a' }}</p>
+
+  @if (items.length > 0) {
+    @let first = items[0];
+    <p>{{ first.name }}</p>
+  } @else {
+    <p>No items</p>
+  }
+</section>

@@ -11,13 +11,28 @@
 #      ^ host-object-literal.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #       ^^ host-object-literal.ng
 >    'class': 'one two',
-#^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#           ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#             ^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                      ^^ host-object-literal.ng hostbindings.ng
 >    'my-attr': 'my-value',
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#             ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#               ^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                         ^^ host-object-literal.ng hostbindings.ng
 >    "doubleQuotes": "value",
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#                  ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#                    ^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                           ^^ host-object-literal.ng hostbindings.ng
 >    'backticksForValue': `my-attr-${value}`,
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#                       ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#                         ^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng
 #                                         ^ host-object-literal.ng
 #                                          ^^^ host-object-literal.ng
 >  },
@@ -31,11 +46,25 @@
 #      ^ host-object-literal.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #       ^^ host-object-literal.ng
 >    class: 'one two',
-#^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#         ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#           ^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                    ^^ host-object-literal.ng hostbindings.ng
 >    myAttr: "my-value",
-#^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#          ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#            ^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                      ^^ host-object-literal.ng hostbindings.ng
 >    style: `color: red;`,
-#^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#         ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#           ^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng
+#                 ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#                   ^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng
+#                        ^^ host-object-literal.ng hostbindings.ng
 >  },
 #^^ host-object-literal.ng hostbindings.ng
 #  ^ host-object-literal.ng
@@ -313,7 +342,11 @@
 #                                              ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
 #                                               ^^ host-object-literal.ng hostbindings.ng
 >    'class': 'hello',
-#^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#           ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#             ^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                    ^^ host-object-literal.ng hostbindings.ng
 >    ...after,
 #^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
 >  },
@@ -342,7 +375,12 @@
 #              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
 #                                           ^^ host-object-literal.ng hostbindings.ng
 >    'class': (MY_CLASS + ' ' + MY_OTHER_CLASS) + ` foo-${bar + 123}`,
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#           ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#             ^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng
+#                         ^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng
 #                                                                  ^ host-object-literal.ng
 #                                                                   ^^^ host-object-literal.ng
 >  },
@@ -356,9 +394,17 @@
 #      ^ host-object-literal.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #       ^^ host-object-literal.ng
 >    'class': 'one two',
-#^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#           ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#             ^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                      ^^ host-object-literal.ng hostbindings.ng
 >    myAttr: "my-value",
-#^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#          ^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#            ^^^^^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.static.ng string
+#                      ^^ host-object-literal.ng hostbindings.ng
 >    '[attr.greeting]': '"hello " + name',
 #^^^^ host-object-literal.ng hostbindings.ng
 #    ^ host-object-literal.ng hostbindings.ng string

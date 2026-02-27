@@ -1,0 +1,28 @@
+><section
+#^^^^^^^^^ text.angular-html
+>  class="demo"
+#^^^^^^^^^^^^^^^ text.angular-html
+>  [class.active]="items.some(item => item.selected)"
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>  (click)="select(item)">
+#^^^^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>  <h1>{{ title }}</h1>
+#^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>  <p>{{ items.find(item => item.id === selectedId)?.name ?? 'n/a' }}</p>
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>
+>  @if (items.length > 0) {
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>    @let first = items[0];
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>    <p>{{ first.name }}</p>
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>  } @else {
+#^^^^^^^^^^^^ text.angular-html
+>    <p>No items</p>
+#^^^^^^^^^^^^^^^^^^^^ text.angular-html
+>  }
+#^^^^ text.angular-html
+></section>
+#^^^^^^^^^^^ text.angular-html
+>

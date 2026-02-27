@@ -1,0 +1,52 @@
+{
+  "comment": "Minimal TypeScript TextMate grammar for testing Angular injection grammars",
+  "scopeName": "source.ts",
+  "patterns": [
+    {"include": "#decorator"},
+    {"include": "#string-template"},
+    {"include": "#string-quoted"}
+  ],
+  "repository": {
+    "decorator": {
+      "begin": "@\\w+\\s*\\(",
+      "end": "\\)",
+      "name": "meta.decorator.ts",
+      "patterns": [{"include": "#objectLiteral"}]
+    },
+    "objectLiteral": {
+      "begin": "\\{",
+      "end": "\\}",
+      "name": "meta.objectliteral.ts",
+      "patterns": [{"include": "#objectMember"}]
+    },
+    "objectMember": {
+      "begin": "(?:^\\s*|(,)\\s*)(\\w+|'[^']*'|\"[^\"]*\")\\s*(:)",
+      "end": "(?=[,}])",
+      "name": "meta.object.member.ts",
+      "beginCaptures": {
+        "2": {"name": "meta.object-literal.key.ts"},
+        "3": {"name": "punctuation.separator.key-value.ts"}
+      },
+      "patterns": [
+        {"include": "#string-template"},
+        {"include": "#string-quoted"},
+        {"include": "#objectLiteral"},
+        {"include": "#bracketExpression"}
+      ]
+    },
+    "string-template": {
+      "begin": "`",
+      "end": "`",
+      "name": "string.template.ts"
+    },
+    "string-quoted": {
+      "match": "'[^']*'|\"[^\"]*\"",
+      "name": "string.quoted.ts"
+    },
+    "bracketExpression": {
+      "begin": "\\[",
+      "end": "\\]",
+      "patterns": [{"include": "#string-template"}, {"include": "#string-quoted"}]
+    }
+  }
+}

@@ -1,0 +1,291 @@
+># Markdown fence embedding
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown
+>
+>```angular-ts
+#^^^ text.html.markdown punctuation.definition.fenced.markdown
+#   ^^^^^^^^^^^ text.html.markdown
+>import {Component} from '@angular/core';
+#^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts
+#                        ^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts string.quoted.ts
+#                                       ^^ text.html.markdown meta.embedded.block.angular-ts
+>
+>@Component({
+#^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts
+#           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>  selector: 'app-demo',
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object.member.ts
+#  ^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object.member.ts meta.object-literal.key.ts
+#          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object.member.ts punctuation.separator.key-value.ts
+#           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object.member.ts
+#            ^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object.member.ts string.quoted.ts
+#                      ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>  host: {
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#  ^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object-literal.key.ts
+#      ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object-literal.key.ts punctuation.separator.key-value.ts
+#       ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>    '[attr.aria-label]': 'label',
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng string
+#     ^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng entity.other.attribute-name.html
+#                      ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng string
+#                       ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#                        ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng
+#                         ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng string
+#                          ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng variable.other.readwrite.ts
+#                               ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng string
+#                                ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+>    '(click)': 'onClick($event)',
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng string
+#     ^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng entity.other.attribute-name.html
+#            ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng string
+#             ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#              ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng
+#               ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng string
+#                ^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng entity.name.function.ts
+#                       ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng meta.brace.round.ts
+#                        ^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng variable.other.readwrite.ts
+#                              ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng meta.brace.round.ts
+#                               ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.dynamic.ng string
+#                                ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+>    role: 'button',
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+#    ^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng entity.other.attribute-name.html
+#        ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.static.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#          ^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng hostbinding.static.ng string
+#                  ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+>  },
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts hostbindings.ng
+#  ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#   ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>  styles: [
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#  ^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object-literal.key.ts
+#        ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object-literal.key.ts punctuation.separator.key-value.ts
+#         ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.array.literal.ts meta.brace.square.ts
+>    `
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts string
+>      :host {
+#^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+>        display: block;
+#^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+>      }
+#^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+>
+>      .item {
+#^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+>        color: red;
+#^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+>      }
+#^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+>    `,
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts source.css.scss
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts string
+#     ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>  ],
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#  ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.array.literal.ts meta.brace.square.ts
+#   ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>  template: `
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#  ^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object-literal.key.ts
+#          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts meta.object-literal.key.ts punctuation.separator.key-value.ts
+#           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+#            ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts string
+>    <button [disabled]="isDisabled" (click)="onClick($event)">{{ title }}</button>
+#^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+#            ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#             ^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.disabled.html
+#                     ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                      ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html punctuation.separator.key-value.html
+#                       ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                        ^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                  ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                                   ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+#                                    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html entity.other.attribute-name.html entity.other.ng-binding-name.event.html punctuation.definition.ng-binding-name.begin.html
+#                                     ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html entity.other.attribute-name.html entity.other.ng-binding-name.event.html entity.other.ng-binding-name.click.html
+#                                          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html entity.other.attribute-name.html entity.other.ng-binding-name.event.html punctuation.definition.ng-binding-name.end.html
+#                                           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html punctuation.separator.key-value.html
+#                                            ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html string.quoted.html punctuation.definition.string.begin.html
+#                                             ^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html expression.ng entity.name.function.ts
+#                                                    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html expression.ng meta.brace.round.ts
+#                                                     ^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html expression.ng variable.other.readwrite.ts
+#                                                           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html expression.ng meta.brace.round.ts
+#                                                            ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative meta.ng-binding.event.html string.quoted.html punctuation.definition.string.end.html
+#                                                             ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+#                                                              ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative punctuation.definition.block.ts
+#                                                                ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative expression.ng
+#                                                                 ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative expression.ng variable.other.readwrite.ts
+#                                                                      ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative expression.ng
+#                                                                       ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative punctuation.definition.block.ts
+#                                                                         ^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+>
+>    @if (items.length > 0) {
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng keyword.control.block.transition.ng
+#     ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng keyword.control.block.kind.ng
+#       ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng
+#        ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng meta.brace.round.ts
+#         ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng variable.other.object.ts
+#              ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng punctuation.accessor.ts
+#               ^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng variable.other.property.ts
+#                     ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng
+#                      ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng keyword.operator.relational.ts
+#                       ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng
+#                        ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.expression.ng constant.numeric.decimal.ts
+#                         ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng meta.brace.round.ts
+#                          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng
+#                           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng punctuation.definition.block.ts
+>      @let first = items[0];
+#^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng
+#      ^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng storage.type.ng
+#          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng
+#           ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng variable.other.constant.ng
+#                ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng
+#                 ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng keyword.operator.assignment.ng
+#                  ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng keyword.operator.assignment.ng
+#                   ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng variable.other.readwrite.ts
+#                        ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng meta.array.literal.ts meta.brace.square.ts
+#                         ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng meta.array.literal.ts constant.numeric.decimal.ts
+#                          ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng meta.array.literal.ts meta.brace.square.ts
+#                           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng punctuation.terminator.statement.ng
+>      <span>{{ first.name }}</span>
+#^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng
+#            ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng punctuation.definition.block.ts
+#              ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng expression.ng
+#               ^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng expression.ng variable.other.object.ts
+#                    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng expression.ng punctuation.accessor.ts
+#                     ^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng expression.ng variable.other.property.ts
+#                         ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng expression.ng
+#                          ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng punctuation.definition.block.ts
+#                            ^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng
+>    } @else {
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng punctuation.definition.block.ts
+#     ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+#      ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng keyword.control.block.transition.ng
+#       ^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng keyword.control.block.kind.ng
+#           ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng
+#            ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng punctuation.definition.block.ts
+>      <span>No items</span>
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng
+>    }
+#^^^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng control.block.body.ng
+#    ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative control.block.ng punctuation.definition.block.ts
+>  `,
+#^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts text.html.derivative
+#  ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts string
+#   ^^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+>})
+#^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts meta.objectliteral.ts
+# ^ text.html.markdown meta.embedded.block.angular-ts meta.decorator.ts
+>export class DemoComponent {
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts
+>  title = 'hello';
+#^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts
+#          ^^^^^^^ text.html.markdown meta.embedded.block.angular-ts string.quoted.ts
+#                 ^^ text.html.markdown meta.embedded.block.angular-ts
+>  isDisabled = false;
+#^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts
+>  items = [{name: 'one'}];
+#^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts
+#                  ^^^^^ text.html.markdown meta.embedded.block.angular-ts string.quoted.ts
+#                       ^^^^ text.html.markdown meta.embedded.block.angular-ts
+>
+>  onClick(_event: MouseEvent): void {}
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-ts
+>}
+#^^ text.html.markdown meta.embedded.block.angular-ts
+>```
+#^^^ text.html.markdown punctuation.definition.fenced.markdown
+>
+>```angular-html
+#^^^ text.html.markdown punctuation.definition.fenced.markdown
+#   ^^^^^^^^^^^^^ text.html.markdown
+><section [class.active]="items.some(item => item.selected)">
+#^^^^^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative
+#         ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#          ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.class.active.html
+#               ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.class.active.html punctuation.accessor.html
+#                ^^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.class.active.html
+#                      ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                       ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html punctuation.separator.key-value.html
+#                        ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                         ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng variable.other.object.ts
+#                              ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng punctuation.accessor.ts
+#                               ^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng entity.name.function.ts
+#                                   ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng meta.brace.round.ts
+#                                    ^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng meta.arrow.ts variable.parameter.ts
+#                                        ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng meta.arrow.ts
+#                                         ^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng meta.arrow.ts storage.type.function.arrow.ts
+#                                           ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng meta.arrow.ts
+#                                            ^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng variable.other.object.ts
+#                                                ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng punctuation.accessor.ts
+#                                                 ^^^^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng variable.other.property.ts
+#                                                         ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html expression.ng meta.brace.round.ts
+#                                                          ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                                                           ^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative
+>  @if (items.length > 0) {
+#^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative
+#  ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng keyword.control.block.transition.ng
+#   ^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng keyword.control.block.kind.ng
+#     ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng
+#      ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng meta.brace.round.ts
+#       ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng variable.other.object.ts
+#            ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng punctuation.accessor.ts
+#             ^^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng variable.other.property.ts
+#                   ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng
+#                    ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng keyword.operator.relational.ts
+#                     ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng
+#                      ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.expression.ng constant.numeric.decimal.ts
+#                       ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng meta.brace.round.ts
+#                        ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng
+#                         ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng punctuation.definition.block.ts
+>    @let first = items[0];
+#^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng
+#    ^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng storage.type.ng
+#        ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng
+#         ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng variable.other.constant.ng
+#              ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng
+#               ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng keyword.operator.assignment.ng
+#                ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng keyword.operator.assignment.ng
+#                 ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng variable.other.readwrite.ts
+#                      ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng meta.array.literal.ts meta.brace.square.ts
+#                       ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng meta.array.literal.ts constant.numeric.decimal.ts
+#                        ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng meta.definition.variable.initializer.ng meta.array.literal.ts meta.brace.square.ts
+#                         ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng meta.definition.variable.ng punctuation.terminator.statement.ng
+>    <p>{{ first.name }}</p>
+#^^^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng
+#       ^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng punctuation.definition.block.ts
+#         ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng expression.ng
+#          ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng expression.ng variable.other.object.ts
+#               ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng expression.ng punctuation.accessor.ts
+#                ^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng expression.ng variable.other.property.ts
+#                    ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng expression.ng
+#                     ^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng punctuation.definition.block.ts
+#                       ^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng
+>  }
+#^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng control.block.body.ng
+#  ^ text.html.markdown meta.embedded.block.angular-html text.html.derivative control.block.ng punctuation.definition.block.ts
+></section>
+#^^^^^^^^^^^ text.html.markdown meta.embedded.block.angular-html text.html.derivative
+>```
+#^^^ text.html.markdown punctuation.definition.fenced.markdown
+>
+>```angularts
+#^^^^^^^^^^^^^ text.html.markdown
+>const x = items.find(item => item.name === 'x');
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown
+>```
+#^^^^ text.html.markdown
+>
+>```angular.html
+#^^^^^^^^^^^^^^^^ text.html.markdown
+><div>{{ items.find(item => item.id === selectedId)?.name }}</div>
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ text.html.markdown
+>```
+#^^^^ text.html.markdown
+>
