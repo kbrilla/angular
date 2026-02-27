@@ -1,6 +1,6 @@
 {
   "scopeName": "template.let.ng",
-  "injectionSelector": "L:text.html -comment -expression.ng -meta.tag -source.css -source.js",
+  "injectionSelector": "L:text.html.derivative text.html -comment -expression.ng -meta.tag -source.css -source.js",
   "patterns": [
     {
       "include": "#letDeclaration"

@@ -10,11 +10,11 @@ import {GrammarDefinition} from './types';
 
 export const InlineStyles: GrammarDefinition = {
   scopeName: 'inline-styles.ng',
-  injectionSelector: 'L:source.ts#meta.decorator.ts -comment',
+  injectionSelector: 'L:meta.decorator.ts -comment -text.html.derivative -hostbindings.ng',
   patterns: [{include: '#inlineStyles'}],
   repository: {
     inlineStyles: {
-      begin: /(styles)\s*(:)/,
+      begin: /(?:^\s*|[,{]\s*)(styles)\s*(:)/,
       beginCaptures: {
         1: {name: 'meta.object-literal.key.ts'},
         2: {name: 'meta.object-literal.key.ts punctuation.separator.key-value.ts'},

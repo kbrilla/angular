@@ -10,7 +10,11 @@ import {GrammarDefinition} from './types';
 
 export const Template: GrammarDefinition = {
   scopeName: 'template.ng',
-  injectionSelector: 'L:text.html -comment -control.block.ng -meta.definition.variable.ng',
+  // Require text.html.derivative as ancestor so this injection only fires inside
+  // Angular template content (inline templates, angular-html/angular-ts fences) but
+  // NOT on regular markdown prose (which never has text.html.derivative in scope).
+  injectionSelector:
+    'L:text.html.derivative text.html -comment -control.block.ng -meta.definition.variable.ng',
   patterns: [{include: '#interpolation'}],
   repository: {
     interpolation: {

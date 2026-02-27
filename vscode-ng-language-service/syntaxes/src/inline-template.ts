@@ -10,11 +10,11 @@ import {GrammarDefinition} from './types';
 
 export const InlineTemplate: GrammarDefinition = {
   scopeName: 'inline-template.ng',
-  injectionSelector: 'L:meta.decorator.ts -comment -text.html',
+  injectionSelector: 'L:meta.decorator.ts -comment -text.html.derivative -hostbindings.ng',
   patterns: [{include: '#inlineTemplate'}],
   repository: {
     inlineTemplate: {
-      begin: /(template)\s*(:)/,
+      begin: /(?:^\s*|[,{]\s*)(template)\s*(:)/,
       beginCaptures: {
         1: {name: 'meta.object-literal.key.ts'},
         2: {name: 'meta.object-literal.key.ts punctuation.separator.key-value.ts'},
@@ -38,7 +38,13 @@ export const InlineTemplate: GrammarDefinition = {
       end: /\1/,
       endCaptures: {0: {name: 'string'}},
       contentName: 'text.html.derivative',
-      patterns: [{include: 'text.html.derivative'}, {include: 'template.ng'}],
+      patterns: [
+        {include: 'template.tag.ng'},
+        {include: 'template.ng'},
+        {include: 'template.blocks.ng'},
+        {include: 'template.let.ng'},
+        {include: 'text.html.derivative'},
+      ],
     },
   },
 };

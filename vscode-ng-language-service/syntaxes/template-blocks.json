@@ -1,6 +1,6 @@
 {
   "scopeName": "template.blocks.ng",
-  "injectionSelector": "L:text.html -comment -expression.ng -meta.tag -source.css -source.js",
+  "injectionSelector": "L:text.html.derivative text.html -comment -expression.ng -meta.tag -source.css -source.js",
   "patterns": [
     {
       "include": "#block"
@@ -37,7 +37,7 @@
       "end": "(?<=\\})"
     },
     "caseHeader": {
-      "begin": "(@)(case|default)(?:\\s*)",
+      "begin": "(?:^\\s*|\\}\\s*)(@)(case|default)(?:\\s*)",
       "beginCaptures": {
         "1": {
           "patterns": [
@@ -165,6 +165,9 @@
         },
         {
           "include": "text.html.derivative"
+        },
+        {
+          "include": "template.let.ng"
         },
         {
           "include": "template.ng"

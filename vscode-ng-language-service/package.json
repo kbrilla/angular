@@ -27,6 +27,22 @@
     "Programming Languages"
   ],
   "contributes": {
+    "languages": [
+      {
+        "id": "angular-ts",
+        "aliases": [
+          "Angular TypeScript",
+          "angular-ts"
+        ]
+      },
+      {
+        "id": "angular-html",
+        "aliases": [
+          "Angular HTML",
+          "angular-html"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "angular.restartNgServer",
@@ -166,7 +182,9 @@
         "path": "./syntaxes/inline-template.json",
         "scopeName": "inline-template.ng",
         "injectTo": [
-          "source.ts"
+          "source.ts",
+          "source.angular-ts",
+          "text.html.markdown"
         ],
         "embeddedLanguages": {
           "text.html.derivative": "html",
@@ -178,7 +196,9 @@
         "path": "./syntaxes/inline-styles.json",
         "scopeName": "inline-styles.ng",
         "injectTo": [
-          "source.ts"
+          "source.ts",
+          "source.angular-ts",
+          "text.html.markdown"
         ],
         "embeddedLanguages": {
           "source.css.scss": "scss"
@@ -189,7 +209,9 @@
         "scopeName": "template.ng",
         "injectTo": [
           "text.html.derivative",
-          "source.ts"
+          "source.ts",
+          "text.angular-html",
+          "text.html.markdown"
         ],
         "embeddedLanguages": {
           "text.html": "html",
@@ -202,7 +224,9 @@
         "scopeName": "template.blocks.ng",
         "injectTo": [
           "text.html.derivative",
-          "source.ts"
+          "source.ts",
+          "text.angular-html",
+          "text.html.markdown"
         ],
         "embeddedLanguages": {
           "text.html": "html",
@@ -215,14 +239,18 @@
         "scopeName": "template.let.ng",
         "injectTo": [
           "text.html.derivative",
-          "source.ts"
+          "source.ts",
+          "text.angular-html",
+          "text.html.markdown"
         ]
       },
       {
         "path": "./syntaxes/host-object-literal.json",
         "scopeName": "host-object-literal.ng",
         "injectTo": [
-          "source.ts"
+          "source.ts",
+          "source.angular-ts",
+          "text.html.markdown"
         ],
         "embeddedLanguages": {
           "text.html.derivative": "html",
@@ -235,12 +263,39 @@
         "scopeName": "template.tag.ng",
         "injectTo": [
           "text.html.derivative",
-          "source.ts"
+          "source.ts",
+          "text.angular-html",
+          "text.html.markdown"
         ]
       },
       {
         "path": "./syntaxes/expression.json",
         "scopeName": "expression.ng"
+      },
+      {
+        "language": "angular-ts",
+        "path": "./syntaxes/angular-ts.json",
+        "scopeName": "source.angular-ts"
+      },
+      {
+        "language": "angular-html",
+        "path": "./syntaxes/angular-html.json",
+        "scopeName": "text.angular-html"
+      },
+      {
+        "path": "./syntaxes/markdown-fence.json",
+        "scopeName": "markdown.fence.ng",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.angular-ts": "angular-ts",
+          "meta.embedded.block.angular-html": "angular-html"
+        },
+        "tokenTypes": {
+          "meta.embedded.block.angular-ts": "other",
+          "meta.embedded.block.angular-html": "other"
+        }
       }
     ],
     "jsonValidation": [

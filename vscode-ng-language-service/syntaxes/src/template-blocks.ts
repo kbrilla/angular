@@ -10,7 +10,9 @@ import {GrammarDefinition} from './types';
 
 export const TemplateBlocks: GrammarDefinition = {
   scopeName: 'template.blocks.ng',
-  injectionSelector: 'L:text.html -comment -expression.ng -meta.tag -source.css -source.js',
+  // Require text.html.derivative as ancestor (see template.ts comment).
+  injectionSelector:
+    'L:text.html.derivative text.html -comment -expression.ng -meta.tag -source.css -source.js',
   patterns: [{include: '#block'}],
   repository: {
     transition: {
@@ -33,7 +35,7 @@ export const TemplateBlocks: GrammarDefinition = {
       end: /(?<=\})/,
     },
     caseHeader: {
-      begin: /(@)(case|default)(?:\s*)/,
+      begin: /(?:^\s*|\}\s*)(@)(case|default)(?:\s*)/,
       beginCaptures: {
         1: {patterns: [{include: '#transition'}]},
         2: {name: 'keyword.control.block.kind.ng'},
@@ -107,6 +109,7 @@ export const TemplateBlocks: GrammarDefinition = {
       patterns: [
         {include: '#caseBlock'},
         {include: 'text.html.derivative'},
+        {include: 'template.let.ng'},
         {include: 'template.ng'},
       ],
     },

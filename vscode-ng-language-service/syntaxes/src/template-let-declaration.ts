@@ -10,7 +10,9 @@ import {GrammarDefinition} from './types';
 
 export const LetDeclaration: GrammarDefinition = {
   scopeName: 'template.let.ng',
-  injectionSelector: 'L:text.html -comment -expression.ng -meta.tag -source.css -source.js',
+  // Require text.html.derivative as ancestor (see template.ts comment).
+  injectionSelector:
+    'L:text.html.derivative text.html -comment -expression.ng -meta.tag -source.css -source.js',
   patterns: [{include: '#letDeclaration'}],
   repository: {
     letDeclaration: {

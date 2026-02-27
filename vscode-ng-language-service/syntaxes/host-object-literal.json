@@ -1,6 +1,6 @@
 {
   "scopeName": "host-object-literal.ng",
-  "injectionSelector": "L:meta.decorator.ts -comment -text.html -expression.ng",
+  "injectionSelector": "L:meta.decorator.ts -comment -text.html.derivative -expression.ng -source.css.scss",
   "patterns": [
     {
       "include": "#hostObjectLiteral"
@@ -8,7 +8,7 @@
   ],
   "repository": {
     "hostObjectLiteral": {
-      "begin": "(host)\\s*(:)\\s*{",
+      "begin": "(?:^\\s*|[,{]\\s*)(host)\\s*(:)\\s*{",
       "beginCaptures": {
         "1": {
           "name": "meta.object-literal.key.ts"
@@ -25,9 +25,6 @@
         },
         {
           "include": "#ngHostBindingStatic"
-        },
-        {
-          "include": "source.ts"
         }
       ]
     },
@@ -75,26 +72,22 @@
       }
     },
     "ngHostBindingStatic": {
-      "begin": "\\s*('|\")?(.*?)(\\1)?\\s*:",
+      "begin": "\\s*((?:'[^']*'|\"[^\"]*\")|(?:\\w+))\\s*(?=:)",
       "end": "(?=,|})",
       "beginCaptures": {
         "1": {
-          "name": "string"
-        },
-        "2": {
           "name": "entity.other.attribute-name.html"
-        },
-        "3": {
-          "name": "string"
-        },
-        "4": {
-          "name": "meta.object-literal.key.ts punctuation.separator.key-value.ts"
         }
       },
       "contentName": "hostbinding.static.ng",
       "patterns": [
         {
-          "include": "source.ts"
+          "match": ":\\s*",
+          "name": "meta.object-literal.key.ts punctuation.separator.key-value.ts"
+        },
+        {
+          "match": "'[^']*'|\"[^\"]*\"",
+          "name": "string"
         }
       ]
     }

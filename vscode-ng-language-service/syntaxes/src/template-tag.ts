@@ -10,7 +10,10 @@ import {GrammarDefinition} from './types';
 
 export const TemplateTag: GrammarDefinition = {
   scopeName: 'template.tag.ng',
-  injectionSelector: 'L:text.html#meta.tag -comment',
+  // Inject inside tag scopes so Angular binding attributes (e.g. [disabled],
+  // (click), [(value)]) are matched before generic HTML "unrecognized
+  // attribute" patterns.
+  injectionSelector: 'L:meta.tag -comment',
   patterns: [
     {include: '#twoWayBinding'},
     {include: '#propertyBinding'},

@@ -2,7 +2,7 @@
 
 **The JSON files in this directory are not meant to be edited by hand.**
 
-If you need to make modification, the respective files should be changed within the repository's [`syntaxes/src`](https://github.com/angular/vscode-ng-language-service/tree/main/syntaxes/src) directory.
+If you need to make modification, the respective files should be changed within the repository's [`syntaxes/src`](./src) directory.
 
 Running `pnpm bazel run //vscode-ng-language-service/syntaxes:syntaxes` will then appropriately update the files in this directory.
 
