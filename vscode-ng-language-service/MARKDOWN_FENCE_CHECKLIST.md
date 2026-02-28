@@ -50,7 +50,13 @@ Deliver fenced `angular-ts` / `angular-html` support with minimal risk: preserve
 ## Regression Coverage
 
 - [x] Fenced grammar e2e suite present and green (positive + anti-bleed assertions).
-- [x] Current status: `9 specs, 0 failures`.
+- [x] `angular-html` positive case in backtick fence.
+- [x] `angular-html` positive case in tilde fence.
+- [x] `angular-ts` scoped behavior (no unexpected html/css deep-scope bleed).
+- [x] Negative case: plain `ts` fence does not trigger Angular fenced scopes.
+- [x] Negative case: malformed language id (`angularts`) does not trigger Angular fenced scopes.
+- [x] Negative case: plain markdown text does not trigger Angular fenced scopes.
+- [x] Current status: `11 specs, 0 failures`.
 
 ## Iteration Log
 
@@ -59,3 +65,4 @@ Deliver fenced `angular-ts` / `angular-html` support with minimal risk: preserve
 - Iteration 3: Audited diff scope (only additive grammar + minimal wiring).
 - Iteration 4: Restored required e2e auth arg (`--use-mock-keychain`).
 - Iteration 5: Re-validated e2e after arg restore; first run showed unrelated flaky `definition_spec`, second run passed (9/9).
+- Iteration 6: Added tilde-fence positive and malformed-language negative tests; e2e passed (11/11).
