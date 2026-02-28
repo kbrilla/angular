@@ -174,4 +174,16 @@ describe('Angular fenced markdown token scopes', () => {
     expect(token.scopes).not.toContain('meta.embedded.block.angular-html');
     expect(token.scopes).not.toContain('keyword.control.block.kind.ng');
   });
+
+  it('does not match case-variant Angular-TS language labels', async () => {
+    const position = positionOfNthWithOffset(document, '@if (caseVariantLanguageId)', 1, 1);
+    const token = await TextmateLanguageService.api.getScopeInformationAtPosition(
+      document,
+      position,
+    );
+
+    expect(token.scopes).not.toContain('meta.embedded.block.angular-ts');
+    expect(token.scopes).not.toContain('meta.embedded.block.angular-html');
+    expect(token.scopes).not.toContain('keyword.control.block.kind.ng');
+  });
 });

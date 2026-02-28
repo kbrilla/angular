@@ -56,3 +56,9 @@ Outside fenced block: @if should not get Angular block scopes.
   <span>no match expected</span>
 }
 ```
+
+```Angular-TS
+@if (caseVariantLanguageId) {
+  <span>no match expected</span>
+}
+```
