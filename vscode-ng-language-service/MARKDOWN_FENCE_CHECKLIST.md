@@ -41,6 +41,38 @@ Deliver fenced `angular-ts` / `angular-html` support with minimal risk: preserve
 - [x] `vscode-ng-language-service/integration/test_constants.ts`
   - Reason: add markdown fixture path constants.
 
+### Checkpoint Items (each change, not grouped)
+
+#### `vscode-ng-language-service/package.json` (existing in main)
+
+- [x] Add `contributes.languages` entry for `angular-ts`.
+- [x] Add `contributes.languages` entry for `angular-html`.
+- [x] Add `contributes.grammars` entry for `source.angular-ts` (`angular-ts.json`).
+- [x] Add `contributes.grammars` entry for `text.angular-html` (`angular-html.json`).
+- [x] Add `contributes.grammars` entry for `markdown.fence.ng` (`markdown-fence.json`).
+- [x] Add `embeddedLanguages` mapping for fenced angular-ts/html scopes.
+- [x] Add `tokenTypes` mapping for fenced angular-ts/html embedded scopes.
+- [x] Keep existing grammar `injectTo` arrays at main-default values (post-trim checkpoint).
+- [x] Add devDependency `vscode-textmate-languageservice` for e2e scope assertions.
+
+#### `vscode-ng-language-service/syntaxes/src/build.ts` (existing in main)
+
+- [x] Add import for `AngularTs` grammar source.
+- [x] Add import for `AngularHtml` grammar source.
+- [x] Add import for `MarkdownFence` grammar source.
+- [x] Add build output step for `angular-ts` JSON.
+- [x] Add build output step for `angular-html` JSON.
+- [x] Add build output step for `markdown-fence` JSON.
+
+#### `vscode-ng-language-service/syntaxes/BUILD.bazel` (existing in main)
+
+- [x] Add `_angular-ts.json` to `js_run_binary.outs`.
+- [x] Add `_angular-html.json` to `js_run_binary.outs`.
+- [x] Add `_markdown-fence.json` to `js_run_binary.outs`.
+- [x] Add `angular-ts.json` write mapping.
+- [x] Add `angular-html.json` write mapping.
+- [x] Add `markdown-fence.json` write mapping.
+
 ### Additive files (not replacing existing main grammar source files)
 
 - [x] `vscode-ng-language-service/syntaxes/src/angular-ts.ts`
