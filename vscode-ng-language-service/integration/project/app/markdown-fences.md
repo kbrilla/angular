@@ -62,3 +62,14 @@ Outside fenced block: @if should not get Angular block scopes.
   <span>no match expected</span>
 }
 ```
+
+```angular-ts
+@Component({
+  template: `
+    @if (tildeTsFence) {
+      <span>{{ label }}</span>
+    }
+  `,
+})
+class TildeTsFenceComponent {}
+```
