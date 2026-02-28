@@ -73,6 +73,33 @@ Deliver fenced `angular-ts` / `angular-html` support with minimal risk: preserve
 - [x] Add `angular-html.json` write mapping.
 - [x] Add `markdown-fence.json` write mapping.
 
+### Necessity Validation Queue (Unchecked until proven)
+
+> Each item is validated by a dedicated micro-iteration: attempt trim/remove/change, run e2e, then keep/remove based on result.
+
+#### `package.json`
+
+- [ ] `contributes.languages.angular-ts` is strictly required.
+- [ ] `contributes.languages.angular-html` is strictly required.
+- [ ] `contributes.grammars` entry for `source.angular-ts` is strictly required.
+- [ ] `contributes.grammars` entry for `text.angular-html` is strictly required.
+- [ ] `contributes.grammars` entry for `markdown.fence.ng` is strictly required.
+- [ ] `embeddedLanguages` mapping in `markdown.fence.ng` is strictly required.
+- [ ] `tokenTypes` mapping in `markdown.fence.ng` is strictly required.
+- [ ] `vscode-textmate-languageservice` dependency is strictly required for current e2e strategy.
+
+#### `syntaxes/src/build.ts`
+
+- [ ] `build(AngularTs, 'angular-ts')` is strictly required.
+- [ ] `build(AngularHtml, 'angular-html')` is strictly required.
+- [ ] `build(MarkdownFence, 'markdown-fence')` is strictly required.
+
+#### `syntaxes/BUILD.bazel`
+
+- [ ] `_angular-ts.json` out + write mapping is strictly required.
+- [ ] `_angular-html.json` out + write mapping is strictly required.
+- [ ] `_markdown-fence.json` out + write mapping is strictly required.
+
 ### Additive files (not replacing existing main grammar source files)
 
 - [x] `vscode-ng-language-service/syntaxes/src/angular-ts.ts`
