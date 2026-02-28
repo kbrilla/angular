@@ -1,0 +1,8 @@
+{
+  "scopeName": "source.angular-ts",
+  "patterns": [
+    {
+      "include": "source.ts"
+    }
+  ]
+}
