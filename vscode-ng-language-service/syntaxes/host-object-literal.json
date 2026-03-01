@@ -21,13 +21,103 @@
       "end": "}",
       "patterns": [
         {
+          "include": "#ngHostStyleBindingDynamic"
+        },
+        {
           "include": "#ngHostBindingDynamic"
+        },
+        {
+          "include": "#ngHostStyleStatic"
         },
         {
           "include": "#ngHostBindingStatic"
         },
         {
           "include": "source.ts"
+        }
+      ]
+    },
+    "ngHostStyleBindingDynamic": {
+      "begin": "\\s*('|\")([\\[])(style)(?:([.])([-_a-zA-Z0-9$]+))?(?:([.])([-_a-zA-Z0-9$%-]+))?([\\]])(\\1)(:)",
+      "beginCaptures": {
+        "1": {
+          "name": "string"
+        },
+        "2": {
+          "name": "punctuation.definition.ng-binding-name.begin.html"
+        },
+        "3": {
+          "name": "entity.other.ng-binding-name.style.html"
+        },
+        "4": {
+          "name": "punctuation.accessor.html"
+        },
+        "5": {
+          "name": "entity.other.ng-binding-name.style.property.html"
+        },
+        "6": {
+          "name": "punctuation.accessor.html"
+        },
+        "7": {
+          "name": "entity.other.ng-binding-name.style.unit.html"
+        },
+        "8": {
+          "name": "punctuation.definition.ng-binding-name.end.html"
+        },
+        "9": {
+          "name": "string"
+        },
+        "10": {
+          "name": "meta.object-literal.key.ts punctuation.separator.key-value.ts"
+        }
+      },
+      "contentName": "hostbinding.dynamic.ng",
+      "patterns": [
+        {
+          "include": "#ngHostStyleBindingDynamicValue"
+        }
+      ],
+      "end": "(?=,|})"
+    },
+    "ngHostStyleBindingDynamicValue": {
+      "begin": "\\s*(`|'|\")",
+      "beginCaptures": {
+        "1": {
+          "name": "string"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#ngHostStyleBindingCssStringValue"
+        },
+        {
+          "include": "expression.ng"
+        }
+      ],
+      "end": "\\1",
+      "endCaptures": {
+        "0": {
+          "name": "string"
+        }
+      }
+    },
+    "ngHostStyleBindingCssStringValue": {
+      "begin": "\\G\\s*(`|'|\")",
+      "beginCaptures": {
+        "1": {
+          "name": "string"
+        }
+      },
+      "end": "\\1",
+      "endCaptures": {
+        "0": {
+          "name": "string"
+        }
+      },
+      "contentName": "source.css.scss",
+      "patterns": [
+        {
+          "include": "source.css.scss"
         }
       ]
     },
@@ -38,7 +128,12 @@
           "name": "string"
         },
         "2": {
-          "name": "entity.other.attribute-name.html"
+          "name": "entity.other.attribute-name.html",
+          "patterns": [
+            {
+              "include": "#bindingKey"
+            }
+          ]
         },
         "3": {
           "name": "string"
@@ -55,6 +150,56 @@
       ],
       "end": "(?=,|})"
     },
+    "bindingKey": {
+      "patterns": [
+        {
+          "match": "([\\[\\(]{1,2}|\\*)(?:\\s*)(@?style)(?:([.])([-_a-zA-Z0-9$]+))?(?:([.])([-_a-zA-Z0-9$%-]+))?(?:\\s*)([\\]\\)]{1,2})?",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.ng-binding-name.begin.html"
+            },
+            "2": {
+              "name": "entity.other.ng-binding-name.style.html"
+            },
+            "3": {
+              "name": "punctuation.accessor.html"
+            },
+            "4": {
+              "name": "entity.other.ng-binding-name.style.property.html"
+            },
+            "5": {
+              "name": "punctuation.accessor.html"
+            },
+            "6": {
+              "name": "entity.other.ng-binding-name.style.unit.html"
+            },
+            "7": {
+              "name": "punctuation.definition.ng-binding-name.end.html"
+            }
+          }
+        },
+        {
+          "match": "([\\[\\(]{1,2}|\\*)(?:\\s*)(@?(?:[-_a-zA-Z0-9.$]+|\\[[^\\[\\]]*]|\\([^()]*\\))*%?)(?:\\s*)([\\]\\)]{1,2})?",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.ng-binding-name.begin.html"
+            },
+            "2": {
+              "name": "entity.other.ng-binding-name.$2.html",
+              "patterns": [
+                {
+                  "match": "\\.",
+                  "name": "punctuation.accessor.html"
+                }
+              ]
+            },
+            "3": {
+              "name": "punctuation.definition.ng-binding-name.end.html"
+            }
+          }
+        }
+      ]
+    },
     "ngHostBindingDynamicValue": {
       "begin": "\\s*(`|'|\")",
       "beginCaptures": {
@@ -68,6 +213,38 @@
         }
       ],
       "end": "\\1",
+      "endCaptures": {
+        "0": {
+          "name": "string"
+        }
+      }
+    },
+    "ngHostStyleStatic": {
+      "begin": "\\s*('|\")?(style)(\\1)?\\s*(:)\\s*(`|'|\")",
+      "beginCaptures": {
+        "1": {
+          "name": "string"
+        },
+        "2": {
+          "name": "entity.other.attribute-name.html"
+        },
+        "3": {
+          "name": "string"
+        },
+        "4": {
+          "name": "meta.object-literal.key.ts punctuation.separator.key-value.ts"
+        },
+        "5": {
+          "name": "string"
+        }
+      },
+      "contentName": "source.css meta.embedded.line.css",
+      "patterns": [
+        {
+          "include": "source.css"
+        }
+      ],
+      "end": "\\5",
       "endCaptures": {
         "0": {
           "name": "string"

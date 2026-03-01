@@ -14,6 +14,7 @@
     class: 'one two',
     myAttr: "my-value",
     style: `color: red;`,
+    'style': 'border: 1px 2px 3px var(--help)',
   },
 
   //// Attribute bindings
@@ -33,6 +34,12 @@
     '[one]': 'value',
     '[two]': 'foo || bar',
     '[@three]': 'animation',
+    '[style.padding]': '"5px"',
+    '[style.padding.px]': '"5"',
+    '[style]': '{width: "200px"; height: "50px";}',
+    '[style.background-color]': 'bg',
+    '[style.backgroundColor]': 'bg2',
+    '[style.width.px]': 'w',
   },
 
   //// Event listeners

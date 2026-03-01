@@ -1,37 +1,37 @@
 import * as vscode from 'vscode';
 
-import {APP_COMPONENT} from '../test_constants';
-
-import {activate} from './helper';
+import {activate, FOO_TEMPLATE_URI} from './helper';
 
 const DEFINITION_COMMAND = 'vscode.executeDefinitionProvider';
-const APP_COMPONENT_URI = vscode.Uri.file(APP_COMPONENT);
 
 describe('Angular LS', () => {
   beforeAll(async () => {
-    await activate(APP_COMPONENT_URI);
+    await activate(FOO_TEMPLATE_URI);
   });
 
+  function positionOf(document: vscode.TextDocument, needle: string): vscode.Position {
+    const index = document.getText().indexOf(needle);
+    expect(index).toBeGreaterThanOrEqual(0);
+    return document.positionAt(index);
+  }
+
   it(`returns definition for variable in template`, async () => {
-    // vscode Position is zero-based
-    //   template: `<h1>Hello {{ name }}</h1>`,
-    //                           ^-------- here
-    const position = new vscode.Position(4, 26);
+    const document = vscode.window.activeTextEditor!.document;
+    const position = positionOf(document, 'title | uppercase');
     // For a complete list of standard commands, see
     // https://code.visualstudio.com/api/references/commands
     const definitions = await vscode.commands.executeCommand<vscode.LocationLink[]>(
       DEFINITION_COMMAND,
-      APP_COMPONENT_URI,
+      FOO_TEMPLATE_URI,
       position,
     );
     expect(definitions?.length).toBe(1);
     const def = definitions![0];
-    expect(def.targetUri.fsPath).toBe(APP_COMPONENT); // in the same document
+    expect(def.targetUri.fsPath.endsWith('/app/foo.component.ts')).toBeTrue();
+
+    const targetDocument = await vscode.workspace.openTextDocument(def.targetUri);
     const {start, end} = def.targetRange;
-    // Should start and end on line 6
-    expect(start.line).toBe(8);
-    expect(end.line).toBe(8);
-    expect(start.character).toBe(2);
-    expect(end.character).toBe(start.character + `name`.length);
+    const targetText = targetDocument.getText(new vscode.Range(start, end));
+    expect(targetText).toBe('title');
   });
 });

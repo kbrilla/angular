@@ -1,7 +1,16 @@
-{{title | uppercase}}
+{{ title | uppercase }}
 <span class="subtitle">
-    subtitle
-    {{sig()}}
-    {{x.sig()}}
+  subtitle
+  {{ sig() }}
+  {{ x.sig() }}
 </span>
+<div
+  [style]="{'background-color': title, backgroundColor: title, '--x': 'var(--some-css-var)'}"
+></div>
+<div [style.background-color]="title"></div>
+<div [style.backgroundColor]="title"></div>
+<div [style.padding]="'5px'"></div>
+<div [style.padding.px]="5"></div>
+<div [style.width.px]="method()"></div>
+<div style="border: 1px solid red"></div>
 <lib-post></lib-post>

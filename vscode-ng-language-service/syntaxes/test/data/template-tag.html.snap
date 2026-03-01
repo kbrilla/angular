@@ -58,17 +58,93 @@
 ><div [style.right.%]="val"></div>
 #^^^^^ template.tag.ng
 #     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
-#      ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.right.%.html
-#           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.right.%.html punctuation.accessor.html
-#            ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.right.%.html
-#                 ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.right.%.html punctuation.accessor.html
-#                  ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.right.%.html
+#      ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#            ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.property.html
+#                 ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#                  ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.unit.html
 #                   ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
 #                    ^ template.tag.ng meta.ng-binding.property.html punctuation.separator.key-value.html
 #                     ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
 #                      ^^^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
 #                         ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
 #                          ^^^^^^^^ template.tag.ng
+><div [style]="{'background-color': bg, backgroundColor: bg2, '--x': 'var(--some-css-var)'}"></div>
+#^^^^^ template.tag.ng
+#     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#      ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#            ^ template.tag.ng meta.ng-binding.property.html punctuation.separator.key-value.html
+#             ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#              ^ template.tag.ng meta.ng-binding.property.html expression.ng
+#               ^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.begin.ts
+#                ^^^^^^^^^^^^^^^^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                ^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.end.ts
+#                                 ^^ template.tag.ng meta.ng-binding.property.html expression.ng
+#                                   ^^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                     ^ template.tag.ng meta.ng-binding.property.html expression.ng punctuation.separator.comma.ts
+#                                      ^ template.tag.ng meta.ng-binding.property.html expression.ng
+#                                       ^^^^^^^^^^^^^^^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                                      ^^ template.tag.ng meta.ng-binding.property.html expression.ng
+#                                                        ^^^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                                           ^ template.tag.ng meta.ng-binding.property.html expression.ng punctuation.separator.comma.ts
+#                                                            ^ template.tag.ng meta.ng-binding.property.html expression.ng
+#                                                             ^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.begin.ts
+#                                                              ^^^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                                                 ^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.end.ts
+#                                                                  ^^ template.tag.ng meta.ng-binding.property.html expression.ng
+#                                                                    ^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.begin.ts
+#                                                                     ^^^^^^^^^^^^^^^^^^^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                                                                        ^ template.tag.ng meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.end.ts
+#                                                                                         ^ template.tag.ng meta.ng-binding.property.html expression.ng
+#                                                                                          ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                                                                                           ^^^^^^^^ template.tag.ng
+><div [style.background-color]="bg"></div>
+#^^^^^ template.tag.ng
+#     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#      ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#            ^^^^^^^^^^^^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.property.html
+#                            ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                             ^ template.tag.ng meta.ng-binding.property.html punctuation.separator.key-value.html
+#                              ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                               ^^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                 ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                                  ^^^^^^^^ template.tag.ng
+><div [style.backgroundColor]="bg2"></div>
+#^^^^^ template.tag.ng
+#     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#      ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#            ^^^^^^^^^^^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.property.html
+#                           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                            ^ template.tag.ng meta.ng-binding.property.html punctuation.separator.key-value.html
+#                             ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                              ^^^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                 ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                                  ^^^^^^^^ template.tag.ng
+><div [style.width.px]="w"></div>
+#^^^^^ template.tag.ng
+#     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#      ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#           ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#            ^^^^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.property.html
+#                 ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#                  ^^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.unit.html
+#                    ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                     ^ template.tag.ng meta.ng-binding.property.html punctuation.separator.key-value.html
+#                      ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                       ^ template.tag.ng meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                        ^ template.tag.ng meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                         ^^^^^^^^ template.tag.ng
+><div style="border: 1px solid red;"></div>
+#^^^^^ template.tag.ng
+#     ^^^^^ template.tag.ng meta.attribute.style.html entity.other.attribute-name.html
+#          ^ template.tag.ng meta.attribute.style.html punctuation.separator.key-value.html
+#           ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.begin.html
+#            ^^^^^^^^^^^^^^^^^^^^^^ template.tag.ng meta.attribute.style.html source.css meta.embedded.line.css
+#                                  ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.end.html
+#                                   ^^^^^^^^ template.tag.ng
 ><div [@animation.trigger]="val"></div>
 #^^^^^ template.tag.ng
 #     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html

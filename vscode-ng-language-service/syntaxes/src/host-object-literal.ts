@@ -26,14 +26,69 @@ export const HostObjectLiteral: GrammarDefinition = {
       contentName: 'hostbindings.ng',
       end: /}/,
       patterns: [
+        // Match style bindings first so property/unit segments can receive
+        // dedicated scopes.
+        {include: '#ngHostStyleBindingDynamic'},
         // Try to match host bindings inside the `host`.
         {include: '#ngHostBindingDynamic'},
         // Try to match a static binding inside the `host`.
+        {include: '#ngHostStyleStatic'},
         {include: '#ngHostBindingStatic'},
         // Include the default TS syntax so that anything that doesn't
         // match the above will get the default highlighting.
         {include: 'source.ts'},
       ],
+    },
+
+    // A style-bound property inside host, e.g. `[style.width.px]="expr"`.
+    ngHostStyleBindingDynamic: {
+      begin:
+        /\s*('|")([\[])(style)(?:([.])([-_a-zA-Z0-9$]+))?(?:([.])([-_a-zA-Z0-9$%-]+))?([\]])(\1)(:)/,
+      beginCaptures: {
+        1: {name: 'string'},
+        2: {name: 'punctuation.definition.ng-binding-name.begin.html'},
+        3: {name: 'entity.other.ng-binding-name.style.html'},
+        4: {name: 'punctuation.accessor.html'},
+        5: {name: 'entity.other.ng-binding-name.style.property.html'},
+        6: {name: 'punctuation.accessor.html'},
+        7: {name: 'entity.other.ng-binding-name.style.unit.html'},
+        8: {name: 'punctuation.definition.ng-binding-name.end.html'},
+        9: {name: 'string'},
+        10: {name: 'meta.object-literal.key.ts punctuation.separator.key-value.ts'},
+      },
+      contentName: 'hostbinding.dynamic.ng',
+      patterns: [{include: '#ngHostStyleBindingDynamicValue'}],
+      end: /(?=,|})/,
+    },
+
+    // Value of a style-bound property inside `host`. If the expression is a
+    // quoted string literal, embed CSS scopes for the inner value.
+    ngHostStyleBindingDynamicValue: {
+      begin: /\s*(`|'|")/,
+      beginCaptures: {
+        1: {name: 'string'},
+      },
+      patterns: [{include: '#ngHostStyleBindingCssStringValue'}, {include: 'expression.ng'}],
+      // @ts-ignore
+      end: /\1/,
+      endCaptures: {
+        0: {name: 'string'},
+      },
+    },
+
+    // Quoted CSS value inside a host style binding, e.g. `"3px solid black"`.
+    ngHostStyleBindingCssStringValue: {
+      begin: /\G\s*(`|'|")/,
+      beginCaptures: {
+        1: {name: 'string'},
+      },
+      // @ts-ignore
+      end: /\1/,
+      endCaptures: {
+        0: {name: 'string'},
+      },
+      contentName: 'source.css.scss',
+      patterns: [{include: 'source.css.scss'}],
     },
 
     // A bound property inside `host`, e.g. `[attr.foo]="expr"` or `(click)="handleClick()"`.
@@ -42,8 +97,11 @@ export const HostObjectLiteral: GrammarDefinition = {
       beginCaptures: {
         // Opening quote is shown as a string. Only allows single and double quotes, no backticks.
         1: {name: 'string'},
-        // Name is shown as an HTML attribute.
-        2: {name: 'entity.other.attribute-name.html'},
+        // Name is shown as an HTML attribute with Angular binding-key decomposition.
+        2: {
+          name: 'entity.other.attribute-name.html',
+          patterns: [{include: '#bindingKey'}],
+        },
         // Closing quote is shown as a string.
         3: {name: 'string'},
         // Colon is shown as JS syntax.
@@ -52,6 +110,41 @@ export const HostObjectLiteral: GrammarDefinition = {
       contentName: 'hostbinding.dynamic.ng',
       patterns: [{include: '#ngHostBindingDynamicValue'}],
       end: /(?=,|})/,
+    },
+
+    bindingKey: {
+      patterns: [
+        {
+          match:
+            /([\[\(]{1,2}|\*)(?:\s*)(@?style)(?:([.])([-_a-zA-Z0-9$]+))?(?:([.])([-_a-zA-Z0-9$%-]+))?(?:\s*)([\]\)]{1,2})?/,
+          captures: {
+            1: {name: 'punctuation.definition.ng-binding-name.begin.html'},
+            2: {name: 'entity.other.ng-binding-name.style.html'},
+            3: {name: 'punctuation.accessor.html'},
+            4: {name: 'entity.other.ng-binding-name.style.property.html'},
+            5: {name: 'punctuation.accessor.html'},
+            6: {name: 'entity.other.ng-binding-name.style.unit.html'},
+            7: {name: 'punctuation.definition.ng-binding-name.end.html'},
+          },
+        },
+        {
+          match:
+            /([\[\(]{1,2}|\*)(?:\s*)(@?(?:[-_a-zA-Z0-9.$]+|\[[^\[\]]*]|\([^()]*\))*%?)(?:\s*)([\]\)]{1,2})?/,
+          captures: {
+            1: {name: 'punctuation.definition.ng-binding-name.begin.html'},
+            2: {
+              name: 'entity.other.ng-binding-name.$2.html',
+              patterns: [
+                {
+                  match: /\./,
+                  name: 'punctuation.accessor.html',
+                },
+              ],
+            },
+            3: {name: 'punctuation.definition.ng-binding-name.end.html'},
+          },
+        },
+      ],
     },
 
     // Value of a bound property inside `host`.
@@ -70,6 +163,25 @@ export const HostObjectLiteral: GrammarDefinition = {
       end: /\1/,
       endCaptures: {
         // Closing quote is shown as a string.
+        0: {name: 'string'},
+      },
+    },
+
+    // Static `style`/`'style'` host key parsed as inline CSS.
+    ngHostStyleStatic: {
+      begin: /\s*('|")?(style)(\1)?\s*(:)\s*(`|'|")/,
+      beginCaptures: {
+        1: {name: 'string'},
+        2: {name: 'entity.other.attribute-name.html'},
+        3: {name: 'string'},
+        4: {name: 'meta.object-literal.key.ts punctuation.separator.key-value.ts'},
+        5: {name: 'string'},
+      },
+      contentName: 'source.css meta.embedded.line.css',
+      patterns: [{include: 'source.css'}],
+      // @ts-ignore
+      end: /\5/,
+      endCaptures: {
         0: {name: 'string'},
       },
     },

@@ -19,6 +19,7 @@ export const TemplateTag: GrammarDefinition = {
     {include: '#propertyBinding'},
     {include: '#eventBinding'},
     {include: '#templateBinding'},
+    {include: '#styleAttribute'},
   ],
   repository: {
     propertyBinding: {
@@ -101,8 +102,38 @@ export const TemplateTag: GrammarDefinition = {
       patterns: [{include: 'expression.ng'}],
     },
 
+    styleAttribute: {
+      begin: /(\bstyle\b)(=)(["'])/,
+      beginCaptures: {
+        1: {name: 'entity.other.attribute-name.html'},
+        2: {name: 'punctuation.separator.key-value.html'},
+        3: {name: 'string.quoted.html punctuation.definition.string.begin.html'},
+      },
+      // @ts-ignore
+      end: /\3/,
+      endCaptures: {
+        0: {name: 'string.quoted.html punctuation.definition.string.end.html'},
+      },
+      name: 'meta.attribute.style.html',
+      contentName: 'source.css meta.embedded.line.css',
+      patterns: [{include: 'source.css'}],
+    },
+
     bindingKey: {
       patterns: [
+        {
+          match:
+            /([\[\(]{1,2}|\*)(?:\s*)(@?style)(?:([.])([-_a-zA-Z0-9$]+))?(?:([.])([-_a-zA-Z0-9$%-]+))?(?:\s*)([\]\)]{1,2})?/,
+          captures: {
+            1: {name: 'punctuation.definition.ng-binding-name.begin.html'},
+            2: {name: 'entity.other.ng-binding-name.style.html'},
+            3: {name: 'punctuation.accessor.html'},
+            4: {name: 'entity.other.ng-binding-name.style.property.html'},
+            5: {name: 'punctuation.accessor.html'},
+            6: {name: 'entity.other.ng-binding-name.style.unit.html'},
+            7: {name: 'punctuation.definition.ng-binding-name.end.html'},
+          },
+        },
         {
           match:
             /([\[\(]{1,2}|\*)(?:\s*)(@?(?:[-_a-zA-Z0-9.$]+|\[[^\[\]]*]|\([^()]*\))*%?)(?:\s*)([\]\)]{1,2})?/,

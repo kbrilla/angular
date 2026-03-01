@@ -6,6 +6,11 @@
     'class-three'
 ]"></div>
 <div [style.right.%]="val"></div>
+<div [style]="{'background-color': bg, backgroundColor: bg2, '--x': 'var(--some-css-var)'}"></div>
+<div [style.background-color]="bg"></div>
+<div [style.backgroundColor]="bg2"></div>
+<div [style.width.px]="w"></div>
+<div style="border: 1px solid red;"></div>
 <div [@animation.trigger]="val"></div>
 <img [attr.aria-label]="val" />
 <div [my-property]="val"></div>

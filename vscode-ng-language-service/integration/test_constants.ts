@@ -31,4 +31,6 @@ export const FOO_TEMPLATE_URI = pathToFileURL(FOO_TEMPLATE).href;
 export const FOO_COMPONENT = join(PROJECT_PATH, 'app', 'foo.component.ts');
 export const FOO_COMPONENT_URI = pathToFileURL(FOO_COMPONENT).href;
 export const MARKDOWN_FENCES = join(PROJECT_PATH, 'app', 'markdown-fences.md');
+export const HOST_BINDINGS_COMPONENT = join(PROJECT_PATH, 'app', 'host-bindings.component.ts');
+export const HOST_BINDINGS_COMPONENT_URI = pathToFileURL(HOST_BINDINGS_COMPONENT).href;
 export const TSCONFIG = join(PROJECT_PATH, 'tsconfig.json');
