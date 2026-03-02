@@ -27,6 +27,6 @@ export class TMComponent{}
 /* Template syntax tests */
 @Component({
   // Interpolation test
-  template: '{{property}}',
+  template: '<div style="width: var(--some-var);"></div><div style="widht: var(--some-var);"></div><div [style.width.px]="w"></div><div [style]="{\'--x\': \'var(--some-var)\'}"></div>{{property}}',
 })
 export class TMComponent{}

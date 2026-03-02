@@ -40,7 +40,11 @@
 #         ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #          ^ host-object-literal.ng hostbindings.ng
 #           ^ host-object-literal.ng hostbindings.ng string
-#            ^^^^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.embedded.line.css
+#            ^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-name.css support.type.property-name.css
+#                 ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                  ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#                   ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+#                      ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
 #                       ^ host-object-literal.ng hostbindings.ng string
 #                        ^^ host-object-literal.ng hostbindings.ng
 >    'style': 'border: 1px 2px 3px var(--help)',
@@ -51,9 +55,51 @@
 #           ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #            ^ host-object-literal.ng hostbindings.ng
 #             ^ host-object-literal.ng hostbindings.ng string
-#              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.embedded.line.css
-#                                             ^ host-object-literal.ng hostbindings.ng string
-#                                              ^^ host-object-literal.ng hostbindings.ng
+#              ^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-name.css support.type.property-name.css
+#                    ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                     ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#                      ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css constant.numeric.css
+#                         ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+#                          ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css constant.numeric.css
+#                             ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+#                              ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css constant.numeric.css
+#                                 ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+#                                  ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                                     ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                                      ^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                            ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                             ^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+>    style: 'width: var(--some-var);',
+#^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#    ^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-name.css
+#         ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#          ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#           ^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+#                   ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                      ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                       ^^^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                 ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                  ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                   ^ host-object-literal.ng hostbindings.ng string
+#                                    ^^ host-object-literal.ng hostbindings.ng
+>    'style': 'widht: var(--some-var);',
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^ host-object-literal.ng hostbindings.ng string
+#     ^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#          ^ host-object-literal.ng hostbindings.ng string
+#           ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#            ^ host-object-literal.ng hostbindings.ng
+#             ^ host-object-literal.ng hostbindings.ng string
+#              ^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-name.css
+#                   ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                    ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#                     ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                        ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                         ^^^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                   ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                    ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                     ^ host-object-literal.ng hostbindings.ng string
+#                                      ^^ host-object-literal.ng hostbindings.ng
 >  },
 #^^ host-object-literal.ng hostbindings.ng
 #  ^ host-object-literal.ng
@@ -225,9 +271,9 @@
 #                     ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #                      ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
 #                       ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
-#                        ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.begin.ts
-#                         ^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts
-#                            ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.end.ts
+#                        ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
+#                         ^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng source.css.scss
+#                            ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
 #                             ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
 #                              ^^ host-object-literal.ng hostbindings.ng
 >    '[style.padding.px]': '"5"',
@@ -244,9 +290,9 @@
 #                        ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #                         ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
 #                          ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
-#                           ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.begin.ts
-#                            ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts
-#                             ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.end.ts
+#                           ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
+#                            ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng source.css.scss
+#                             ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
 #                              ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
 #                               ^^ host-object-literal.ng hostbindings.ng
 >    '[style]': '{width: "200px"; height: "50px";}',
@@ -605,5 +651,99 @@
 >})
 #^^^ host-object-literal.ng
 >export class TMComponent{}
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng
+>
+>@Directive({
+#^^^^^^^^^^^^^ host-object-literal.ng
+>  host: {
+#^^ host-object-literal.ng
+#  ^^^^ host-object-literal.ng meta.object-literal.key.ts
+#      ^ host-object-literal.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#       ^^ host-object-literal.ng
+>    style: 'width: var(--some-var);',
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#         ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#          ^ host-object-literal.ng hostbindings.ng
+#           ^ host-object-literal.ng hostbindings.ng string
+#            ^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-name.css support.type.property-name.css
+#                 ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                  ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#                   ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                      ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                       ^^^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                 ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                  ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                   ^ host-object-literal.ng hostbindings.ng string
+#                                    ^^ host-object-literal.ng hostbindings.ng
+>    'style': 'widht: var(--some-var);',
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^ host-object-literal.ng hostbindings.ng string
+#     ^^^^^ host-object-literal.ng hostbindings.ng entity.other.attribute-name.html
+#          ^ host-object-literal.ng hostbindings.ng string
+#           ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#            ^ host-object-literal.ng hostbindings.ng
+#             ^ host-object-literal.ng hostbindings.ng string
+#              ^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-name.css
+#                   ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                    ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css
+#                     ^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                        ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                         ^^^^^^^^^^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                   ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                    ^ host-object-literal.ng hostbindings.ng source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                     ^ host-object-literal.ng hostbindings.ng string
+#                                      ^^ host-object-literal.ng hostbindings.ng
+>    '[style.width.px]': 'w',
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^ host-object-literal.ng hostbindings.ng string
+#     ^ host-object-literal.ng hostbindings.ng punctuation.definition.ng-binding-name.begin.html
+#      ^^^^^ host-object-literal.ng hostbindings.ng entity.other.ng-binding-name.style.html
+#           ^ host-object-literal.ng hostbindings.ng punctuation.accessor.html
+#            ^^^^^ host-object-literal.ng hostbindings.ng entity.other.ng-binding-name.style.property.html
+#                 ^ host-object-literal.ng hostbindings.ng punctuation.accessor.html
+#                  ^^ host-object-literal.ng hostbindings.ng entity.other.ng-binding-name.style.unit.html
+#                    ^ host-object-literal.ng hostbindings.ng punctuation.definition.ng-binding-name.end.html
+#                     ^ host-object-literal.ng hostbindings.ng string
+#                      ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#                       ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#                        ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
+#                         ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng variable.other.readwrite.ts
+#                          ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
+#                           ^^ host-object-literal.ng hostbindings.ng
+>    '[style]': '{width: "200px"; height: "50px";}',
+#^^^^ host-object-literal.ng hostbindings.ng
+#    ^ host-object-literal.ng hostbindings.ng string
+#     ^ host-object-literal.ng hostbindings.ng punctuation.definition.ng-binding-name.begin.html
+#      ^^^^^ host-object-literal.ng hostbindings.ng entity.other.ng-binding-name.style.html
+#           ^ host-object-literal.ng hostbindings.ng punctuation.definition.ng-binding-name.end.html
+#            ^ host-object-literal.ng hostbindings.ng string
+#             ^ host-object-literal.ng hostbindings.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
+#              ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#               ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
+#                ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#                 ^^^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng variable.other.readwrite.ts
+#                      ^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#                        ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.begin.ts
+#                         ^^^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts
+#                              ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.end.ts
+#                               ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng punctuation.terminator.statement.ts
+#                                ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#                                 ^^^^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng variable.other.readwrite.ts
+#                                       ^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#                                         ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.begin.ts
+#                                          ^^^^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts
+#                                              ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string.quoted.double.ts punctuation.definition.string.end.ts
+#                                               ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng punctuation.terminator.statement.ts
+#                                                ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng
+#                                                 ^ host-object-literal.ng hostbindings.ng hostbinding.dynamic.ng string
+#                                                  ^^ host-object-literal.ng hostbindings.ng
+>  },
+#^^ host-object-literal.ng hostbindings.ng
+#  ^ host-object-literal.ng
+#   ^^ host-object-literal.ng
+>})
+#^^^ host-object-literal.ng
+>export class TMDirective{}
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^ host-object-literal.ng
 >

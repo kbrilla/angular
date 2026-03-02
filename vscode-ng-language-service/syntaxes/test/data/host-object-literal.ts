@@ -15,6 +15,8 @@
     myAttr: "my-value",
     style: `color: red;`,
     'style': 'border: 1px 2px 3px var(--help)',
+    style: 'width: var(--some-var);',
+    'style': 'widht: var(--some-var);',
   },
 
   //// Attribute bindings
@@ -85,3 +87,13 @@
   },
 })
 export class TMComponent{}
+
+@Directive({
+  host: {
+    style: 'width: var(--some-var);',
+    'style': 'widht: var(--some-var);',
+    '[style.width.px]': 'w',
+    '[style]': '{width: "200px"; height: "50px";}',
+  },
+})
+export class TMDirective{}

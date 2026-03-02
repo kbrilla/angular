@@ -115,8 +115,64 @@ export const TemplateTag: GrammarDefinition = {
         0: {name: 'string.quoted.html punctuation.definition.string.end.html'},
       },
       name: 'meta.attribute.style.html',
-      contentName: 'source.css meta.embedded.line.css',
-      patterns: [{include: 'source.css'}],
+      contentName: 'source.css meta.property-list.css meta.embedded.line.css',
+      patterns: [{include: '#styleAttributeDeclarationList'}],
+    },
+
+    styleAttributeDeclarationList: {
+      patterns: [
+        {include: '#styleAttributeKnownDeclaration'},
+        {include: '#styleAttributeGenericDeclaration'},
+        {match: /;/, name: 'punctuation.terminator.rule.css'},
+      ],
+    },
+
+    styleAttributeKnownDeclaration: {
+      begin:
+        /\s*((?:width|height|padding|margin|border|color|background|background-color))\s*(:)\s*/,
+      beginCaptures: {
+        1: {name: 'meta.property-name.css support.type.property-name.css'},
+        2: {name: 'punctuation.separator.key-value.css'},
+      },
+      end: /(?=;|$)/,
+      contentName: 'meta.property-value.css',
+      patterns: [{include: '#styleAttributeValue'}],
+    },
+
+    styleAttributeGenericDeclaration: {
+      begin: /\s*((?:--[-_a-zA-Z0-9]+|[-_a-zA-Z][-a-zA-Z0-9-]*))\s*(:)\s*/,
+      beginCaptures: {
+        1: {name: 'meta.property-name.css'},
+        2: {name: 'punctuation.separator.key-value.css'},
+      },
+      end: /(?=;|$)/,
+      contentName: 'meta.property-value.css',
+      patterns: [{include: '#styleAttributeValue'}],
+    },
+
+    styleAttributeValue: {
+      patterns: [
+        {include: '#styleAttributeVarFunction'},
+        {match: /--[-_a-zA-Z0-9]+/, name: 'variable.argument.css'},
+        {
+          match: /[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:%|[a-zA-Z]+)?/,
+          name: 'constant.numeric.css',
+        },
+      ],
+    },
+
+    styleAttributeVarFunction: {
+      begin: /(?<![\w-])(var)(\()/,
+      beginCaptures: {
+        1: {name: 'support.function.misc.css'},
+        2: {name: 'punctuation.section.function.begin.bracket.round.css'},
+      },
+      end: /\)/,
+      endCaptures: {
+        0: {name: 'punctuation.section.function.end.bracket.round.css'},
+      },
+      name: 'meta.function.variable.css',
+      patterns: [{match: /--[-_a-zA-Z0-9]+/, name: 'variable.argument.css'}],
     },
 
     bindingKey: {

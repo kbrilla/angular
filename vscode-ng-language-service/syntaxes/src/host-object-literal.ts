@@ -32,6 +32,7 @@ export const HostObjectLiteral: GrammarDefinition = {
         // Try to match host bindings inside the `host`.
         {include: '#ngHostBindingDynamic'},
         // Try to match a static binding inside the `host`.
+        {include: '#ngHostStyleStaticUnquoted'},
         {include: '#ngHostStyleStatic'},
         {include: '#ngHostBindingStatic'},
         // Include the default TS syntax so that anything that doesn't
@@ -167,7 +168,80 @@ export const HostObjectLiteral: GrammarDefinition = {
       },
     },
 
-    // Static `style`/`'style'` host key parsed as inline CSS.
+    hostStaticStyleDeclarationList: {
+      patterns: [
+        {include: '#hostStaticStyleKnownDeclaration'},
+        {include: '#hostStaticStyleGenericDeclaration'},
+        {match: /;/, name: 'punctuation.terminator.rule.css'},
+      ],
+    },
+
+    hostStaticStyleKnownDeclaration: {
+      begin:
+        /\s*((?:width|height|padding|margin|border|color|background|background-color))\s*(:)\s*/,
+      beginCaptures: {
+        1: {name: 'meta.property-name.css support.type.property-name.css'},
+        2: {name: 'punctuation.separator.key-value.css'},
+      },
+      end: /(?=;|$)/,
+      contentName: 'meta.property-value.css',
+      patterns: [{include: '#hostStaticStyleValue'}],
+    },
+
+    hostStaticStyleGenericDeclaration: {
+      begin: /\s*((?:--[-_a-zA-Z0-9]+|[-_a-zA-Z][-a-zA-Z0-9-]*))\s*(:)\s*/,
+      beginCaptures: {
+        1: {name: 'meta.property-name.css'},
+        2: {name: 'punctuation.separator.key-value.css'},
+      },
+      end: /(?=;|$)/,
+      contentName: 'meta.property-value.css',
+      patterns: [{include: '#hostStaticStyleValue'}],
+    },
+
+    hostStaticStyleValue: {
+      patterns: [
+        {include: '#hostStaticStyleVarFunction'},
+        {match: /--[-_a-zA-Z0-9]+/, name: 'variable.argument.css'},
+        {
+          match: /[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:%|[a-zA-Z]+)?/,
+          name: 'constant.numeric.css',
+        },
+      ],
+    },
+
+    hostStaticStyleVarFunction: {
+      begin: /(?<![\w-])(var)(\()/,
+      beginCaptures: {
+        1: {name: 'support.function.misc.css'},
+        2: {name: 'punctuation.section.function.begin.bracket.round.css'},
+      },
+      end: /\)/,
+      endCaptures: {
+        0: {name: 'punctuation.section.function.end.bracket.round.css'},
+      },
+      name: 'meta.function.variable.css',
+      patterns: [{match: /--[-_a-zA-Z0-9]+/, name: 'variable.argument.css'}],
+    },
+
+    // Static unquoted `style` host key parsed as inline CSS declarations.
+    ngHostStyleStaticUnquoted: {
+      begin: /\s*(style)\s*(:)\s*(`|'|")/,
+      beginCaptures: {
+        1: {name: 'entity.other.attribute-name.html'},
+        2: {name: 'meta.object-literal.key.ts punctuation.separator.key-value.ts'},
+        3: {name: 'string'},
+      },
+      contentName: 'source.css meta.property-list.css meta.embedded.line.css',
+      patterns: [{include: '#hostStaticStyleDeclarationList'}],
+      // @ts-ignore
+      end: /\3/,
+      endCaptures: {
+        0: {name: 'string'},
+      },
+    },
+
+    // Static `style`/`'style'` host key parsed as inline CSS declarations.
     ngHostStyleStatic: {
       begin: /\s*('|")?(style)(\1)?\s*(:)\s*(`|'|")/,
       beginCaptures: {
@@ -177,8 +251,8 @@ export const HostObjectLiteral: GrammarDefinition = {
         4: {name: 'meta.object-literal.key.ts punctuation.separator.key-value.ts'},
         5: {name: 'string'},
       },
-      contentName: 'source.css meta.embedded.line.css',
-      patterns: [{include: 'source.css'}],
+      contentName: 'source.css meta.property-list.css meta.embedded.line.css',
+      patterns: [{include: '#hostStaticStyleDeclarationList'}],
       // @ts-ignore
       end: /\5/,
       endCaptures: {

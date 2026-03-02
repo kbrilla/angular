@@ -102,19 +102,74 @@
 #^^^^^^^^^^^^^ inline-template.ng
 >  // Interpolation test
 #^^^^^^^^^^^^^^^^^^^^^^^^ inline-template.ng
->  template: '{{property}}',
+>  template: '<div style="width: var(--some-var);"></div><div style="widht: var(--some-var);"></div><div [style.width.px]="w"></div><div [style]="{\'--x\': \'var(--some-var)\'}"></div>{{property}}',
 #^^ inline-template.ng
 #  ^^^^^^^^ inline-template.ng meta.object-literal.key.ts
 #          ^ inline-template.ng meta.object-literal.key.ts punctuation.separator.key-value.ts
 #           ^ inline-template.ng
 #            ^ inline-template.ng string
-#             ^^ inline-template.ng text.html.derivative punctuation.definition.block.ts
-#               ^^^^^^^^ inline-template.ng text.html.derivative expression.ng variable.other.readwrite.ts
-#                       ^^ inline-template.ng text.html.derivative punctuation.definition.block.ts
-#                         ^ inline-template.ng string
-#                          ^^ inline-template.ng
+#             ^^^^^ inline-template.ng text.html.derivative
+#                  ^^^^^ inline-template.ng text.html.derivative meta.attribute.style.html entity.other.attribute-name.html
+#                       ^ inline-template.ng text.html.derivative meta.attribute.style.html punctuation.separator.key-value.html
+#                        ^ inline-template.ng text.html.derivative meta.attribute.style.html string.quoted.html punctuation.definition.string.begin.html
+#                         ^^^^^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-name.css support.type.property-name.css
+#                              ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                               ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css
+#                                ^^^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                                   ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                                    ^^^^^^^^^^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                              ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                               ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                                ^ inline-template.ng text.html.derivative meta.attribute.style.html string.quoted.html punctuation.definition.string.end.html
+#                                                 ^^^^^^^^^^^^ inline-template.ng text.html.derivative
+#                                                             ^^^^^ inline-template.ng text.html.derivative meta.attribute.style.html entity.other.attribute-name.html
+#                                                                  ^ inline-template.ng text.html.derivative meta.attribute.style.html punctuation.separator.key-value.html
+#                                                                   ^ inline-template.ng text.html.derivative meta.attribute.style.html string.quoted.html punctuation.definition.string.begin.html
+#                                                                    ^^^^^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-name.css
+#                                                                         ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                                                                          ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css
+#                                                                           ^^^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                                                                              ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                                                                               ^^^^^^^^^^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                                                                         ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                                                                          ^ inline-template.ng text.html.derivative meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                                                                           ^ inline-template.ng text.html.derivative meta.attribute.style.html string.quoted.html punctuation.definition.string.end.html
+#                                                                                            ^^^^^^^^^^^^ inline-template.ng text.html.derivative
+#                                                                                                        ^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#                                                                                                         ^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#                                                                                                              ^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#                                                                                                               ^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.property.html
+#                                                                                                                    ^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.accessor.html
+#                                                                                                                     ^^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.unit.html
+#                                                                                                                       ^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                                                                                                                        ^ inline-template.ng text.html.derivative meta.ng-binding.property.html punctuation.separator.key-value.html
+#                                                                                                                         ^ inline-template.ng text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                                                                                                                          ^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                                                                                                                           ^ inline-template.ng text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.end.html
+#                                                                                                                            ^^^^^^^^^^^^ inline-template.ng text.html.derivative
+#                                                                                                                                        ^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html
+#                                                                                                                                         ^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html entity.other.ng-binding-name.style.html
+#                                                                                                                                              ^ inline-template.ng text.html.derivative meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.end.html
+#                                                                                                                                               ^ inline-template.ng text.html.derivative meta.ng-binding.property.html punctuation.separator.key-value.html
+#                                                                                                                                                ^ inline-template.ng text.html.derivative meta.ng-binding.property.html string.quoted.html punctuation.definition.string.begin.html
+#                                                                                                                                                 ^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng
+#                                                                                                                                                   ^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.begin.ts
+#                                                                                                                                                    ^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                                                                                                                                       ^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts constant.character.escape.ts
+#                                                                                                                                                         ^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                                                                                                                                           ^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts constant.character.escape.ts
+#                                                                                                                                                             ^^^^^^^^^^^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                                                                                                                                                            ^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts constant.character.escape.ts
+#                                                                                                                                                                              ^^^^^^^^^^^^^^^^^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts
+#                                                                                                                                                                                                   ^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng string.quoted.single.ts punctuation.definition.string.end.ts
+#                                                                                                                                                                                                    ^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng punctuation.separator.comma.ts
 >})
-#^^^ inline-template.ng
+#^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng
 >export class TMComponent{}
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^ inline-template.ng
+#^^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#      ^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng
+#       ^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#            ^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng
+#             ^^^^^^^^^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng variable.other.readwrite.ts
+#                        ^^^ inline-template.ng text.html.derivative meta.ng-binding.property.html expression.ng
 >

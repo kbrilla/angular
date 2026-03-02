@@ -142,9 +142,44 @@
 #     ^^^^^ template.tag.ng meta.attribute.style.html entity.other.attribute-name.html
 #          ^ template.tag.ng meta.attribute.style.html punctuation.separator.key-value.html
 #           ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.begin.html
-#            ^^^^^^^^^^^^^^^^^^^^^^ template.tag.ng meta.attribute.style.html source.css meta.embedded.line.css
+#            ^^^^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-name.css support.type.property-name.css
+#                  ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                   ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css
+#                    ^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css constant.numeric.css
+#                       ^^^^^^^^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css
+#                                 ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
 #                                  ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.end.html
 #                                   ^^^^^^^^ template.tag.ng
+><div style="width: var(--some-var);"></div>
+#^^^^^ template.tag.ng
+#     ^^^^^ template.tag.ng meta.attribute.style.html entity.other.attribute-name.html
+#          ^ template.tag.ng meta.attribute.style.html punctuation.separator.key-value.html
+#           ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.begin.html
+#            ^^^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-name.css support.type.property-name.css
+#                 ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                  ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css
+#                   ^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                      ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                       ^^^^^^^^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                 ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                  ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                   ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.end.html
+#                                    ^^^^^^^^ template.tag.ng
+><div style="widht: var(--some-var);"></div>
+#^^^^^ template.tag.ng
+#     ^^^^^ template.tag.ng meta.attribute.style.html entity.other.attribute-name.html
+#          ^ template.tag.ng meta.attribute.style.html punctuation.separator.key-value.html
+#           ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.begin.html
+#            ^^^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-name.css
+#                 ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.separator.key-value.css
+#                  ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css
+#                   ^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css support.function.misc.css
+#                      ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.begin.bracket.round.css
+#                       ^^^^^^^^^^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css variable.argument.css
+#                                 ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css meta.property-value.css meta.function.variable.css punctuation.section.function.end.bracket.round.css
+#                                  ^ template.tag.ng meta.attribute.style.html source.css meta.property-list.css meta.embedded.line.css punctuation.terminator.rule.css
+#                                   ^ template.tag.ng meta.attribute.style.html string.quoted.html punctuation.definition.string.end.html
+#                                    ^^^^^^^^ template.tag.ng
 ><div [@animation.trigger]="val"></div>
 #^^^^^ template.tag.ng
 #     ^ template.tag.ng meta.ng-binding.property.html entity.other.attribute-name.html entity.other.ng-binding-name.property.html punctuation.definition.ng-binding-name.begin.html

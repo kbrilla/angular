@@ -33,4 +33,24 @@ export const FOO_COMPONENT_URI = pathToFileURL(FOO_COMPONENT).href;
 export const MARKDOWN_FENCES = join(PROJECT_PATH, 'app', 'markdown-fences.md');
 export const HOST_BINDINGS_COMPONENT = join(PROJECT_PATH, 'app', 'host-bindings.component.ts');
 export const HOST_BINDINGS_COMPONENT_URI = pathToFileURL(HOST_BINDINGS_COMPONENT).href;
+export const STYLE_TOKEN_PARITY_COMPONENT = join(
+  PROJECT_PATH,
+  'app',
+  'style-token-parity.component.ts',
+);
+export const STYLE_TOKEN_PARITY_COMPONENT_URI = pathToFileURL(STYLE_TOKEN_PARITY_COMPONENT).href;
+export const STYLE_TOKEN_PARITY_TEMPLATE = join(
+  PROJECT_PATH,
+  'app',
+  'style-token-parity.component.html',
+);
+export const STYLE_TOKEN_PARITY_TEMPLATE_URI = pathToFileURL(STYLE_TOKEN_PARITY_TEMPLATE).href;
+export const STYLE_TOKEN_PARITY_INLINE_COMPONENT = join(
+  PROJECT_PATH,
+  'app',
+  'style-token-parity-inline.component.ts',
+);
+export const STYLE_TOKEN_PARITY_INLINE_COMPONENT_URI = pathToFileURL(
+  STYLE_TOKEN_PARITY_INLINE_COMPONENT,
+).href;
 export const TSCONFIG = join(PROJECT_PATH, 'tsconfig.json');
