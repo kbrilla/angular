@@ -118,5 +118,32 @@ describe('style token parity', () => {
     expectContainsAll(directiveHostInvalidScopes, ['hostbindings.ng', 'meta.property-name.css']);
     expect(directiveHostInvalidScopes).not.toContain('support.type.property-name.css');
     expect(directiveHostInvalidScopes).not.toContain('meta.selector.css');
+
+    const componentHostNoSemiScopes = await scopesAt(
+      appDocument,
+      'width: var(--parity-component-host-no-semi)',
+      0,
+    );
+    const directiveHostNoSemiScopes = await scopesAt(
+      appDocument,
+      'width: var(--parity-directive-host-no-semi)',
+      0,
+    );
+
+    expectContainsAll(componentHostNoSemiScopes, [
+      'hostbindings.ng',
+      'source.css',
+      'meta.property-name.css',
+      'support.type.property-name.css',
+    ]);
+    expect(componentHostNoSemiScopes).not.toContain('meta.selector.css');
+
+    expectContainsAll(directiveHostNoSemiScopes, [
+      'hostbindings.ng',
+      'source.css',
+      'meta.property-name.css',
+      'support.type.property-name.css',
+    ]);
+    expect(directiveHostNoSemiScopes).not.toContain('meta.selector.css');
   });
 });

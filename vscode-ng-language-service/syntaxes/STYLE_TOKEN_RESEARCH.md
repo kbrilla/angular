@@ -239,6 +239,12 @@ Verification completed:
   - validated external template, inline template, `@Component` host, and `@Directive` host contexts.
 - Re-ran `//vscode-ng-language-service/integration/e2e:test` and got PASS.
 
+Additional hardening iteration completed:
+
+- Declaration parsers were updated to handle semicolon-less declarations at end-of-value boundaries (before closing quote/backtick).
+- Parity fixtures/spec were extended to validate semicolon-less host static style declarations for both component and directive host objects.
+- Re-ran both syntax snapshots and full e2e after hardening; all checks passed.
+
 Current limitation:
 
 - Snapshot harness output is still not a full replacement for manual scope-inspector review in ad-hoc user scenarios.

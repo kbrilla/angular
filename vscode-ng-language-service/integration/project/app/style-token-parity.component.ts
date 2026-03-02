@@ -6,6 +6,8 @@ import {Component, Directive} from '@angular/core';
   host: {
     style: 'width: var(--parity-component-host-var);',
     'style': 'widht: var(--parity-component-host-var);',
+    style: 'width: var(--parity-component-host-no-semi)',
+    'style': 'widht: var(--parity-component-host-no-semi)',
     '[style.width.px]': 'w',
     '[style]': 'expr',
   },
@@ -21,6 +23,8 @@ export class StyleTokenParityComponent {
   host: {
     style: 'width: var(--parity-directive-host-var);',
     'style': 'widht: var(--parity-directive-host-var);',
+    style: 'width: var(--parity-directive-host-no-semi)',
+    'style': 'widht: var(--parity-directive-host-no-semi)',
     '[style.width.px]': 'w',
     '[style]': 'expr',
   },

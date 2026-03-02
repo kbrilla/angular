@@ -161,6 +161,8 @@ Completed:
   - `getScopeInformationAtPosition`
   - dedicated parity fixtures for external template, inline template, component host, and directive host.
 - Re-ran full e2e target successfully.
+- Added semicolon-less declaration coverage in grammar and parity fixtures for host static style values.
+- Re-ran syntax snapshots and full e2e after semicolon-less hardening; both pass.
 
 Remaining for full closure:
 

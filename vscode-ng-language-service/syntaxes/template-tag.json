@@ -198,7 +198,7 @@
           "name": "punctuation.separator.key-value.css"
         }
       },
-      "end": "(?=;|$)",
+      "end": "(?=;|$|\"|')",
       "contentName": "meta.property-value.css",
       "patterns": [
         {
@@ -216,7 +216,7 @@
           "name": "punctuation.separator.key-value.css"
         }
       },
-      "end": "(?=;|$)",
+      "end": "(?=;|$|\"|')",
       "contentName": "meta.property-value.css",
       "patterns": [
         {
