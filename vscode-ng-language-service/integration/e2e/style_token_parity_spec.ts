@@ -129,6 +129,9 @@ describe('style token parity', () => {
       'width: var(--parity-directive-host-no-semi)',
       0,
     );
+    const attrKeyScopes = await scopesAt(appDocument, '[attr.data-test]', 1);
+    const stylePaddingKeyScopes = await scopesAt(appDocument, 'padding]', 0);
+    const stylePaddingPxKeyScopes = await scopesAt(appDocument, 'px]', 0);
 
     expectContainsAll(componentHostNoSemiScopes, [
       'hostbindings.ng',
@@ -145,5 +148,20 @@ describe('style token parity', () => {
       'support.type.property-name.css',
     ]);
     expect(directiveHostNoSemiScopes).not.toContain('meta.selector.css');
+
+    expectContainsAll(attrKeyScopes, ['hostbindings.ng', 'entity.other.attribute-name.html']);
+    expect(attrKeyScopes).not.toContain('source.css');
+
+    expectContainsAll(stylePaddingKeyScopes, [
+      'hostbindings.ng',
+      'entity.other.ng-binding-name.style.property.html',
+    ]);
+    expect(stylePaddingKeyScopes).not.toContain('source.css');
+
+    expectContainsAll(stylePaddingPxKeyScopes, [
+      'hostbindings.ng',
+      'entity.other.ng-binding-name.style.unit.html',
+    ]);
+    expect(stylePaddingPxKeyScopes).not.toContain('source.css');
   });
 });

@@ -244,6 +244,9 @@ Additional hardening iteration completed:
 - Declaration parsers were updated to handle semicolon-less declarations at end-of-value boundaries (before closing quote/backtick).
 - Parity fixtures/spec were extended to validate semicolon-less host static style declarations for both component and directive host objects.
 - Re-ran both syntax snapshots and full e2e after hardening; all checks passed.
+- Added explicit e2e regression assertions for screenshot-like mixed host objects:
+  - static `style` entry followed by `'[attr.data-test]'`, `'[style.padding]'`, `'[style.padding.px]'`
+  - verified these keys keep Angular host-binding scopes (no CSS bleed into binding keys).
 
 Current limitation:
 
