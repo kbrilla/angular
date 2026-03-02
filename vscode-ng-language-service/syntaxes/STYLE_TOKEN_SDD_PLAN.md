@@ -53,6 +53,10 @@ For declaration-only style content, semantic token families for `width: var(--so
 
 Switch inline declaration contexts from stylesheet root embedding to declaration-list embedding.
 
+### Upstream alignment rule
+
+Token semantics should stay aligned with upstream `microsoft/vscode-css` grammar concepts (`css.cson`), especially declaration-list constructs (`rule-list` / `rule-list-innards`) and related property/value/function scope families.
+
 ### Target grammar areas
 
 - `syntaxes/src/template-tag.ts`

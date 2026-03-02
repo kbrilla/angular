@@ -79,6 +79,26 @@ The `selector` rule starts early and can match declaration-like starts (`width`)
 
 So embedding full `source.css` root in declaration-only contexts can produce incorrect top-level scope classification (`meta.selector.css`).
 
+## Upstream Grammar Alignment (vscode-css)
+
+Source of truth reviewed:
+
+- `microsoft/vscode-css` grammar (`grammars/css.cson`, main branch)
+
+Key upstream constructs used for alignment:
+
+- Root stylesheet order includes `#selector` before declaration list handling (`#rule-list`).
+- Declaration parsing is centered in `#rule-list-innards` with:
+  - `meta.property-name.css`
+  - `punctuation.separator.key-value.css`
+  - `meta.property-value.css`
+  - `#property-values` (numbers/functions/keywords/etc.)
+- `var(...)` function token family appears under function patterns (`support.function.misc.css`, `meta.function.variable.css`, `variable.argument.css` in effective stacks).
+
+Implementation note:
+
+- Current Angular grammar changes intentionally mirror these upstream token families for declaration-only host/style contexts while preventing selector-first misclassification.
+
 ## Key Insight
 
 For inline declaration-only content, grammar should enter a declaration-list context (equivalent to `rule-list-innards`) instead of stylesheet-root context (`source.css`).
