@@ -15,7 +15,7 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "ES2022",
-    "lib": ["ES2022", "ES2023.Array", "dom"],
+    "lib": ["ES2022", "es2023.array", "dom"],
     "types": ["node", "dom-navigation"],
     "skipLibCheck": true,
     "paths": {
