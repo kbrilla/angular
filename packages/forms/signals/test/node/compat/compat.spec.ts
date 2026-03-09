@@ -191,14 +191,15 @@ describe('Forms compat', () => {
     });
 
     it('supports async validation', async () => {
-      let resolve: Function = () => {};
+      let resolve: (value: any) => void = () => {};
       const formControl = new FormControl<number>(5, {
         nonNullable: true,
         asyncValidators: () => {
           // can't use promiseWithResolver here, because this runs multiple times across tests.
-          const {promise, resolve: resolveFn}: {promise: Promise<null>; resolve: Function} = (
-            Promise as any
-          ).withResolvers();
+          const {promise, resolve: resolveFn}: {
+            promise: Promise<null>;
+            resolve: (value: any) => void;
+          } = (Promise as any).withResolvers();
           resolve = resolveFn;
           return promise;
         },

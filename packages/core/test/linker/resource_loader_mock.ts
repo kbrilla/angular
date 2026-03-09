@@ -103,8 +103,8 @@ export class MockResourceLoader extends ResourceLoader {
 }
 
 class _PendingRequest {
-  resolve!: (result: string) => void;
-  reject!: (error: any) => void;
+  resolve: (result: string) => void;
+  reject: (error: any) => void;
   promise: Promise<string>;
 
   constructor(public url: string) {

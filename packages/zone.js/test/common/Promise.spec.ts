@@ -276,13 +276,9 @@ describe(
         let resolve: Function | null = null;
 
         testZone.run(function () {
-          (
-            (() => {
-              const {promise, resolve: resolveFn} = (Promise as any).withResolvers();
-              resolve = resolveFn;
-              return promise;
-            })() as any
-          ).finally(function () {
+          const {promise, resolve: resolveFn} = (Promise as any).withResolvers();
+          resolve = resolveFn;
+          (promise as any).finally(function () {
             expect(arguments.length).toBe(0);
             expect(Zone.current).toBe(testZone);
             done();
@@ -296,13 +292,9 @@ describe(
         let reject: Function | null = null;
 
         testZone.run(function () {
-          (
-            (() => {
-              const {promise, reject: rejectFn} = (Promise as any).withResolvers();
-              reject = rejectFn;
-              return promise;
-            })() as any
-          ).finally(function () {
+          const {promise, reject: rejectFn} = (Promise as any).withResolvers();
+          reject = rejectFn;
+          (promise as any).finally(function () {
             expect(arguments.length).toBe(0);
             expect(Zone.current).toBe(testZone);
             done();
