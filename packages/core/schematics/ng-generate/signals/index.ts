@@ -28,7 +28,7 @@ interface Options {
 export function migrate(options: Options): Rule {
   // The migrations are independent so we can run them in any order, but we sort them here
   // alphabetically so we get a consistent execution order in case of issue reports.
-  const migrations = options.migrations.slice().sort();
+  const migrations = options.migrations.toSorted();
   const rules: Rule[] = [];
 
   for (const migration of migrations) {

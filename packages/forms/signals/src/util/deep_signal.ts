@@ -47,8 +47,13 @@ export function deepSignal<S, K extends keyof S>(
  */
 function valueForWrite(sourceValue: unknown, newPropValue: unknown, prop: PropertyKey): unknown {
   if (isArray(sourceValue)) {
+    const index = typeof prop === 'number' ? prop : Number(prop);
+    if (Number.isInteger(index) && index >= 0 && index < sourceValue.length) {
+      return sourceValue.with(index, newPropValue);
+    }
+
     const newValue = [...sourceValue];
-    newValue[prop as number] = newPropValue;
+    (newValue as {[key: PropertyKey]: unknown})[prop] = newPropValue;
     return newValue;
   } else {
     return {...(sourceValue as object), [prop]: newPropValue};

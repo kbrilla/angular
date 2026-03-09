@@ -11,12 +11,13 @@ export class Reorder {
   items = ['stuff', 'things', 'cheese', 'paper', 'scissors', 'rock'];
 
   randomize() {
-    const randItems = [...this.items];
+    let randItems = this.items.toSpliced();
     const newItems = [];
     for (let i of this.items) {
       const max: number = this.items.length - newItems.length;
       const randNum = Math.floor(Math.random() * max);
-      newItems.push(...randItems.splice(randNum, 1));
+      newItems.push(randItems[randNum]);
+      randItems = randItems.toSpliced(randNum, 1);
     }
 
     this.items = newItems;

@@ -201,7 +201,7 @@ export class TypingsLoader {
     }
 
     // Dedup and deterministic order
-    const uniqueSorted = Array.from(new Set(results)).sort();
+    const uniqueSorted = Array.from(new Set(results)).toSorted();
     return uniqueSorted;
   }
 

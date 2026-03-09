@@ -112,7 +112,7 @@ export function readConfiguration(
 
       // Call readAngularCompilerOptions recursively to merge NG Compiler options
       // Reverse the array so the overrides happen from right to left.
-      return [...extendsPaths].reverse().reduce((prevOptions, extendsPath) => {
+      return extendsPaths.toReversed().reduce((prevOptions, extendsPath) => {
         const extendedConfigPath = getExtendedConfigPath(configFile, extendsPath, host, fs);
 
         return extendedConfigPath === null

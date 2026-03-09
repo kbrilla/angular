@@ -47,7 +47,7 @@ export function stringifyElement(el: Element): string {
 
     // Attributes in an ordered way
     const attributeMap = getAttributeMap(el);
-    const sortedKeys = Array.from(attributeMap.keys()).sort();
+    const sortedKeys = Array.from(attributeMap.keys()).toSorted();
     for (const key of sortedKeys) {
       const lowerCaseKey = key.toLowerCase();
       let attValue = attributeMap.get(key);

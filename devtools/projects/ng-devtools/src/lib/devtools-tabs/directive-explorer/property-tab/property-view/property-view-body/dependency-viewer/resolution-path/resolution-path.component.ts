@@ -25,7 +25,7 @@ export const NODE_TYPE_CLASS_MAP: {[key in SerializedInjector['type']]: string} 
 })
 export class ResolutionPathComponent {
   readonly path = input<SerializedInjector[]>([]);
-  readonly reversedPath = computed(() => this.path().slice().reverse());
+  readonly reversedPath = computed(() => this.path().toReversed());
 
   NODE_TYPE_CLASS_MAP = NODE_TYPE_CLASS_MAP;
 }

@@ -178,7 +178,7 @@ export class FrameSelectorComponent {
   }
 
   private _selectFrames({indexes}: {indexes: Set<number>}): void {
-    const sortedIndexes = [...indexes].sort((a, b) => a - b);
+    const sortedIndexes = Array.from(indexes).toSorted((a, b) => a - b);
     this.startFrameIndex.set(sortedIndexes[0]);
     this.endFrameIndex.set(sortedIndexes[sortedIndexes.length - 1]);
     this._ensureVisible(this.startFrameIndex());

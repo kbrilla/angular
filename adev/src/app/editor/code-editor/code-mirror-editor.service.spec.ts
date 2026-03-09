@@ -29,7 +29,7 @@ class FakeNodeRuntimeSandbox {
 
 const files = ['1.ts', '2.ts', '3.ts'];
 // reverse the files list to test openFiles order
-const filesReverse = [...files].reverse();
+const filesReverse = files.toReversed();
 
 export class FakeEmbeddedTutorialManager {
   commonFilesystemTree = signal<FileSystemTree | null>(null);

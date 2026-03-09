@@ -174,7 +174,7 @@ export class MruTracker {
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
     // Since items are sorted from least recently used to most recently used,
     // we reverse the result.
-    return [...this.set].reverse();
+    return Array.from(this.set).toReversed();
   }
 }
 

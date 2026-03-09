@@ -328,7 +328,7 @@ export function reconcile<T, V>(
     let duplicatedKeysMsg = [];
     for (const [key, idxSet] of duplicateKeys!) {
       if (idxSet.size > 1) {
-        const idx = [...idxSet].sort((a, b) => a - b);
+        const idx = Array.from(idxSet).toSorted((a, b) => a - b);
         for (let i = 1; i < idx.length; i++) {
           duplicatedKeysMsg.push(
             `key "${stringifyForError(key)}" at index "${idx[i - 1]}" and "${idx[i]}"`,

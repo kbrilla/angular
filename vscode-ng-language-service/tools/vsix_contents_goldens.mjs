@@ -49,7 +49,7 @@ async function main(outPath) {
     }
   }
 
-  await writeFile(outPath, Array.from(resultSet).sort().join('\n'));
+  await writeFile(outPath, Array.from(resultSet).toSorted().join('\n'));
 }
 
 const argv = process.argv.slice(2);

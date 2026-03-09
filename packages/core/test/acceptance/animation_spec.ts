@@ -2043,11 +2043,7 @@ describe('Animation', () => {
         max = 6;
 
         removeSecondToLast() {
-          this.items.update((old) => {
-            const newList = [...old];
-            newList.splice(1, 1);
-            return newList;
-          });
+          this.items.update((old) => old.toSpliced(1, 1));
         }
       }
       TestBed.configureTestingModule({animationsEnabled: true});
