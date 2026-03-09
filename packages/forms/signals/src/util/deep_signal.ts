@@ -49,7 +49,7 @@ function valueForWrite(sourceValue: unknown, newPropValue: unknown, prop: Proper
   if (isArray(sourceValue)) {
     const index = typeof prop === 'number' ? prop : Number(prop);
     if (Number.isInteger(index) && index >= 0 && index < sourceValue.length) {
-      return (sourceValue as any).with(index, newPropValue);
+      return sourceValue.with(index, newPropValue);
     }
 
     const newValue = [...sourceValue];

@@ -2043,7 +2043,7 @@ describe('Animation', () => {
         max = 6;
 
         removeSecondToLast() {
-          this.items.update((old) => (old as any).toSpliced(1, 1));
+          this.items.update((old) => old.toSpliced(1, 1));
         }
       }
       TestBed.configureTestingModule({animationsEnabled: true});

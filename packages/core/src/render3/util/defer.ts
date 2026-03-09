@@ -158,7 +158,7 @@ function findDeferBlocks(node: Node, lView: LView, results: DeferBlockData[]) {
         exists: tDetails.placeholderTmplIndex !== null,
         minimumTime: tDetails.placeholderBlockConfig?.[MINIMUM_SLOT] ?? null,
       },
-      triggers: tDetails.debug?.triggers ? (Array.from(tDetails.debug.triggers) as any).toSorted() : [],
+      triggers: tDetails.debug?.triggers ? Array.from(tDetails.debug.triggers).toSorted() : [],
       hostNode: details.lContainer[HOST] as Node,
       rootNodes,
     };

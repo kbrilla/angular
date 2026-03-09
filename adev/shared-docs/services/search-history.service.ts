@@ -35,9 +35,7 @@ export class SearchHistory {
   private readonly history = signal<Map<string, HistoryItem>>(new Map());
 
   private readonly allItems = computed(() =>
-    (Array.from(this.history().values()) as any).toSorted(
-      (a: HistoryItem, b: HistoryItem) => b.createdAt - a.createdAt,
-    ),
+    Array.from(this.history().values()).toSorted((a, b) => b.createdAt - a.createdAt),
   );
 
   readonly items = computed<{recent: HistoryItem[]; favorite: HistoryItem[]}>(() => ({

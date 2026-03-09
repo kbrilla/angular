@@ -212,7 +212,7 @@ export function getFirstComponentForTemplateFile(
 ): TypeCheckInfo | undefined {
   const templateTypeChecker = compiler.getTemplateTypeChecker();
   const components = compiler.getComponentsWithTemplateFile(fileName);
-  const sortedComponents = (Array.from(components) as any).toSorted(tsDeclarationSortComparator);
+  const sortedComponents = Array.from(components).toSorted(tsDeclarationSortComparator);
   for (const component of sortedComponents) {
     if (!ts.isClassDeclaration(component)) {
       continue;

@@ -180,7 +180,7 @@ export function grabInjectorPathsFromDirectiveForest(
 
   const grabInjectorPaths = (node: DevToolsNode) => {
     if (node.resolutionPath) {
-      injectorPaths.push({node, path: (node.resolutionPath as any).toReversed()});
+      injectorPaths.push({node, path: node.resolutionPath.toReversed()});
     }
 
     node.children.forEach((child) => grabInjectorPaths(child));
@@ -230,7 +230,7 @@ export function splitInjectorPathsIntoElementAndEnvironmentPaths(injectorPaths: 
       // reverse each path to get the paths starting from the starting element
       startingElementToEnvironmentPath.set(
         elementPath[elementPath.length - 1].id,
-        (environmentPath as any).toReversed(),
+        environmentPath.toReversed(),
       );
     }
   });

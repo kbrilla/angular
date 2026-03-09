@@ -78,8 +78,7 @@ export class Generator {
     }
 
     // Compute hashes for all matched files and add them to the hash-table.
-    const allMatchedFiles = (([] as string[]).concat(...Array.from(filesPerGroup.values())) as any)
-      .toSorted() as string[];
+    const allMatchedFiles = Array.from(filesPerGroup.values()).flat().toSorted();
     const allMatchedHashes = await processInBatches(allMatchedFiles, 500, (file) =>
       this.fs.hash(file),
     );

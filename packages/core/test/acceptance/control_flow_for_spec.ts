@@ -262,7 +262,7 @@ describe('control flow - for', () => {
 
       const fixture = TestBed.createComponent(TestComponent);
       fixture.detectChanges();
-      expect((Array.from(calls) as any).toSorted()).toEqual(['a:hello', 'b:hello']);
+      expect(Array.from(calls).toSorted()).toEqual(['a:hello', 'b:hello']);
     });
 
     it('should be able to access component properties in the tracking function from a nested template', () => {
@@ -294,7 +294,7 @@ describe('control flow - for', () => {
 
       const fixture = TestBed.createComponent(TestComponent);
       fixture.detectChanges();
-      expect((Array.from(calls) as any).toSorted()).toEqual(['a:hello', 'b:hello']);
+      expect(Array.from(calls).toSorted()).toEqual(['a:hello', 'b:hello']);
     });
 
     it('should invoke method tracking function with the correct context', () => {
