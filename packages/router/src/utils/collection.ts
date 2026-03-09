@@ -55,8 +55,8 @@ export function equalArraysOrString(
 ): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
-    const aSorted = [...a].sort();
-    const bSorted = [...b].sort();
+    const aSorted = (a as any).toSorted() as string[];
+    const bSorted = (b as any).toSorted() as string[];
     return aSorted.every((val, index) => bSorted[index] === val);
   } else {
     return a === b;

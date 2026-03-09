@@ -42,7 +42,9 @@ export function consolidateMessages(
     messages.sort(compareLocations);
   }
   // Now we sort the groups by location of the first message in the group.
-  return Array.from(messageGroups.values()).sort((a1, a2) => compareLocations(a1[0], a2[0]));
+  return (Array.from(messageGroups.values()) as any).toSorted((a1: ɵParsedMessage[], a2: ɵParsedMessage[]) =>
+    compareLocations(a1[0], a2[0]),
+  );
 }
 
 /**

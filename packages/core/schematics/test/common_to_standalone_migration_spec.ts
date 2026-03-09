@@ -30,7 +30,7 @@ function expectImportsToContain(content: string, ...importNames: string[]): void
 // Helper function to check import declarations with flexible formatting
 function expectImportDeclarationToContain(content: string, ...importNames: string[]): void {
   // Sort the import names to match the sorted order in the actual imports
-  const sortedImports = [...importNames].sort();
+  const sortedImports = (importNames as any).toSorted();
 
   // Match both single-line and multi-line import formats
   // Pattern matches: import { A, B, C } from '@angular/common'

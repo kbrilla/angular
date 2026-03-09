@@ -244,7 +244,7 @@ function collectMessage(
   addSubMessageParams(messageOp, subMessagePlaceholders);
 
   // Sort the params for consistency with TemaplateDefinitionBuilder output.
-  messageOp.params = new Map([...messageOp.params.entries()].sort());
+  messageOp.params = new Map((Array.from(messageOp.params.entries()) as any).toSorted());
 
   const mainVar = o.variable(job.pool.uniqueName(TRANSLATION_VAR_PREFIX));
   // Closure Compiler requires const names to start with `MSG_` but disallows any other
@@ -263,7 +263,7 @@ function collectMessage(
   if (messageOp.needsPostprocessing || messageOp.postprocessingParams.size > 0) {
     // Sort the post-processing params for consistency with TemaplateDefinitionBuilder output.
     const postprocessingParams = Object.fromEntries(
-      [...messageOp.postprocessingParams.entries()].sort(),
+      (Array.from(messageOp.postprocessingParams.entries()) as any).toSorted(),
     );
     const formattedPostprocessingParams = formatI18nPlaceholderNamesInMap(
       postprocessingParams,

@@ -896,7 +896,9 @@ export function calcPossibleSecurityContexts(
       ctxs.push(...possibleElementNames.map(nameToContext));
     });
   }
-  return ctxs.length === 0 ? [SecurityContext.NONE] : Array.from(new Set(ctxs)).sort();
+  return ctxs.length === 0
+    ? [SecurityContext.NONE]
+    : (Array.from(new Set(ctxs)) as any).toSorted();
 }
 
 /**

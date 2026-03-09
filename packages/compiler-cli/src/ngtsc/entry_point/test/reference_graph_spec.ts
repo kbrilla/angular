@@ -12,7 +12,7 @@ describe('entry_point reference graph', () => {
   let graph: ReferenceGraph<string>;
 
   const refs = (target: string) => {
-    return Array.from(graph.transitiveReferencesOf(target)).sort();
+    return (Array.from(graph.transitiveReferencesOf(target)) as any).toSorted();
   };
 
   beforeEach(() => {

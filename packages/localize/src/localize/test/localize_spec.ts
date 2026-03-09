@@ -127,6 +127,6 @@ const reverseTranslate: TranslateFn = function (
   messageParts: TemplateStringsArray,
   expressions: readonly any[],
 ) {
-  expressions = Array.from(expressions).reverse();
+  expressions = (Array.from(expressions) as any).toReversed();
   return [messageParts, expressions];
 };

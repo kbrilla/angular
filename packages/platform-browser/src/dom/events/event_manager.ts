@@ -55,7 +55,7 @@ export class EventManager {
     });
 
     const otherPlugins = plugins.filter((p) => !(p instanceof DomEventsPlugin));
-    this._plugins = otherPlugins.slice().reverse();
+    this._plugins = (otherPlugins as any).toReversed();
 
     // DomEventsPlugin.supports() always returns true, it should always be the last plugin.
     const domEventPlugin = plugins.find((p) => p instanceof DomEventsPlugin);
