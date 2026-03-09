@@ -11,12 +11,11 @@ import {Injectable} from '@angular/core';
 @Injectable()
 export class ResourceLoaderImpl extends ResourceLoader {
   override get(url: string): Promise<string> {
-    let resolve: (result: any) => void;
-    let reject: (error: any) => void;
-    const promise = new Promise<string>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
+    const {promise, resolve, reject}: {
+      promise: Promise<string>;
+      resolve: (result: any) => void;
+      reject: (error: any) => void;
+    } = (Promise as any).withResolvers();
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.responseType = 'text';

@@ -143,10 +143,10 @@ export class RouterTestingHarness {
   async navigateByUrl<T>(url: string, requiredRoutedComponentType: Type<T>): Promise<T>;
   async navigateByUrl<T>(url: string, requiredRoutedComponentType?: Type<T>): Promise<T | null> {
     const router = TestBed.inject(Router);
-    let resolveFn!: () => void;
-    const redirectTrackingPromise = new Promise<void>((resolve) => {
-      resolveFn = resolve;
-    });
+    const {promise: redirectTrackingPromise, resolve: resolveFn}: {
+      promise: Promise<void>;
+      resolve: () => void;
+    } = (Promise as any).withResolvers();
     afterNextNavigation(TestBed.inject(Router), resolveFn);
     await router.navigateByUrl(url);
     await redirectTrackingPromise;

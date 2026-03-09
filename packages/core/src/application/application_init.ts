@@ -215,10 +215,16 @@ export class ApplicationInitStatus {
 
   private initialized = false;
   public readonly done = false;
-  public readonly donePromise: Promise<any> = new Promise((res, rej) => {
-    this.resolve = res;
-    this.reject = rej;
-  });
+  public readonly donePromise: Promise<any> = (() => {
+    const {promise, resolve, reject}: {
+      promise: Promise<any>;
+      resolve: (...args: any[]) => void;
+      reject: (...args: any[]) => void;
+    } = (Promise as any).withResolvers();
+    this.resolve = resolve;
+    this.reject = reject;
+    return promise;
+  })();
 
   private readonly appInits = inject(APP_INITIALIZER, {optional: true}) ?? [];
   private readonly injector = inject(Injector);

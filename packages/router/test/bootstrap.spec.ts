@@ -80,8 +80,8 @@ describe('bootstrap', () => {
   @Injectable({providedIn: 'root'})
   class TestResolver {
     resolve() {
-      let resolve: (value: unknown) => void;
-      const res = new Promise((r) => (resolve = r));
+      const {promise: res, resolve}: {promise: Promise<unknown>; resolve: (value: unknown) => void} =
+        (Promise as any).withResolvers();
       setTimeout(() => resolve('test-data'), 0);
       return res;
     }
@@ -644,9 +644,8 @@ function provideNavigationEndAction(fn: Function) {
 }
 
 function createPromise() {
-  let resolveFn: () => void;
-  const promise = new Promise<void>((r) => {
-    resolveFn = r;
-  });
+  const {promise, resolve: resolveFn}: {promise: Promise<void>; resolve: () => void} = (
+    Promise as any
+  ).withResolvers();
   return {resolveFn: () => resolveFn(), promise};
 }

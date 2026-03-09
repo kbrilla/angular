@@ -161,10 +161,14 @@ export class Deferred<R> {
   reject!: (error?: any) => void;
 
   constructor() {
-    this.promise = new Promise((res, rej) => {
-      this.resolve = res;
-      this.reject = rej;
-    });
+    const {promise, resolve, reject}: {
+      promise: Promise<R>;
+      resolve: (value: R | PromiseLike<R>) => void;
+      reject: (error?: any) => void;
+    } = (Promise as any).withResolvers();
+    this.promise = promise;
+    this.resolve = resolve;
+    this.reject = reject;
   }
 }
 

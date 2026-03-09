@@ -90,9 +90,11 @@ describe('public PendingTasks', () => {
 
     let resolveFn: () => void;
     pendingTasks.run(() => {
-      return new Promise<void>((r) => {
-        resolveFn = r;
-      });
+      const {promise, resolve}: {promise: Promise<void>; resolve: () => void} = (
+        Promise as any
+      ).withResolvers();
+      resolveFn = resolve;
+      return promise;
     });
     await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(false);
     resolveFn!();
@@ -107,9 +109,11 @@ describe('public PendingTasks', () => {
 
     let rejectFn: () => void;
     pendingTasks.run(() => {
-      return new Promise<void>((_, reject) => {
-        rejectFn = reject;
-      });
+      const {promise, reject}: {promise: Promise<void>; reject: () => void} = (
+        Promise as any
+      ).withResolvers();
+      rejectFn = reject;
+      return promise;
     });
     await expectAsync(applicationRefIsStable(appRef)).toBeResolvedTo(false);
     rejectFn!();

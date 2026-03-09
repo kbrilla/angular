@@ -339,8 +339,11 @@ class HttpResourceImpl<T>
 
         // Start off stream as undefined.
         const stream = signal<ResourceStreamItem<T>>({value: undefined as T});
-        let resolve: ((value: Signal<ResourceStreamItem<T>>) => void) | undefined;
-        const promise = new Promise<Signal<ResourceStreamItem<T>>>((r) => (resolve = r));
+        const {promise, resolve: initialResolve}: {
+          promise: Promise<Signal<ResourceStreamItem<T>>>;
+          resolve: (value: Signal<ResourceStreamItem<T>>) => void;
+        } = (Promise as any).withResolvers();
+        let resolve: ((value: Signal<ResourceStreamItem<T>>) => void) | undefined = initialResolve;
 
         const send = (value: ResourceStreamItem<T>): void => {
           stream.set(value);

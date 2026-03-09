@@ -93,9 +93,11 @@ export class IdleScheduler {
     this.queue.push({desc, run});
 
     if (this.emptyResolve === null) {
-      this.empty = new Promise((resolve) => {
-        this.emptyResolve = resolve;
-      });
+      const {promise, resolve}: {promise: Promise<void>; resolve: () => void} = (
+        Promise as any
+      ).withResolvers();
+      this.empty = promise;
+      this.emptyResolve = resolve;
     }
 
     if (this.oldestScheduledAt === null) {

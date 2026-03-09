@@ -103,17 +103,19 @@ export class MockResourceLoader extends ResourceLoader {
 }
 
 class _PendingRequest {
-  // Using non null assertion, these fields are defined below
-  // within the `new Promise` callback (synchronously).
   resolve!: (result: string) => void;
   reject!: (error: any) => void;
   promise: Promise<string>;
 
   constructor(public url: string) {
-    this.promise = new Promise((res, rej) => {
-      this.resolve = res;
-      this.reject = rej;
-    });
+    const {promise, resolve, reject}: {
+      promise: Promise<string>;
+      resolve: (result: string) => void;
+      reject: (error: any) => void;
+    } = (Promise as any).withResolvers();
+    this.promise = promise;
+    this.resolve = resolve;
+    this.reject = reject;
   }
 
   complete(response: string | null) {

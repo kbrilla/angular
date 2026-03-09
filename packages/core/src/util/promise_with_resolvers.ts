@@ -39,5 +39,5 @@ export function promiseWithResolvers<T>(): {
   resolve: (value: T | PromiseLike<T>) => void;
   reject: (reason?: any) => void;
 } {
-  return (Promise as PromiseConstructor).withResolvers<T>();
+  return (Promise as unknown as PromiseConstructor).withResolvers<T>();
 }

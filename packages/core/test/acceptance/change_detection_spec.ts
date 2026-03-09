@@ -1480,9 +1480,11 @@ describe('change detection', () => {
           private resolve?: Function;
           changeDetectorRef = inject(ChangeDetectorRef);
           createReadPromise() {
-            this.promise = new Promise<void>((resolve) => {
-              this.resolve = resolve;
-            });
+            const {promise, resolve}: {promise: Promise<void>; resolve: () => void} = (
+              Promise as any
+            ).withResolvers();
+            this.promise = promise;
+            this.resolve = resolve;
           }
           resolveReadPromise() {
             this.resolve?.();

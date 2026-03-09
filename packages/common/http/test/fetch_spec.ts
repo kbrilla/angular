@@ -612,10 +612,16 @@ export class MockFetchFactory extends FetchFactory {
 
   private clearWarningTimeout?: VoidFunction;
 
-  private promise = new Promise<Response>((resolve, reject) => {
+  private promise: Promise<Response> = (() => {
+    const {promise, resolve, reject}: {
+      promise: Promise<Response>;
+      resolve: Function;
+      reject: Function;
+    } = (Promise as any).withResolvers();
     this.resolve = resolve;
     this.reject = reject;
-  });
+    return promise;
+  })();
 
   override fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     this.request.method = init?.method;
@@ -688,10 +694,14 @@ export class MockFetchFactory extends FetchFactory {
   }
 
   resetFetchPromise() {
-    this.promise = new Promise<Response>((resolve, reject) => {
-      this.resolve = resolve;
-      this.reject = reject;
-    });
+    const {promise, resolve, reject}: {
+      promise: Promise<Response>;
+      resolve: Function;
+      reject: Function;
+    } = (Promise as any).withResolvers();
+    this.promise = promise;
+    this.resolve = resolve;
+    this.reject = reject;
   }
 }
 

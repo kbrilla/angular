@@ -36,12 +36,11 @@ export class UserMetric extends Metric {
    * Ends measuring.
    */
   override endMeasure(restart: boolean): Promise<{[key: string]: any}> {
-    let resolve: (result: any) => void;
-    let reject: (error: any) => void;
-    const promise = new Promise<{[key: string]: any}>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
+    const {promise, resolve, reject}: {
+      promise: Promise<{[key: string]: any}>;
+      resolve: (result: any) => void;
+      reject: (error: any) => void;
+    } = (Promise as any).withResolvers();
     const adapter = this._wdAdapter;
     const names = Object.keys(this._userMetrics);
 

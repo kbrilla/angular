@@ -196,9 +196,11 @@ describe('Forms compat', () => {
         nonNullable: true,
         asyncValidators: () => {
           // can't use promiseWithResolver here, because this runs multiple times across tests.
-          return new Promise<null>((r) => {
-            resolve = r;
-          });
+          const {promise, resolve: resolveFn}: {promise: Promise<null>; resolve: Function} = (
+            Promise as any
+          ).withResolvers();
+          resolve = resolveFn;
+          return promise;
         },
       });
       const cat = signal({
