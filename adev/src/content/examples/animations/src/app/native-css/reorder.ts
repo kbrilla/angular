@@ -11,7 +11,7 @@ export class Reorder {
   items = ['stuff', 'things', 'cheese', 'paper', 'scissors', 'rock'];
 
   randomize() {
-    let randItems = this.items;
+    let randItems = (this.items as any).toSpliced();
     const newItems = [];
     for (let i of this.items) {
       const max: number = this.items.length - newItems.length;
