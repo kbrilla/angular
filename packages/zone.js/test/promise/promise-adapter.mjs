@@ -2,12 +2,7 @@ import '../../build/zone.umd.js';
 
 Zone[Zone.__symbol__('ignoreConsoleErrorUncaughtError')] = true;
 const deferred = function () {
-  const p = {};
-  p.promise = new Promise((resolve, reject) => {
-    p.resolve = resolve;
-    p.reject = reject;
-  });
-  return p;
+  return Promise.withResolvers();
 };
 
 const resolved = (val) => {
