@@ -7,6 +7,7 @@
  */
 
 import {stringify} from '../src/util/stringify';
+import {describe, expect, it} from 'vitest';
 
 describe('stringify', () => {
   it('should return string undefined when toString returns undefined', () =>

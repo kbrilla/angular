@@ -1,4 +1,4 @@
-load("//tools:defaults.bzl", "angular_jasmine_test", "ng_web_test_suite", "ts_project")
+load("//tools:defaults.bzl", "angular_jasmine_test", "js_test", "ng_web_test_suite", "ts_project")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -23,6 +23,7 @@ ts_project(
         ["**/*.ts"],
         exclude = UTILS + [
             "**/*_node_only_spec.ts",
+            "util_spec.ts",
         ],
     ),
     # Visible to //:saucelabs_unit_tests_poc target
@@ -53,6 +54,29 @@ ts_project(
         "//packages/router",
         "//packages/router/testing",
     ],
+)
+
+ts_project(
+    name = "vitest_test_lib",
+    testonly = True,
+    srcs = [
+        "util_spec.ts",
+    ],
+    deps = [
+        "//:node_modules/vitest",
+        "//packages/core/src/util",
+    ],
+)
+
+js_test(
+    name = "util_spec_vitest",
+    # Use a dedicated runner/config to execute this single migrated spec with Vitest.
+    data = [
+        ":vitest_test_lib",
+        ":util_spec_vitest.config.mjs",
+        "//:node_modules/vitest",
+    ],
+    entry_point = ":util_spec_vitest.mjs",
 )
 
 ts_project(
