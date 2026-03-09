@@ -26,6 +26,7 @@ import {
   TmplAstLetDeclaration,
   TmplAstReference,
   TmplAstSwitchBlockCase,
+  TmplAstSwitchBlock,
   TmplAstTemplate,
   TmplAstTextAttribute,
   TmplAstVariable,
@@ -247,6 +248,12 @@ export interface OutOfBandDiagnosticRecorder {
     id: TypeCheckId,
     node: TmplAstBoundAttribute | TmplAstTextAttribute,
   ): void;
+
+  /**
+   * Reports that the `@default never` exhaustiveness check on a `@switch` block was skipped
+   * because the switch expression cannot be narrowed by TypeScript in a switch default arm.
+   */
+  switchExhaustiveCheckSkipped(id: TypeCheckId, block: TmplAstSwitchBlock): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -906,6 +913,23 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
         ts.DiagnosticCategory.Error,
         ngErrorCode(ErrorCode.FORM_FIELD_UNSUPPORTED_BINDING),
         message,
+      ),
+    );
+  }
+
+  switchExhaustiveCheckSkipped(id: TypeCheckId, block: TmplAstSwitchBlock): void {
+    this._diagnostics.push(
+      makeTemplateDiagnostic(
+        id,
+        this.resolver.getTemplateSourceMapping(id),
+        block.sourceSpan,
+        ts.DiagnosticCategory.Warning,
+        ngErrorCode(ErrorCode.SWITCH_EXHAUSTIVE_SKIP),
+        `The '@default never' exhaustiveness check was skipped because Angular cannot ` +
+          `determine whether all cases are covered for this switch expression. ` +
+          `TypeScript does not narrow dynamic indexed access (e.g. 'items[$index].type') ` +
+          `or safe navigation chains (e.g. 'item?.type') in switch default arms. ` +
+          `Consider switching on a loop variable or an @if alias instead.`,
       ),
     );
   }

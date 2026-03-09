@@ -649,6 +649,19 @@ export enum ErrorCode {
   FORBIDDEN_REQUIRED_INITIALIZER_INVOCATION = 8118,
 
   /**
+   * The `@default never` exhaustiveness check on a `@switch` block was silently skipped because
+   * the switch expression cannot be narrowed by TypeScript in a switch default arm.
+   *
+   * Common causes:
+   * - Switching on a dynamic indexed access: `items[$index].type`
+   * - Switching on a safe navigation chain: `maybe?.type`
+   * - Switching on a keyed read on a dynamic receiver: `items[$index]['type']`
+   *
+   * In these cases Angular cannot verify that all discriminant values are covered.
+   */
+  SWITCH_EXHAUSTIVE_SKIP = 8119,
+
+  /**
    * The template type-checking engine would need to generate an inline type check block for a
    * component, but the current type-checking environment doesn't support it.
    */

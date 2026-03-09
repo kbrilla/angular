@@ -1453,6 +1453,134 @@ class TestComponent {
 
       expect(messages).toEqual([]);
     });
+
+    it('should not report an error when all discriminant cases are handled in a @for loop', () => {
+      // Regression test for https://github.com/angular/angular/issues/67406
+      const messages = diagnose(
+        `
+          @for (item of items; track $index) {
+            @switch (item.type) {
+              @case ('alpha') { {{item.alpha}} }
+              @case ('beta')  { {{item.beta}} }
+              @default never;
+            }
+          }
+        `,
+        `
+          interface Alpha { type: 'alpha'; alpha: string; }
+          interface Beta  { type: 'beta';  beta: number;  }
+          type Item = Alpha | Beta;
+          export class TestComponent {
+            items: Item[] = [];
+          }
+        `,
+      );
+
+      expect(messages).toEqual([]);
+    });
+
+    it('should report an error when a case is missing in a @for loop switch', () => {
+      const messages = diagnose(
+        `
+          @for (item of items; track $index) {
+            @switch (item.type) {
+              @case ('alpha') {}
+              @default never;
+            }
+          }
+        `,
+        `
+          interface Alpha { type: 'alpha'; alpha: string; }
+          interface Beta  { type: 'beta';  beta: number;  }
+          type Item = Alpha | Beta;
+          export class TestComponent {
+            items: Item[] = [];
+          }
+        `,
+      );
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toContain(`not assignable to type 'never'`);
+    });
+
+    it('should not report an error when all discriminant cases are handled for a @if alias', () => {
+      // Regression test for https://github.com/angular/angular/issues/67406
+      const messages = diagnose(
+        `
+          @if (maybe; as union) {
+            @switch (union.type) {
+              @case ('alpha') { {{union.alpha}} }
+              @case ('beta')  { {{union.beta}} }
+              @default never;
+            }
+          }
+        `,
+        `
+          interface Alpha { type: 'alpha'; alpha: string; }
+          interface Beta  { type: 'beta';  beta: number;  }
+          type Item = Alpha | Beta;
+          export class TestComponent {
+            maybe: Item | null = null;
+          }
+        `,
+      );
+
+      expect(messages).toEqual([]);
+    });
+
+    it('should not produce a false positive when switching on an indexed array access', () => {
+      // `items[$index].type` — the receiver `items[$index]` is a dynamic indexed access
+      // that TypeScript cannot narrow in a switch default, so the assertion is omitted and
+      // a warning is emitted instead.
+      const messages = diagnose(
+        `
+          @for (item of items; track $index) {
+            @switch (items[$index].type) {
+              @case ('alpha') {}
+              @case ('beta')  {}
+              @default never;
+            }
+          }
+        `,
+        `
+          interface Alpha { type: 'alpha'; alpha: string; }
+          interface Beta  { type: 'beta';  beta: number;  }
+          type Item = Alpha | Beta;
+          export class TestComponent {
+            items: Item[] = [];
+          }
+        `,
+      );
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toContain(`exhaustiveness check was skipped`);
+    });
+
+    it('should not produce a false positive for a safe navigation switch expression', () => {
+      // `maybe?.type` — TypeScript cannot narrow through `?.` in switch defaults.
+      // The assertion is omitted and a warning is emitted instead.
+      const messages = diagnose(
+        `
+          @switch (maybe?.type) {
+            @case ('alpha') {}
+            @case ('beta')  {}
+            @case (undefined) {}
+            @default never;
+          }
+        `,
+        `
+          interface Alpha { type: 'alpha'; }
+          interface Beta  { type: 'beta';  }
+          type Item = Alpha | Beta;
+          export class TestComponent {
+            maybe: Item | undefined = undefined;
+          }
+        `,
+      );
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toContain(`exhaustiveness check was skipped`);
+    });
   });
 
   // https://github.com/angular/angular/issues/43970
