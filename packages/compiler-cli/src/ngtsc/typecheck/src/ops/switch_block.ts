@@ -6,7 +6,18 @@
  * found in the LICENSE file at https://angular.dev/license
  */
 
-import {TmplAstSwitchBlock, TmplAstSwitchBlockCaseGroup} from '@angular/compiler';
+import {
+  AST,
+  ASTWithSource,
+  ImplicitReceiver,
+  KeyedRead,
+  PropertyRead,
+  SafeKeyedRead,
+  SafePropertyRead,
+  ThisReceiver,
+  TmplAstSwitchBlock,
+  TmplAstSwitchBlockCaseGroup,
+} from '@angular/compiler';
 import {TcbOp} from './base';
 import {getStatementsBlock, TcbExpr} from './codegen';
 import type {Context} from './context';
@@ -60,12 +71,29 @@ export class TcbSwitchOp extends TcbOp {
     });
 
     if (this.block.exhaustiveCheck) {
-      const switchValue = tcbExpression(this.block.expression, this.tcb, this.scope);
-      const exhaustiveId = this.tcb.allocateId();
+      // When the switch expression is a property read off a discriminated union (e.g.
+      // `nested.type`), TypeScript cannot narrow the property itself to `never` in the
+      // default arm because control flow analysis doesn't propagate through property
+      // accesses on loop variables or aliased values. For property reads, asserting the
+      // *receiver* object (`nested`) as `never` matches what TypeScript actually narrows in
+      // switch default arms. Keyed reads are handled separately because TypeScript can narrow
+      // simple keyed accesses like `item['type']` directly, but not indexed receiver chains
+      // like `items[$index]['type']`.
+      const assertionTarget = this.getExhaustiveCheckAssertionTarget(this.block.expression);
+      if (assertionTarget !== null) {
+        const switchValue = tcbExpression(assertionTarget, this.tcb, this.scope);
+        const exhaustiveId = this.tcb.allocateId();
 
-      clauses.push(
-        new TcbExpr(`default: const tcbExhaustive${exhaustiveId}: never = ${switchValue.print()};`),
-      );
+        clauses.push(
+          new TcbExpr(
+            `default: const tcbExhaustive${exhaustiveId}: never = ${switchValue.print()};`,
+          ),
+        );
+      } else {
+        // The expression cannot be narrowed by TypeScript in a switch default arm.
+        // Emit a warning so the user knows the exhaustiveness check was skipped.
+        this.tcb.oobRecorder.switchExhaustiveCheckSkipped(this.tcb.id, this.block);
+      }
     }
 
     this.scope.addStatement(
@@ -138,5 +166,49 @@ export class TcbSwitchOp extends TcbOp {
     }
 
     return guard;
+  }
+
+  /**
+   * Returns the AST node to use as the target of the exhaustiveness `never` assertion,
+   * or `null` if the assertion should be omitted to avoid a false positive.
+   *
+   * When switching on a discriminant property (e.g. `item.type`), TypeScript narrows the
+   * *receiver* (`item`) to `never` in the default arm — not the property access itself.
+   * Asserting `item.type: never` yields `any` (from `never.type`) and causes a spurious
+   * error even when all cases are covered. Asserting the receiver instead is correct.
+   *
+   * Returns `null` (skips the assertion) when the expression cannot be narrowed by TypeScript:
+   * - Safe navigation (`maybe?.type`) — `?.` prevents narrowing through optional chains.
+   * - Dynamic indexed access (`items[$index].type`, `items[$index]['type']`) — TypeScript
+   *   cannot narrow `arr[expr]` through control flow analysis.
+   */
+  private getExhaustiveCheckAssertionTarget(expression: AST): AST | null {
+    const inner = expression instanceof ASTWithSource ? expression.ast : expression;
+
+    // Safe navigation operators (`?.`) prevent TypeScript from narrowing in switch defaults.
+    if (inner instanceof SafePropertyRead || inner instanceof SafeKeyedRead) {
+      return null;
+    }
+
+    if (
+      inner instanceof PropertyRead &&
+      !(inner.receiver instanceof ImplicitReceiver) &&
+      !(inner.receiver instanceof ThisReceiver)
+    ) {
+      // Peel to the receiver so TypeScript can narrow the discriminated union object.
+      // Skip when the receiver is a dynamic indexed access (TypeScript cannot narrow arr[i]).
+      const receiver =
+        inner.receiver instanceof ASTWithSource ? inner.receiver.ast : inner.receiver;
+      return receiver instanceof KeyedRead ? null : inner.receiver;
+    }
+
+    // A keyed read on a dynamic receiver (e.g. `items[$index]['type']`) cannot be narrowed.
+    if (inner instanceof KeyedRead) {
+      const receiver =
+        inner.receiver instanceof ASTWithSource ? inner.receiver.ast : inner.receiver;
+      return receiver instanceof KeyedRead ? null : expression;
+    }
+
+    return expression;
   }
 }
