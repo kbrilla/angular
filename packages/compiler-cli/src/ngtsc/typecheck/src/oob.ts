@@ -253,7 +253,7 @@ export interface OutOfBandDiagnosticRecorder {
    * Reports that the `@default never` exhaustiveness check on a `@switch` block was skipped
    * because the switch expression cannot be narrowed by TypeScript in a switch default arm.
    */
-  switchExhaustiveCheckSkipped(id: TypeCheckId, block: TmplAstSwitchBlock): void;
+  switchExhaustiveCheckSkipped(id: TypeCheckId, sourceSpan: ParseSourceSpan): void;
 }
 
 export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecorder {
@@ -917,18 +917,18 @@ export class OutOfBandDiagnosticRecorderImpl implements OutOfBandDiagnosticRecor
     );
   }
 
-  switchExhaustiveCheckSkipped(id: TypeCheckId, block: TmplAstSwitchBlock): void {
+  switchExhaustiveCheckSkipped(id: TypeCheckId, sourceSpan: ParseSourceSpan): void {
     this._diagnostics.push(
       makeTemplateDiagnostic(
         id,
         this.resolver.getTemplateSourceMapping(id),
-        block.sourceSpan,
+        sourceSpan,
         ts.DiagnosticCategory.Warning,
         ngErrorCode(ErrorCode.SWITCH_EXHAUSTIVE_SKIP),
-        `The '@default never' exhaustiveness check was skipped because Angular cannot ` +
-          `determine whether all cases are covered for this switch expression. ` +
-          `TypeScript does not narrow dynamic indexed access (e.g. 'items[$index].type') ` +
-          `or safe navigation chains (e.g. 'item?.type') in switch default arms. ` +
+        `The '@default never' exhaustiveness check was skipped because this switch ` +
+          `expression cannot be narrowed by TypeScript in a switch default arm ` +
+          `(for example, dynamic indexed access like 'items[$index].type' or safe ` +
+          `navigation like 'item?.type'). ` +
           `Consider switching on a loop variable or an @if alias instead.`,
       ),
     );

@@ -95,7 +95,10 @@ export class TcbSwitchOp extends TcbOp {
       } else {
         // The expression cannot be narrowed by TypeScript in a switch default arm.
         // Emit a warning so the user knows the exhaustiveness check was skipped.
-        this.tcb.oobRecorder.switchExhaustiveCheckSkipped(this.tcb.id, this.block);
+        this.tcb.oobRecorder.switchExhaustiveCheckSkipped(
+          this.tcb.id,
+          this.block.exhaustiveCheck.nameSpan,
+        );
       }
     }
 
