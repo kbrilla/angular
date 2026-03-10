@@ -1089,6 +1089,7 @@ export class NoopOobRecorder implements OutOfBandDiagnosticRecorder {
       | TmplAstInteractionDeferredTrigger
       | TmplAstViewportDeferredTrigger,
   ): void {}
+  switchExhaustiveCheckSkipped(): void {}
 }
 
 export function createNgCompilerForFile(fileContent: string) {

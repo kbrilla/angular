@@ -2211,6 +2211,30 @@ describe('type check blocks', () => {
       ]);
     });
 
+    it('should allow exhaustive switches for a 3-way discriminated union', () => {
+      const TEMPLATE = `
+        @switch (value.type) {
+          @case ('alpha') {}
+          @case ('beta') {}
+          @case ('gamma') {}
+          @default never;
+        }
+      `;
+
+      const SOURCE = `
+        type Union =
+          | { type: 'alpha', alpha: 'alpha' }
+          | { type: 'beta', beta: 'beta' }
+          | { type: 'gamma', gamma: 'gamma' };
+
+        export class TestComponent {
+          value: Union = { type: 'alpha', alpha: 'alpha' } as Union;
+        }
+      `;
+
+      expect(diagnose(TEMPLATE, SOURCE)).toEqual([]);
+    });
+
     it('should not generate exhaustiveness checking when there is a consecutive default case', () => {
       const TEMPLATE = `
         @switch (expr) {
@@ -2254,6 +2278,63 @@ describe('type check blocks', () => {
           'case 3: "" + ((this).default()); break; ' +
           'case 2: "" + ((this).two()); break; }',
       );
+    });
+
+    it('should assert the receiver when exhaustiveness checking a property read', () => {
+      const TEMPLATE = `
+        @switch (expr.kind) {
+          @case ('a') {}
+          @default never;
+        }
+      `;
+
+      // When switching on `expr.kind`, assert `expr` (the receiver) — not `expr.kind`.
+      // TypeScript can narrow `expr` to `never` via discriminant fields, not the field itself.
+      expect(tcb(TEMPLATE)).toContain('default: const tcbExhaustive_t1: never = ((this).expr);');
+    });
+
+    it('should assert the for-loop variable when exhaustiveness checking a property read', () => {
+      const TEMPLATE = `
+        @for (item of items; track $index) {
+          @switch (item.type) {
+            @case ('a') {}
+            @default never;
+          }
+        }
+      `;
+
+      const result = tcb(TEMPLATE);
+      // _t1 is the for-loop variable; assert _t1, not (_t1).type.
+      expect(result).toContain('for (const _t1 of');
+      expect(result).toContain('never = _t1;');
+    });
+
+    it('should omit the exhaustiveness assertion for dynamic indexed array access', () => {
+      // `items[$index].type` — receiver is a dynamic KeyedRead that TypeScript cannot narrow.
+      const TEMPLATE = `
+        @for (item of items; track $index) {
+          @switch (items[$index].type) {
+            @case ('a') {}
+            @default never;
+          }
+        }
+      `;
+
+      expect(tcb(TEMPLATE)).not.toContain('tcbExhaustive');
+    });
+
+    it('should keep exhaustiveness assertion for literal-index receiver chains', () => {
+      // `item.list[0].type` is narrowable by TypeScript; assertion should be emitted.
+      const TEMPLATE = `
+        @for (item of items; track $index) {
+          @switch (item.list[0].type) {
+            @case ('a') {}
+            @default never;
+          }
+        }
+      `;
+
+      expect(tcb(TEMPLATE)).toContain('tcbExhaustive');
     });
   });
 
