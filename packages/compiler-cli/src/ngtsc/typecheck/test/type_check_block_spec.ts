@@ -2322,6 +2322,20 @@ describe('type check blocks', () => {
 
       expect(tcb(TEMPLATE)).not.toContain('tcbExhaustive');
     });
+
+    it('should keep exhaustiveness assertion for literal-index receiver chains', () => {
+      // `item.list[0].type` is narrowable by TypeScript; assertion should be emitted.
+      const TEMPLATE = `
+        @for (item of items; track $index) {
+          @switch (item.list[0].type) {
+            @case ('a') {}
+            @default never;
+          }
+        }
+      `;
+
+      expect(tcb(TEMPLATE)).toContain('tcbExhaustive');
+    });
   });
 
   describe('for loop blocks', () => {

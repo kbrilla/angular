@@ -1581,6 +1581,33 @@ class TestComponent {
       expect(messages.length).toBe(1);
       expect(messages[0]).toContain(`exhaustiveness check was skipped`);
     });
+
+    it('should keep exhaustiveness checking for literal-index receiver chains', () => {
+      // `item.list[0].type` — literal indexed access is narrowable by TypeScript,
+      // so exhaustiveness checking should still be generated (no skipped-check warning).
+      const messages = diagnose(
+        `
+          @for (item of items; track $index) {
+            @switch (item.list[0].type) {
+              @case ('alpha') {}
+              @case ('beta')  {}
+              @default never;
+            }
+          }
+        `,
+        `
+          interface Alpha { type: 'alpha'; }
+          interface Beta  { type: 'beta';  }
+          type Inner = Alpha | Beta;
+          interface Outer { list: Inner[]; }
+          export class TestComponent {
+            items: Outer[] = [];
+          }
+        `,
+      );
+
+      expect(messages).toEqual([]);
+    });
   });
 
   // https://github.com/angular/angular/issues/43970

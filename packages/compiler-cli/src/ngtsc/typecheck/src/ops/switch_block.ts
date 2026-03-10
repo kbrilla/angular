@@ -9,8 +9,11 @@
 import {
   AST,
   ASTWithSource,
+  Binary,
   ImplicitReceiver,
   KeyedRead,
+  LiteralPrimitive,
+  NonNullAssert,
   PropertyRead,
   SafeKeyedRead,
   SafePropertyRead,
@@ -181,6 +184,9 @@ export class TcbSwitchOp extends TcbOp {
    * - Safe navigation (`maybe?.type`) — `?.` prevents narrowing through optional chains.
    * - Dynamic indexed access (`items[$index].type`, `items[$index]['type']`) — TypeScript
    *   cannot narrow `arr[expr]` through control flow analysis.
+   *
+   * Note that indexed access with literal keys (e.g. `item.list[0].type`) *is* narrowable by
+   * TypeScript and therefore should still get an exhaustiveness assertion.
    */
   private getExhaustiveCheckAssertionTarget(expression: AST): AST | null {
     const inner = expression instanceof ASTWithSource ? expression.ast : expression;
@@ -196,19 +202,47 @@ export class TcbSwitchOp extends TcbOp {
       !(inner.receiver instanceof ThisReceiver)
     ) {
       // Peel to the receiver so TypeScript can narrow the discriminated union object.
-      // Skip when the receiver is a dynamic indexed access (TypeScript cannot narrow arr[i]).
+      // Skip only when the receiver is not narrowable by TypeScript.
       const receiver =
         inner.receiver instanceof ASTWithSource ? inner.receiver.ast : inner.receiver;
-      return receiver instanceof KeyedRead ? null : inner.receiver;
+      return this.isNarrowableTarget(receiver) ? inner.receiver : null;
     }
 
     // A keyed read on a dynamic receiver (e.g. `items[$index]['type']`) cannot be narrowed.
     if (inner instanceof KeyedRead) {
-      const receiver =
-        inner.receiver instanceof ASTWithSource ? inner.receiver.ast : inner.receiver;
-      return receiver instanceof KeyedRead ? null : expression;
+      return this.isNarrowableTarget(inner) ? expression : null;
     }
 
     return expression;
+  }
+
+  private isNarrowableTarget(expression: AST): boolean {
+    const inner = expression instanceof ASTWithSource ? expression.ast : expression;
+
+    if (inner instanceof ImplicitReceiver || inner instanceof ThisReceiver) {
+      return true;
+    }
+
+    if (inner instanceof NonNullAssert) {
+      return this.isNarrowableTarget(inner.expression);
+    }
+
+    if (
+      inner instanceof SafePropertyRead ||
+      inner instanceof SafeKeyedRead ||
+      inner instanceof Binary
+    ) {
+      return false;
+    }
+
+    if (inner instanceof PropertyRead) {
+      return this.isNarrowableTarget(inner.receiver);
+    }
+
+    if (inner instanceof KeyedRead) {
+      return inner.key instanceof LiteralPrimitive && this.isNarrowableTarget(inner.receiver);
+    }
+
+    return false;
   }
 }
