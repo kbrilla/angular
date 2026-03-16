@@ -210,6 +210,7 @@ export interface R3DirectiveMetadataFacade {
 export interface R3ComponentMetadataFacade extends R3DirectiveMetadataFacade {
   template: string;
   preserveWhitespaces: boolean;
+  optionalChainingSemantics?: 'legacy' | 'native';
   animations: OpaqueValue[] | undefined;
   declarations: R3TemplateDependencyFacade[];
   styles: string[];
@@ -279,6 +280,7 @@ export interface R3DeclareComponentFacade extends R3DeclareDirectiveFacade {
   changeDetection?: ChangeDetectionStrategy;
   encapsulation?: ViewEncapsulation;
   preserveWhitespaces?: boolean;
+  optionalChainingSemantics?: 'legacy' | 'native';
 }
 
 export type R3DeclareTemplateDependencyFacade = {

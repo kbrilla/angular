@@ -622,6 +622,32 @@ export interface Component extends Directive {
   preserveWhitespaces?: boolean;
 
   /**
+   * Controls the semantics of the safe navigation operator (`?.`) in this component's template.
+   *
+   * - `'legacy'` (default): `?.` returns `null` on short-circuit. This is Angular's historical
+   *   behavior.
+   * - `'native'`: `?.` returns `undefined` on short-circuit, matching JavaScript/TypeScript
+   *   optional chaining semantics (TC39 spec).
+   *
+   * This per-component setting overrides the project-wide `strictOptionalChainingSemantics`
+   * compiler option. Use it to opt individual components into native semantics while keeping
+   * the rest of the project on legacy, or vice versa.
+   *
+   * @usageNotes
+   *
+   * ```typescript
+   * @Component({
+   *   template: '{{ user?.name }}',
+   *   optionalChainingSemantics: 'native',
+   * })
+   * class MyComponent {
+   *   user: {name: string} | null = null;
+   * }
+   * ```
+   */
+  optionalChainingSemantics?: 'legacy' | 'native';
+
+  /**
    * Set `standalone` to `false` if you want to import the directive into an NgModule.
    */
   standalone?: boolean;

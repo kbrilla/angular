@@ -1543,6 +1543,7 @@ export class NgCompiler {
         typeCheckHostBindings,
         this.enableSelectorless,
         this.emitDeclarationOnly,
+        !!this.options.strictOptionalChainingSemantics,
       ),
 
       // TODO(alxhub): understand why the cast here is necessary (something to do with `null`

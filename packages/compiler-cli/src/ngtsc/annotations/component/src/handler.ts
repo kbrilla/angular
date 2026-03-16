@@ -25,6 +25,7 @@ import {
   ExternalExpr,
   FactoryTarget,
   makeBindingParser,
+  OptionalChainingSemantics,
   outputAst as o,
   R3ComponentDeferMetadata,
   R3ComponentMetadata,
@@ -135,6 +136,7 @@ import {
   compileNgFactoryDefField,
   compileResults,
   createForwardRefResolver,
+  createValueHasWrongTypeError,
   extractClassDebugInfo,
   extractClassMetadata,
   extractSchemas,
@@ -282,6 +284,7 @@ export class ComponentDecoratorHandler
     private readonly typeCheckHostBindings: boolean,
     private readonly enableSelectorless: boolean,
     private readonly emitDeclarationOnly: boolean,
+    private readonly strictOptionalChainingSemantics: boolean = false,
   ) {
     this.extractTemplateOptions = {
       enableI18nLegacyMessageIdFormat: this.enableI18nLegacyMessageIdFormat,
@@ -539,6 +542,23 @@ export class ComponentDecoratorHandler
       );
     } else if (component.has('changeDetection')) {
       changeDetection = new o.WrappedNodeExpr(component.get('changeDetection')!);
+    }
+
+    // Read per-component optionalChainingSemantics override from @Component metadata.
+    // Allows individual components to override the project-wide strictOptionalChainingSemantics.
+    let componentOptionalChainingSemantics: OptionalChainingSemantics | null = null;
+    if (component.has('optionalChainingSemantics')) {
+      const expr = component.get('optionalChainingSemantics')!;
+      const value = this.evaluator.evaluate(expr);
+      if (value !== 'legacy' && value !== 'native') {
+        throw createValueHasWrongTypeError(
+          expr,
+          value,
+          `optionalChainingSemantics must be 'legacy' or 'native'`,
+        );
+      }
+      componentOptionalChainingSemantics =
+        value === 'native' ? OptionalChainingSemantics.Native : OptionalChainingSemantics.Legacy;
     }
 
     let animations: o.Expression | null = null;
@@ -978,7 +998,14 @@ export class ComponentDecoratorHandler
         localReferencedSymbols,
         meta: {
           ...metadata,
-          template,
+          template: {
+            ...template,
+            optionalChainingSemantics:
+              componentOptionalChainingSemantics ??
+              (this.strictOptionalChainingSemantics
+                ? OptionalChainingSemantics.Native
+                : OptionalChainingSemantics.Legacy),
+          },
           encapsulation,
           changeDetection,
           styles,
