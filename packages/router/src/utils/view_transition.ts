@@ -82,10 +82,10 @@ export function createViewTransition(
     return new Promise((resolve) => setTimeout(resolve));
   }
 
-  let resolveViewTransitionStarted: () => void;
-  const viewTransitionStarted = new Promise<void>((resolve) => {
-    resolveViewTransitionStarted = resolve;
-  });
+  const {promise: viewTransitionStarted, resolve: resolveViewTransitionStarted}: {
+    promise: Promise<void>;
+    resolve: () => void;
+  } = (Promise as any).withResolvers();
   const transition = document.startViewTransition(() => {
     resolveViewTransitionStarted();
     // We don't actually update dom within the transition callback. The resolving of the above

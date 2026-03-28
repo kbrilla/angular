@@ -246,9 +246,9 @@ describe(
         let resolve: Function | null = null;
 
         testZone.run(function () {
-          new Promise(function (resolveFn) {
-            resolve = resolveFn;
-          }).then(function () {
+          const {promise, resolve: resolveFn} = (Promise as any).withResolvers();
+          resolve = resolveFn;
+          promise.then(function () {
             expect(Zone.current).toBe(testZone);
             done();
           });
@@ -261,9 +261,9 @@ describe(
         let reject: (() => void) | null = null;
 
         testZone.run(function () {
-          new Promise(function (resolveFn, rejectFn) {
-            reject = rejectFn;
-          })['catch'](function () {
+          const {promise, reject: rejectFn} = (Promise as any).withResolvers();
+          reject = rejectFn;
+          promise['catch'](function () {
             expect(Zone.current).toBe(testZone);
             done();
           });
@@ -276,11 +276,9 @@ describe(
         let resolve: Function | null = null;
 
         testZone.run(function () {
-          (
-            new Promise(function (resolveFn) {
-              resolve = resolveFn;
-            }) as any
-          ).finally(function () {
+          const {promise, resolve: resolveFn} = (Promise as any).withResolvers();
+          resolve = resolveFn;
+          (promise as any).finally(function () {
             expect(arguments.length).toBe(0);
             expect(Zone.current).toBe(testZone);
             done();
@@ -294,11 +292,9 @@ describe(
         let reject: Function | null = null;
 
         testZone.run(function () {
-          (
-            new Promise(function (_, rejectFn) {
-              reject = rejectFn;
-            }) as any
-          ).finally(function () {
+          const {promise, reject: rejectFn} = (Promise as any).withResolvers();
+          reject = rejectFn;
+          (promise as any).finally(function () {
             expect(arguments.length).toBe(0);
             expect(Zone.current).toBe(testZone);
             done();

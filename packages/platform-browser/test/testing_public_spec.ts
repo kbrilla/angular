@@ -935,12 +935,11 @@ describe('public testing API', () => {
     let originalJasmineIt: (description: string, func: () => void) => jasmine.Spec;
 
     const patchJasmineIt = () => {
-      let resolve: (result: any) => void;
-      let reject: (error: any) => void;
-      const promise = new Promise((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
+      const {promise, resolve, reject}: {
+        promise: Promise<any>;
+        resolve: (result: any) => void;
+        reject: (error: any) => void;
+      } = (Promise as any).withResolvers();
       const jasmineEnv = jasmine.getEnv() as any;
       originalJasmineIt = jasmineEnv.it;
       jasmineEnv.it = (description: string, fn: (done: DoneFn) => void): any => {
@@ -981,8 +980,9 @@ describe('public testing API', () => {
 
       it('should fail with an error from a promise', waitForAsync(
         inject([], () => {
-          let reject: (error: any) => void = undefined!;
-          const promise = new Promise((_, rej) => (reject = rej));
+          const {promise, reject}: {promise: Promise<any>; reject: (error: any) => void} = (
+            Promise as any
+          ).withResolvers();
           const p = promise.then(() => expect(1).toEqual(2));
 
           reject('baz');

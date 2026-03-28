@@ -32,9 +32,11 @@ export class AsyncPromisePipeComponent {
 
   reset() {
     this.arrived = false;
-    this.greeting = new Promise<string>((resolve, reject) => {
-      this.resolve = resolve;
-    });
+    const {promise, resolve}: {promise: Promise<string>; resolve: (value: string) => void} = (
+      Promise as any
+    ).withResolvers();
+    this.greeting = promise;
+    this.resolve = resolve;
   }
 
   clicked() {

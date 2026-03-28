@@ -145,14 +145,11 @@ export function performWatchCompilation(host: PerformWatchHost): {
   const firstCompileResult = doCompilation();
 
   // Watch basePath, ignoring .dotfiles
-  let resolveReadyPromise: () => void;
-  const readyPromise = new Promise<void>((resolve) => (resolveReadyPromise = resolve));
-  // Note: ! is ok as options are filled after the first compilation
-  // Note: ! is ok as resolvedReadyPromise is filled by the previous call
+  const {promise: readyPromise, resolve: resolveReadyPromise} = (Promise as any).withResolvers();
   const fileWatcher = host.onFileChange(
     cachedOptions!.options,
     watchedFileChanged,
-    resolveReadyPromise!,
+    resolveReadyPromise,
   );
 
   return {close, ready: (cb) => readyPromise.then(cb), firstCompileResult};

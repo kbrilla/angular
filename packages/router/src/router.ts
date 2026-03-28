@@ -667,10 +667,7 @@ export class Router {
       reject = priorPromise.reject;
       promise = priorPromise.promise;
     } else {
-      promise = new Promise<boolean>((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
+      ({promise, resolve, reject} = (Promise as any).withResolvers());
     }
 
     // Indicate that the navigation is happening.

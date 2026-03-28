@@ -30,15 +30,7 @@ function promiseWithResolvers<T>(): {
   resolve: (value: T | PromiseLike<T>) => void;
   reject: (reason?: any) => void;
 } {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: any) => void;
-
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return {promise, resolve, reject};
+  return (Promise as any).withResolvers();
 }
 
 describe('Forms compat', () => {
@@ -199,14 +191,17 @@ describe('Forms compat', () => {
     });
 
     it('supports async validation', async () => {
-      let resolve: Function = () => {};
+      let resolve: (value: any) => void = () => {};
       const formControl = new FormControl<number>(5, {
         nonNullable: true,
         asyncValidators: () => {
           // can't use promiseWithResolver here, because this runs multiple times across tests.
-          return new Promise<null>((r) => {
-            resolve = r;
-          });
+          const {promise, resolve: resolveFn}: {
+            promise: Promise<null>;
+            resolve: (value: any) => void;
+          } = (Promise as any).withResolvers();
+          resolve = resolveFn;
+          return promise;
         },
       });
       const cat = signal({

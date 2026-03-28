@@ -49,10 +49,7 @@ describe('ApplicationInitStatus', () => {
     let initFnInvoked = false;
 
     beforeEach(() => {
-      promise = new Promise((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
+      ({promise, resolve, reject} = (Promise as any).withResolvers());
       TestBed.configureTestingModule({
         providers: [{provide: APP_INITIALIZER, useValue: [() => promise]}],
       });

@@ -934,8 +934,9 @@ export function guardsIntegrationSuite() {
         });
 
         function delayPromise(delay: number): Promise<boolean> {
-          let resolve: (val: boolean) => void;
-          const promise = new Promise<boolean>((res) => (resolve = res));
+          const {promise, resolve}: {promise: Promise<boolean>; resolve: (val: boolean) => void} = (
+            Promise as any
+          ).withResolvers();
           setTimeout(() => resolve(true), delay);
           return promise;
         }
@@ -1230,8 +1231,10 @@ export function guardsIntegrationSuite() {
                 canDeactivate: [
                   () => {
                     log.push('called');
-                    let resolve: (result: boolean) => void;
-                    const promise = new Promise((res) => (resolve = res));
+                    const {promise, resolve}: {
+                      promise: Promise<boolean>;
+                      resolve: (result: boolean) => void;
+                    } = (Promise as any).withResolvers();
                     setTimeout(() => resolve(false), 0);
                     return promise;
                   },

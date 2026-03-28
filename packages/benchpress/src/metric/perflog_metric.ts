@@ -180,10 +180,10 @@ export class PerflogMetric extends Metric {
         this._remainingEvents = events;
         return result;
       }
-      let resolve: (result: any) => void;
-      const promise = new Promise<{[key: string]: number}>((res) => {
-        resolve = res;
-      });
+      const {promise, resolve}: {
+        promise: Promise<{[key: string]: number}>;
+        resolve: (result: any) => void;
+      } = (Promise as any).withResolvers();
       this._setTimeout(() => resolve(this._readUntilEndMark(markName, loopCount + 1)), 100);
       return promise;
     });

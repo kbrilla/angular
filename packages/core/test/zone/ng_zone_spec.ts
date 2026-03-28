@@ -90,10 +90,9 @@ describe('NgZone', () => {
 
     it('should produce long stack traces', (done) => {
       macroTask(() => {
-        let resolve: (result: any) => void;
-        const promise: Promise<any> = new Promise((res) => {
-          resolve = res;
-        });
+        const {promise, resolve}: {promise: Promise<any>; resolve: (result: any) => void} = (
+          Promise as any
+        ).withResolvers();
 
         _zone.run(() => {
           setTimeout(() => {
@@ -114,10 +113,9 @@ describe('NgZone', () => {
 
     it('should produce long stack traces (when using microtasks)', (done) => {
       macroTask(() => {
-        let resolve: (result: any) => void;
-        const promise: Promise<any> = new Promise((res) => {
-          resolve = res;
-        });
+        const {promise, resolve}: {promise: Promise<any>; resolve: (result: any) => void} = (
+          Promise as any
+        ).withResolvers();
 
         _zone.run(() => {
           queueMicrotask(() => {
@@ -150,10 +148,9 @@ describe('NgZone', () => {
 
     it('should disable long stack traces', (done) => {
       macroTask(() => {
-        let resolve: (result: any) => void;
-        const promise: Promise<any> = new Promise((res) => {
-          resolve = res;
-        });
+        const {promise, resolve}: {promise: Promise<any>; resolve: (result: any) => void} = (
+          Promise as any
+        ).withResolvers();
 
         _zone.run(() => {
           setTimeout(() => {
@@ -569,9 +566,7 @@ function commonTests() {
 
       macroTask(() => {
         NgZone.assertNotInAngularZone();
-        promise = new Promise<string | null>((res) => {
-          resolve = res;
-        });
+        ({promise, resolve} = (Promise as any).withResolvers());
       });
 
       runNgZoneNoLog(() => {
@@ -748,12 +743,8 @@ function commonTests() {
 
       runNgZoneNoLog(() => {
         macroTask(() => {
-          aPromise = new Promise<string | null>((res) => {
-            aResolve = res;
-          });
-          bPromise = new Promise<string | null>((res) => {
-            bResolve = res;
-          });
+          ({promise: aPromise, resolve: aResolve} = (Promise as any).withResolvers());
+          ({promise: bPromise, resolve: bResolve} = (Promise as any).withResolvers());
           aPromise.then(_log.fn('a then'));
           bPromise.then(_log.fn('b then'));
           _log.add('run start');

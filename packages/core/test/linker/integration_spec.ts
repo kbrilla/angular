@@ -2476,9 +2476,11 @@ class PushCmpWithAsyncPipe {
   promise: Promise<any>;
 
   constructor() {
-    this.promise = new Promise((resolve) => {
-      this.resolve = resolve;
-    });
+    const {promise, resolve}: {promise: Promise<any>; resolve: (result: any) => void} = (
+      Promise as any
+    ).withResolvers();
+    this.promise = promise;
+    this.resolve = resolve;
   }
 
   get field() {

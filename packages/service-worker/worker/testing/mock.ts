@@ -141,16 +141,20 @@ export class MockServerState {
     private resources: Map<string, Response>,
     private errors: Set<string>,
   ) {
-    this.nextRequest = new Promise((resolve) => {
-      this.resolveNextRequest = resolve;
-    });
+    const {promise, resolve}: {promise: Promise<Request>; resolve: (value: Request) => void} = (
+      Promise as any
+    ).withResolvers();
+    this.nextRequest = promise;
+    this.resolveNextRequest = resolve;
   }
 
   async fetch(req: Request): Promise<Response> {
     this.resolveNextRequest?.(req);
-    this.nextRequest = new Promise((resolve) => {
-      this.resolveNextRequest = resolve;
-    });
+    const {promise, resolve}: {promise: Promise<Request>; resolve: (value: Request) => void} = (
+      Promise as any
+    ).withResolvers();
+    this.nextRequest = promise;
+    this.resolveNextRequest = resolve;
 
     await this.gate;
 
@@ -174,9 +178,11 @@ export class MockServerState {
   }
 
   pause(): void {
-    this.gate = new Promise((resolve) => {
-      this.resolve = resolve;
-    });
+    const {promise, resolve}: {promise: Promise<void>; resolve: () => void} = (
+      Promise as any
+    ).withResolvers();
+    this.gate = promise;
+    this.resolve = resolve;
   }
 
   unpause(): void {
@@ -232,9 +238,11 @@ export class MockServerState {
 
   reset(): void {
     this.clearRequests();
-    this.nextRequest = new Promise((resolve) => {
-      this.resolveNextRequest = resolve;
-    });
+    const {promise, resolve}: {promise: Promise<Request>; resolve: (value: Request) => void} = (
+      Promise as any
+    ).withResolvers();
+    this.nextRequest = promise;
+    this.resolveNextRequest = resolve;
     this.gate = Promise.resolve();
     this.resolve = null;
     this.online = true;

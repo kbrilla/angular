@@ -215,15 +215,21 @@ export class ApplicationInitStatus {
 
   private initialized = false;
   public readonly done = false;
-  public readonly donePromise: Promise<any> = new Promise((res, rej) => {
-    this.resolve = res;
-    this.reject = rej;
-  });
+  public readonly donePromise: Promise<any>;
 
   private readonly appInits = inject(APP_INITIALIZER, {optional: true}) ?? [];
   private readonly injector = inject(Injector);
 
   constructor() {
+    const {promise, resolve, reject}: {
+      promise: Promise<any>;
+      resolve: (...args: any[]) => void;
+      reject: (...args: any[]) => void;
+    } = (Promise as any).withResolvers();
+    this.donePromise = promise;
+    this.resolve = resolve;
+    this.reject = reject;
+
     if ((typeof ngDevMode === 'undefined' || ngDevMode) && !Array.isArray(this.appInits)) {
       throw new RuntimeError(
         RuntimeErrorCode.INVALID_MULTI_PROVIDER,

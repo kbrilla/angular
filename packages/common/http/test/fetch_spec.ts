@@ -606,15 +606,17 @@ describe('FetchBackend', () => {
 export class MockFetchFactory extends FetchFactory {
   public readonly response = new MockFetchResponse();
   public readonly request = new MockFetchRequest();
-  private resolve!: Function;
-  private reject!: Function;
+  private resolve!: (value: Response | PromiseLike<Response>) => void;
+  private reject!: (reason?: any) => void;
 
   private clearWarningTimeout?: VoidFunction;
 
-  private promise = new Promise<Response>((resolve, reject) => {
-    this.resolve = resolve;
-    this.reject = reject;
-  });
+  private promise!: Promise<Response>;
+
+  constructor() {
+    super();
+    this.resetFetchPromise();
+  }
 
   override fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     this.request.method = init?.method;
@@ -687,10 +689,10 @@ export class MockFetchFactory extends FetchFactory {
   }
 
   resetFetchPromise() {
-    this.promise = new Promise<Response>((resolve, reject) => {
-      this.resolve = resolve;
-      this.reject = reject;
-    });
+    const {promise, resolve, reject} = (Promise as any).withResolvers();
+    this.promise = promise;
+    this.resolve = resolve;
+    this.reject = reject;
   }
 }
 

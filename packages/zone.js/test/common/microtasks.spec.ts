@@ -67,9 +67,8 @@ describe('Microtasks', function () {
       'in different zone.',
     function (done) {
       let resolve: Function;
-      const promise = new Promise(function (rs) {
-        resolve = rs;
-      });
+      const {promise, resolve: resolveFn} = (Promise as any).withResolvers();
+      resolve = resolveFn;
 
       const testZone = Zone.current.fork({name: 'test'});
 
