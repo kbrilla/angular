@@ -16,4 +16,5 @@ The HTTP client service offers the following major features:
 <docs-pill-row>
   <docs-pill href="guide/http/setup" title="Setting up HttpClient"/>
   <docs-pill href="guide/http/making-requests" title="Making HTTP requests"/>
+  <docs-pill href="guide/http/fetch-full-support-research" title="Fetch support research"/>
 </docs-pill-row>
